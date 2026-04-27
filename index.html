@@ -602,7 +602,7 @@
         <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">線路名稱</div>
         <div style="display:flex;gap:10px;align-items:center">
           <input class="ev-big-input" id="ev-line" placeholder="" style="flex:1">
-          <div id="ev-color-swatch" onclick="openColorSheet()" style="width:38px;height:38px;border-radius:4px;background:#CCC;cursor:pointer;flex-shrink:0;border:1.5px solid #E0E0E0"></div>
+          <div id="ev-color-swatch" onclick="openColorSheet()" style="width:36px;height:36px;border-radius:50%;background:#CCC;cursor:pointer;flex-shrink:0;border:1.5px solid #E0E0E0"></div>
         </div>
       </div>
       <div style="padding:0 20px 16px">
@@ -711,7 +711,7 @@
 
 <!-- ═══ COLOR PICKER SHEET ═══ -->
 <div class="modal-overlay" id="modal-color-sheet">
-  <div class="modal-sheet" style="max-height:85vh;overflow-y:auto">
+  <div class="modal-sheet" style="max-height:85vh;overflow-y:auto;background:#fff">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;position:sticky;top:0;background:#fff;z-index:1">
       <span class="modal-title" style="padding:0">選擇線路顏色</span>
       <button onclick="closeModal('modal-color-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#999">×</button>
