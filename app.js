@@ -152,11 +152,18 @@ function freshTripData() {
 function save() {
   if (!currentTripId) return;
   try { localStorage.setItem(TRIP_PREFIX + currentTripId, JSON.stringify(data)); } catch(e) {}
-  // sync meta coverImg from first day photo
+  // sync meta from current trip settings
   const trip = meta.trips.find(t => t.id === currentTripId);
   if (trip) {
     const firstPhoto = data.days?.[0]?.banner?.photos?.[0] || '';
     if (firstPhoto) trip.coverImg = firstPhoto;
+    if (data.settings?.tripName) trip.name = data.settings.tripName;
+    if (data.settings?.tripDates) {
+      const { startDate, endDate } = _parseTripSheetDates(data.settings.tripDates);
+      if (startDate) trip.startDate = startDate;
+      if (endDate)   trip.endDate   = endDate;
+    }
+    if (data.settings?.currency) trip.currency = data.settings.currency;
   }
   saveMeta();
 }
@@ -253,12 +260,99 @@ function switchTab(tab) {
 }
 
 /* ═══════════════════════════════════════
-   HOME SCREEN
+   HOME SYNC: pull meta from each trip's settings
 ═══════════════════════════════════════ */
+function syncMetaFromTrips() {
+  let changed = false;
+  (meta.trips || []).forEach(trip => {
+    try {
+      const raw = localStorage.getItem(TRIP_PREFIX + trip.id);
+      if (!raw) return;
+      const td = JSON.parse(raw);
+      const s = td.settings || {};
+
+      // Sync name
+      if (s.tripName && s.tripName !== trip.name) {
+        trip.name = s.tripName;
+        changed = true;
+      }
+
+      // Sync dates from settings.tripDates (YYYY/MM/DD–MM/DD)
+      if (s.tripDates) {
+        const { startDate, endDate } = _parseTripSheetDates(s.tripDates);
+        if (startDate && startDate !== trip.startDate) { trip.startDate = startDate; changed = true; }
+        if (endDate   && endDate   !== trip.endDate)   { trip.endDate   = endDate;   changed = true; }
+      }
+
+      // Sync currency
+      if (s.currency && s.currency !== trip.currency) {
+        trip.currency = s.currency;
+        changed = true;
+      }
+
+      // Sync cover from first day photo
+      const firstPhoto = td.days?.[0]?.banner?.photos?.[0];
+      if (firstPhoto && firstPhoto !== trip.coverImg) {
+        trip.coverImg = firstPhoto;
+        changed = true;
+      }
+    } catch(e) {}
+  });
+
+  if (changed) saveMeta();
+  return changed;
+}
+
+/* ─── Pull-to-refresh ─── */
+function initHomePullToRefresh() {
+  const screen = document.getElementById('screen-home');
+  const indicator = document.getElementById('home-pull-indicator');
+  const icon = document.getElementById('home-pull-icon');
+  if (!screen || !indicator) return;
+
+  let startY = 0, pulling = false, triggered = false;
+  const THRESHOLD = 70;
+
+  screen.addEventListener('touchstart', e => {
+    if (screen.scrollTop === 0) {
+      startY = e.touches[0].clientY;
+      pulling = true;
+      triggered = false;
+    }
+  }, { passive: true });
+
+  screen.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0) { pulling = false; return; }
+    const clamped = Math.min(dy, THRESHOLD * 1.5);
+    indicator.style.height = Math.min(clamped * 0.6, 44) + 'px';
+    indicator.style.opacity = Math.min(dy / THRESHOLD, 1);
+    icon.style.transform = `rotate(${Math.min(dy / THRESHOLD, 1) * 360}deg)`;
+    if (dy >= THRESHOLD && !triggered) triggered = true;
+  }, { passive: true });
+
+  screen.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    indicator.style.height = '0';
+    indicator.style.opacity = '0.5';
+    icon.style.transform = 'rotate(0deg)';
+    if (triggered) {
+      syncMetaFromTrips();
+      renderHome();
+      showToast('已同步更新');
+    }
+  });
+}
+
+
 let _homeYear = null; // currently selected year tab
 let _tripSheetCurrency = 'TWD';
 
 function renderHome() {
+  // Init pull-to-refresh once
+  if (!renderHome._ptr) { renderHome._ptr = true; initHomePullToRefresh(); }
   const trips = meta.trips || [];
 
   // Collect years that have trips
@@ -567,14 +661,32 @@ function renderInfoGrid() {
 function openInfoCustomSheet() {
   const modules = getInfoModules();
   const list = document.getElementById('info-custom-list');
-  list.innerHTML = INFO_MODULE_DEFS.map(m => {
+
+  if (!list.dataset.built) {
+    list.dataset.built = '1';
+    list.innerHTML = INFO_MODULE_DEFS.map(m => {
+      const checked = modules.includes(m.id);
+      return `<div class="fsheet-row" onclick="toggleInfoModule('${m.id}')" style="cursor:pointer">` +
+        `<span class="fsheet-label" style="font-size:18px;white-space:nowrap;font-weight:700;color:#1A1A1A">${m.label}</span>` +
+        `<span id="info-mod-check-${m.id}" class="info-mod-cb${checked ? ' checked' : ''}">` +
+          `<svg viewBox="0 0 10 10" width="10" height="10" style="visibility:${checked ? 'visible' : 'hidden'};display:block">` +
+            `<polyline points="1.5,5 4,8 8.5,2" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>` +
+          `</svg>` +
+        `</span>` +
+        `</div>`;
+    }).join('');
+  }
+
+  // Always sync visual state (handles switching trips)
+  INFO_MODULE_DEFS.forEach(m => {
+    const el = document.getElementById('info-mod-check-' + m.id);
+    if (!el) return;
     const checked = modules.includes(m.id);
-    const border = checked ? '#1A1A1A' : '#BBBBBB';
-    const bg = checked ? '#1A1A1A' : 'transparent';
-    const circle = `width:24px;height:24px;border-radius:50%;border:2px solid ${border};display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${bg}`;
-    const tick = checked ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="#fff" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : '';
-    return `<div class="fsheet-row" style="cursor:pointer" onclick="toggleInfoModule('${m.id}')"><span class="fsheet-label" style="font-size:18px;white-space:nowrap;font-weight:700;color:#1A1A1A">${m.label}</span><div id="info-mod-check-${m.id}" style="${circle}">${tick}</div></div>`;
-  }).join('');
+    el.classList.toggle('checked', checked);
+    const svg = el.querySelector('svg');
+    if (svg) svg.style.visibility = checked ? 'visible' : 'hidden';
+  });
+
   const modal = document.getElementById('modal-info-custom');
   if (!modal.classList.contains('open')) modal.classList.add('open');
 }
@@ -590,18 +702,16 @@ function toggleInfoModule(id) {
     modules.push(id);
   }
   data.settings.infoModules = modules;
-
-  // Update only this checkbox in-place (no re-render = no jump)
   const checked = modules.includes(id);
   const el = document.getElementById('info-mod-check-' + id);
   if (el) {
-    el.style.border = `2px solid ${checked ? '#1A1A1A' : '#BBBBBB'}`;
-    el.style.background = checked ? '#1A1A1A' : 'transparent';
-    el.innerHTML = checked
-      ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="#fff" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
-      : '';
+    el.dataset.checked = checked;
+    el.classList.toggle('checked', checked);
+    const svg = el.querySelector('svg');
+    if (svg) svg.style.visibility = checked ? 'visible' : 'hidden';
   }
 }
+
 
 function saveInfoModules() {
   save();
@@ -1917,6 +2027,11 @@ function renderHotelCards() {
 ═══════════════════════════════════════ */
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
+  // Reset info-custom-list built flag so it rebuilds fresh next open (different trip may have different modules)
+  if (id === 'modal-info-custom') {
+    const list = document.getElementById('info-custom-list');
+    if (list) delete list.dataset.built;
+  }
 }
 
 document.querySelectorAll('.modal-overlay').forEach(o => {
