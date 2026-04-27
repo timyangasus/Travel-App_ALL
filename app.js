@@ -160,8 +160,8 @@ function save() {
     if (data.settings?.tripName) trip.name = data.settings.tripName;
     if (data.settings?.tripDates) {
       const { startDate, endDate } = _parseTripSheetDates(data.settings.tripDates);
-      if (startDate) trip.startDate = startDate;
-      if (endDate)   trip.endDate   = endDate;
+      if (startDate) trip.startDate = _cleanDate(startDate);
+      if (endDate)   trip.endDate   = _cleanDate(endDate);
     }
     if (data.settings?.currency) trip.currency = data.settings.currency;
   }
@@ -186,10 +186,15 @@ function tripDateDisplay(trip) {
   // Extract MM/DD from any date string, strip weekday brackets
   const mmdd = d => {
     if (!d) return '';
-    // Strip （週幾） if present
-    d = d.replace(/（[^）]*）/, '').trim();
-    const m = d.match(/\d{4}\/(\d{2}\/\d{2})/);
-    return m ? m[1] : d.replace(/\d{4}\//, '');
+    // Strip anything in brackets （） or ()
+    d = d.replace(/[（(][^）)]*[）)]/g, '').trim();
+    // Try YYYY/MM/DD
+    const m4 = d.match(/\d{4}\/(\d{2})\/(\d{2})/);
+    if (m4) return m4[1] + '/' + m4[2];
+    // Try MM/DD
+    const m2 = d.match(/(\d{2})\/(\d{2})/);
+    if (m2) return m2[1] + '/' + m2[2];
+    return '';
   };
 
   if (s || e) return e ? mmdd(s) + '–' + mmdd(e) : mmdd(s);
@@ -560,6 +565,13 @@ function fmtTripSheetDates(el) {
     result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6,8) + '–' + digits.slice(8,10) + '/' + digits.slice(10,12); // YYYY/MM/DD–MM/DD
   }
   el.value = result;
+}
+
+function _cleanDate(d) {
+  if (!d) return '';
+  d = d.replace(/[（(][^）)]*[）)]/g, '').trim();
+  const m = d.match(/(\d{4}\/\d{2}\/\d{2})/);
+  return m ? m[1] : d;
 }
 
 function _parseTripSheetDates(raw) {
