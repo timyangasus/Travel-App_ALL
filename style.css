@@ -2774,7 +2774,7 @@ canvas { display: block; width: 100%; height: 100%; }
   display: flex;
   justify-content: flex-end;
   gap: 20px;
-  padding: 0 20px 40px;
+  padding: 0 30px 25px;
 }
 
 .home-year-tab {
@@ -2845,13 +2845,13 @@ canvas { display: block; width: 100%; height: 100%; }
 .home-trip-list-topline {
   height: 1.5px;
   background: #1A1A1A;
-  margin: 0 20px 0 0;
+  margin: 0 30px 0 0;
 }
 
 .home-trip-row-bottom-line {
   height: 1.5px;
   background: #1A1A1A;
-  margin: 0 20px 0 0;
+  margin: 0 30px 0 0;
 }
 
 .home-trip-row-inner {
@@ -2903,7 +2903,7 @@ canvas { display: block; width: 100%; height: 100%; }
 .home-trip-name {
   font-family: 'SF Mono', 'Courier New', monospace;
   font-size: 32px;
-  font-weight: 900;
+  font-weight: 750;
   color: #1A1A1A;
   line-height: 1.15;
   letter-spacing: -0.3px;
