@@ -1426,27 +1426,27 @@ canvas { display: block; width: 100%; height: 100%; }
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: #D4AF37;
   letter-spacing: -0.2px;
   transition: opacity 0.12s;
-  padding: 24px 20px 20px;
+  padding: 30px 25px 25px;
 }
 .info-grid-btn:active { opacity: 0.5; }
 .info-grid-icon {
-  width: 60px;
-  height: 60px;
+  width: 75px;
+  height: 75px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .info-grid-icon svg {
-  width: 60px !important;
-  height: 60px !important;
+  width: 75px !important;
+  height: 75px !important;
 }
 
 /* Fill empty last cell white when 7 items */
