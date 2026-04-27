@@ -602,19 +602,7 @@
         <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">線路名稱</div>
         <div style="display:flex;gap:10px;align-items:center">
           <input class="ev-big-input" id="ev-line" placeholder="" style="flex:1">
-          <div id="ev-color-swatch" onclick="toggleEvColorPicker()" style="width:38px;height:38px;border-radius:0;background:#999;cursor:pointer;flex-shrink:0;border:1.5px solid #E0E0E0"></div>
-        </div>
-        <div id="ev-color-picker" style="display:none;flex-wrap:wrap;gap:8px;margin-top:10px">
-          <div class="ev-color-opt" style="background:#C0392B" onclick="setEvColor('#C0392B')"></div>
-          <div class="ev-color-opt" style="background:#2980B9" onclick="setEvColor('#2980B9')"></div>
-          <div class="ev-color-opt" style="background:#27AE60" onclick="setEvColor('#27AE60')"></div>
-          <div class="ev-color-opt" style="background:#E67E22" onclick="setEvColor('#E67E22')"></div>
-          <div class="ev-color-opt" style="background:#8E44AD" onclick="setEvColor('#8E44AD')"></div>
-          <div class="ev-color-opt" style="background:#F1C40F" onclick="setEvColor('#F1C40F')"></div>
-          <div class="ev-color-opt" style="background:#795548" onclick="setEvColor('#795548')"></div>
-          <div class="ev-color-opt" style="background:#E91E63" onclick="setEvColor('#E91E63')"></div>
-          <div class="ev-color-opt" style="background:#00BCD4" onclick="setEvColor('#00BCD4')"></div>
-          <div class="ev-color-opt" style="background:#212121" onclick="setEvColor('#212121')"></div>
+          <div id="ev-color-swatch" onclick="openColorSheet()" style="width:38px;height:38px;border-radius:4px;background:#CCC;cursor:pointer;flex-shrink:0;border:1.5px solid #E0E0E0"></div>
         </div>
       </div>
       <div style="padding:0 20px 16px">
@@ -717,6 +705,59 @@
       <div style="padding:0 0 16px">
         <button class="modal-btn modal-btn-save" style="width:100%;margin:0" onclick="saveTripSheet()">Add</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ COLOR PICKER SHEET ═══ -->
+<div class="modal-overlay" id="modal-color-sheet">
+  <div class="modal-sheet" style="max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;position:sticky;top:0;background:#fff;z-index:1">
+      <span class="modal-title" style="padding:0">選擇線路顏色</span>
+      <button onclick="closeModal('modal-color-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#999">×</button>
+    </div>
+    <div style="padding:0 16px 20px">
+      <div class="cpk-row">
+        <div class="cpk-swatch" style="background:#C0392B" onclick="pickColor('#C0392B')"></div>
+        <div class="cpk-swatch" style="background:#E53935" onclick="pickColor('#E53935')"></div>
+        
+        <div class="cpk-swatch" style="background:#E91E63" onclick="pickColor('#E91E63')"></div>
+        <div class="cpk-swatch" style="background:#AD1457" onclick="pickColor('#AD1457')"></div>
+      </div>
+      <div class="cpk-row">
+        <div class="cpk-swatch" style="background:#E67E22" onclick="pickColor('#E67E22')"></div>
+        <div class="cpk-swatch" style="background:#FF8F00" onclick="pickColor('#FF8F00')"></div>
+        <div class="cpk-swatch" style="background:#F5A623" onclick="pickColor('#F5A623')"></div>
+        <div class="cpk-swatch" style="background:#F1C40F" onclick="pickColor('#F1C40F')"></div>
+        <div class="cpk-swatch" style="background:#B8860B" onclick="pickColor('#B8860B')"></div>
+      </div>
+      <div class="cpk-row">
+        <div class="cpk-swatch" style="background:#27AE60" onclick="pickColor('#27AE60')"></div>
+        <div class="cpk-swatch" style="background:#2E7D32" onclick="pickColor('#2E7D32')"></div>
+        
+        <div class="cpk-swatch" style="background:#26A69A" onclick="pickColor('#26A69A')"></div>
+        <div class="cpk-swatch" style="background:#8BC34A" onclick="pickColor('#8BC34A')"></div>
+      </div>
+      <div class="cpk-row">
+        <div class="cpk-swatch" style="background:#29B6F6" onclick="pickColor('#29B6F6')"></div>
+        <div class="cpk-swatch" style="background:#2196F3" onclick="pickColor('#2196F3')"></div>
+        <div class="cpk-swatch" style="background:#1565C0" onclick="pickColor('#1565C0')"></div>
+        <div class="cpk-swatch" style="background:#00BCD4" onclick="pickColor('#00BCD4')"></div>
+      </div>
+      <div class="cpk-row">
+        <div class="cpk-swatch" style="background:#CE93D8" onclick="pickColor('#CE93D8')"></div>
+        <div class="cpk-swatch" style="background:#9C27B0" onclick="pickColor('#9C27B0')"></div>
+        
+        <div class="cpk-swatch" style="background:#6A1B9A" onclick="pickColor('#6A1B9A')"></div>
+      </div>
+      <div class="cpk-row">
+        <div class="cpk-swatch" style="background:#795548" onclick="pickColor('#795548')"></div>
+        <div class="cpk-swatch" style="background:#BCAAA4" onclick="pickColor('#BCAAA4')"></div>
+        <div class="cpk-swatch" style="background:#9E9E9E" onclick="pickColor('#9E9E9E')"></div>
+        <div class="cpk-swatch" style="background:#607D8B" onclick="pickColor('#607D8B')"></div>
+        <div class="cpk-swatch" style="background:#212121" onclick="pickColor('#212121')"></div>
+      </div>
+
     </div>
   </div>
 </div>

@@ -1216,19 +1216,25 @@ function initAutoResize() {
 
 let _evColor = '#999';
 
-function toggleEvColorPicker() {
-  const picker = document.getElementById('ev-color-picker');
-  picker.style.display = picker.style.display === 'none' ? 'flex' : 'none';
+function openColorSheet() {
+  // Mark currently selected color
+  document.querySelectorAll('.cpk-swatch').forEach(el => {
+    el.classList.toggle('selected', el.style.background === _evColor || el.style.backgroundColor === _evColor);
+  });
+  document.getElementById('modal-color-sheet').classList.add('open');
 }
 
-function setEvColor(hex) {
+function pickColor(hex) {
   _evColor = hex;
   document.getElementById('ev-color-swatch').style.background = hex;
-  document.querySelectorAll('.ev-color-opt').forEach(el => {
+  document.querySelectorAll('.cpk-swatch').forEach(el => {
     el.classList.toggle('selected', el.style.background === hex || el.style.backgroundColor === hex);
   });
-  document.getElementById('ev-color-picker').style.display = 'none';
+  closeModal('modal-color-sheet');
 }
+
+function setEvColor(hex) { pickColor(hex); }
+function toggleEvColorPicker() { openColorSheet(); }
 
 function noteToHtml(text) {
   // Convert URLs to clickable links
@@ -1239,10 +1245,8 @@ function noteToHtml(text) {
 function openEventModal(id) {
   editingEventId = id !== undefined ? id : null;
   document.getElementById('modal-event-title').textContent = id !== undefined ? '編輯行程' : '新增行程';
-  _evColor = '#999';
-  document.getElementById('ev-color-swatch').style.background = '#999';
-  document.getElementById('ev-color-picker').style.display = 'none';
-  document.querySelectorAll('.ev-color-opt').forEach(el => el.classList.remove('selected'));
+  _evColor = '#CCC';
+  document.getElementById('ev-color-swatch').style.background = '#CCC';
 
   if (id !== undefined) {
     const ev = data.days[currentDay].events.find(e => e.id === id);
@@ -1262,7 +1266,10 @@ function openEventModal(id) {
     });
   }
   document.getElementById('modal-event').classList.add('open');
-  setTimeout(() => document.getElementById('ev-time').focus(), 340);
+  setTimeout(() => {
+    document.getElementById('ev-time').focus();
+    initAutoResize();
+  }, 340);
 }
 
 function editEvent(id) { openEventModal(id); }
