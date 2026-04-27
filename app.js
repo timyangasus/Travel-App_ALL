@@ -2087,7 +2087,7 @@ function renderFlightCards() {
       <div class="fc-divider"></div>
       <div class="fc-bottom">
         ${f.baggage ? `<div class="fc-detail"><span class="fc-detail-label">Baggage weight</span><span class="fc-detail-val">${esc(f.baggage)} Kg</span></div>` : ''}
-        ${f.seat    ? `<div class="fc-detail"><span class="fc-detail-label">Seat</span><span class="fc-detail-val">${esc(f.seat)}</span></div>` : ''}
+        ${f.seat    ? `<div class="fc-detail fc-detail-right"><span class="fc-detail-label">Seat</span><span class="fc-detail-val">${esc(f.seat)}</span></div>` : ''}
       </div>` : ''}
     </div>`;
   }).join('');
