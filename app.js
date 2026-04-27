@@ -411,7 +411,20 @@ function selectHomeYear(y) {
 function renderHomeTripList() {
   const el = document.getElementById('home-trip-list');
   if (!el) return;
-  const trips = (meta.trips || []).filter(t => tripYear(t) === _homeYear);
+  const parseStartDate = trip => {
+    let d = (trip.startDate || '').replace(/[（(][^）)]*[）)]/g, '').trim();
+    // Try YYYY/MM/DD
+    const m = d.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+    if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+    // Try MM/DD (assume current year from tripYear)
+    const m2 = d.match(/(\d{2})\/(\d{2})/);
+    if (m2) return new Date(tripYear(trip), +m2[1]-1, +m2[2]);
+    return new Date(9999, 0, 1); // no date → push to end
+  };
+
+  const trips = (meta.trips || [])
+    .filter(t => tripYear(t) === _homeYear)
+    .sort((a, b) => parseStartDate(a) - parseStartDate(b));
 
   if (!trips.length) {
     el.innerHTML = `<div class="home-empty">點右上角 ＋ 新增行程</div>`;
