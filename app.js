@@ -180,43 +180,63 @@ function parseTripDates(str) {
 
 /* ─── Date for Home list display: "MM/DD–MM/DD" ─── */
 function tripDateDisplay(trip) {
-  const s = trip.startDate || '';
-  const e = trip.endDate || '';
+  let s = trip.startDate || '';
+  let e = trip.endDate || '';
 
-  // Extract MM/DD from any date string, strip weekday brackets
   const mmdd = d => {
     if (!d) return '';
-    // Strip anything in brackets （） or ()
     d = d.replace(/[（(][^）)]*[）)]/g, '').trim();
-    // Try YYYY/MM/DD
     const m4 = d.match(/\d{4}\/(\d{2})\/(\d{2})/);
     if (m4) return m4[1] + '/' + m4[2];
-    // Try MM/DD
     const m2 = d.match(/(\d{2})\/(\d{2})/);
     if (m2) return m2[1] + '/' + m2[2];
     return '';
   };
 
-  if (s || e) return e ? mmdd(s) + '–' + mmdd(e) : mmdd(s);
+  // If missing endDate, try to get from trip data
+  if (s && !e) {
+    try {
+      const raw = localStorage.getItem(TRIP_PREFIX + trip.id);
+      if (raw) {
+        const td = JSON.parse(raw);
+        const tripDates = td.settings?.tripDates || '';
+        if (tripDates) {
+          const parts = tripDates.split('–');
+          if (parts[1]) e = parts[1].trim();
+        }
+        if (!e) {
+          const dLast = td.days?.[td.days.length - 1]?.banner?.date || '';
+          if (dLast) e = dLast;
+        }
+      }
+    } catch(err) {}
+  }
 
-  // Fallback: try reading from trip data
+  if (s || e) {
+    const ms = mmdd(s), me = mmdd(e);
+    if (ms && me && ms !== me) return ms + '–' + me;
+    return ms || me;
+  }
+
+  // Full fallback
   try {
     const raw = localStorage.getItem(TRIP_PREFIX + trip.id);
     if (raw) {
       const td = JSON.parse(raw);
-      const d0 = td.days?.[0]?.banner?.date || '';
-      const dLast = td.days?.[td.days.length - 1]?.banner?.date || '';
-      const fmt = d => { const m = d.match(/\d{4}\/(\d{2}\/\d{2})/); return m ? m[1] : ''; };
       const tripDates = td.settings?.tripDates || '';
       if (tripDates) {
         const parts = tripDates.split('–');
-        return parts.map(p => mmdd(p.trim())).join('–');
+        return parts.map(p => mmdd(p.trim())).filter(Boolean).join('–');
       }
+      const d0 = td.days?.[0]?.banner?.date || '';
+      const dLast = td.days?.[td.days.length - 1]?.banner?.date || '';
+      const fmt = d => { const m = d.match(/\d{4}\/(\d{2})\/(\d{2})/); return m ? m[1] + '/' + m[2] : ''; };
       if (d0) return fmt(d0) + (dLast && dLast !== d0 ? '–' + fmt(dLast) : '');
     }
-  } catch(e) {}
+  } catch(err) {}
   return '';
 }
+
 
 /* ─── Extract year from trip for year-tab grouping ─── */
 
@@ -1770,8 +1790,8 @@ function openFlightSheet(editId) {
     if (f) {
       fields.forEach(k => { const el = document.getElementById('ff-'+k); if (el) el.value = f[k]||''; });
     }
-  } else if (data.flights && data.flights.length > 0) {
-    // Auto-fill return flight: swap last flight's from/to, keep airline
+  } else if (data.flights && data.flights.length > 0 && data.flights.length % 2 === 1) {
+    // Odd count = adding an even-numbered flight (2nd, 4th...) → swap last flight's from/to
     const last = data.flights[data.flights.length - 1];
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
     set('ff-airline',      last.airline);
@@ -1781,8 +1801,7 @@ function openFlightSheet(editId) {
     set('ff-toCode',       last.fromCode);
     set('ff-toName',       last.fromName);
     set('ff-toTerminal',   last.fromTerminal);
-    set('ff-baggage',      last.baggage);
-    // Clear flight number, times, seat — user fills those in
+    // baggage, flightNo, times, seat left blank
   }
   const title = document.getElementById('flight-sheet-title');
   if (title) title.textContent = editId ? '編輯機票' : '新增機票';
