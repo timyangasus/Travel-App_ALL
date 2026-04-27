@@ -575,7 +575,8 @@ function openInfoCustomSheet() {
     const tick = checked ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="#fff" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : '';
     return `<div class="fsheet-row" style="cursor:pointer" onclick="toggleInfoModule('${m.id}')"><span class="fsheet-label" style="font-size:18px;white-space:nowrap;font-weight:700;color:#1A1A1A">${m.label}</span><div id="info-mod-check-${m.id}" style="${circle}">${tick}</div></div>`;
   }).join('');
-  document.getElementById('modal-info-custom').classList.add('open');
+  const modal = document.getElementById('modal-info-custom');
+  if (!modal.classList.contains('open')) modal.classList.add('open');
 }
 
 
@@ -2095,14 +2096,31 @@ function getCurrencySymbol() {
 }
 
 function exportJSON() {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  // Pack meta + all trip data into one export
+  const allTrips = {};
+  (meta.trips || []).forEach(trip => {
+    try {
+      const raw = localStorage.getItem(TRIP_PREFIX + trip.id);
+      if (raw) allTrips[trip.id] = JSON.parse(raw);
+    } catch(e) {}
+  });
+
+  const exportData = {
+    _version: 2,
+    meta: meta,
+    trips: allTrips,
+    // Also include current trip data for backwards compat
+    currentTripId: currentTripId,
+  };
+
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = `travel-journal-${Date.now()}.json`;
+  a.download = `travel-trace-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('已匯出 JSON');
+  showToast(`已匯出 ${(meta.trips||[]).length} 筆行程`);
 }
 
 function importJSON(input) {
@@ -2112,25 +2130,55 @@ function importJSON(input) {
   reader.onload = (e) => {
     try {
       const imported = JSON.parse(e.target.result);
-      if (!imported.days) throw new Error('格式錯誤');
-      showConfirm('匯入資料', '現有資料將被覆蓋，確定繼續？', () => {
-        data = imported;
-        if (!data.settings) data.settings = { tripName: '', budget: 0, currency: 'TWD', theme: 'light' };
-        // 清除無效的 blob-key（session 已重置，blob URL 失效）
-        // 保留 image/ 路徑的預設圖
-        data.days.forEach((d, i) => {
-          if (!d.banner) d.banner = { date: '', subtitle: '', photos: [] };
-          if (!d.banner.photos) d.banner.photos = [];
-          // 移除 blob-key 開頭的（session 間無效），保留一般路徑
-          d.banner.photos = d.banner.photos.filter(p => p && !p.startsWith('blob-key:'));
+
+      // v2 format: has meta + trips
+      if (imported._version === 2 && imported.meta) {
+        showConfirm('匯入資料', `將匯入 ${(imported.meta.trips||[]).length} 筆行程，現有資料將被覆蓋，確定繼續？`, () => {
+          // Restore meta
+          meta = imported.meta;
+          if (!meta.trips) meta.trips = [];
+          saveMeta();
+
+          // Restore each trip
+          Object.entries(imported.trips || {}).forEach(([id, tripData]) => {
+            localStorage.setItem(TRIP_PREFIX + id, JSON.stringify(tripData));
+          });
+
+          // Load first trip or last active
+          const firstId = imported.currentTripId || meta.trips[0]?.id;
+          if (firstId) {
+            loadTrip(firstId);
+            renderItinerary();
+            renderExpense();
+            renderSettings();
+          }
+          switchTab('home');
+          showToast('匯入成功');
         });
-        save();
-        renderItinerary();
-        renderExpense();
-        renderSettings();
-        showToast('匯入成功');
-      });
-    } catch {
+        return;
+      }
+
+      // v1 legacy format: single trip (has days)
+      if (imported.days) {
+        showConfirm('匯入資料', '現有資料將被覆蓋，確定繼續？', () => {
+          data = imported;
+          if (!data.settings) data.settings = { tripName: '', budget: 0, currency: 'TWD', theme: 'light' };
+          data.days.forEach(d => {
+            if (!d.banner) d.banner = { date: '', subtitle: '', photos: [] };
+            if (!d.banner.photos) d.banner.photos = [];
+            d.banner.photos = d.banner.photos.filter(p => p && !p.startsWith('blob-key:'));
+          });
+          save();
+          renderItinerary();
+          renderExpense();
+          renderSettings();
+          showToast('匯入成功');
+        });
+        return;
+      }
+
+      showToast('檔案格式錯誤');
+    } catch(err) {
       showToast('檔案格式錯誤');
     }
   };
