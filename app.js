@@ -183,10 +183,13 @@ function tripDateDisplay(trip) {
   const s = trip.startDate || '';
   const e = trip.endDate || '';
 
-  // Extract MM/DD from YYYY/MM/DD
+  // Extract MM/DD from any date string, strip weekday brackets
   const mmdd = d => {
+    if (!d) return '';
+    // Strip （週幾） if present
+    d = d.replace(/（[^）]*）/, '').trim();
     const m = d.match(/\d{4}\/(\d{2}\/\d{2})/);
-    return m ? m[1] : d;
+    return m ? m[1] : d.replace(/\d{4}\//, '');
   };
 
   if (s || e) return e ? mmdd(s) + '–' + mmdd(e) : mmdd(s);
