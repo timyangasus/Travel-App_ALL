@@ -1770,6 +1770,19 @@ function openFlightSheet(editId) {
     if (f) {
       fields.forEach(k => { const el = document.getElementById('ff-'+k); if (el) el.value = f[k]||''; });
     }
+  } else if (data.flights && data.flights.length > 0) {
+    // Auto-fill return flight: swap last flight's from/to, keep airline
+    const last = data.flights[data.flights.length - 1];
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+    set('ff-airline',      last.airline);
+    set('ff-fromCode',     last.toCode);
+    set('ff-fromName',     last.toName);
+    set('ff-fromTerminal', last.toTerminal);
+    set('ff-toCode',       last.fromCode);
+    set('ff-toName',       last.fromName);
+    set('ff-toTerminal',   last.fromTerminal);
+    set('ff-baggage',      last.baggage);
+    // Clear flight number, times, seat — user fills those in
   }
   const title = document.getElementById('flight-sheet-title');
   if (title) title.textContent = editId ? '編輯機票' : '新增機票';
