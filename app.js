@@ -573,7 +573,7 @@ function openInfoCustomSheet() {
     const bg = checked ? '#1A1A1A' : 'transparent';
     const circle = `width:24px;height:24px;border-radius:50%;border:2px solid ${border};display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${bg}`;
     const tick = checked ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="#fff" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : '';
-    return `<div class="fsheet-row" style="cursor:pointer" onclick="toggleInfoModule('${m.id}')"><span class="fsheet-label" style="font-size:18px;white-space:nowrap">${m.label}</span><div id="info-mod-check-${m.id}" style="${circle}">${tick}</div></div>`;
+    return `<div class="fsheet-row" style="cursor:pointer" onclick="toggleInfoModule('${m.id}')"><span class="fsheet-label" style="font-size:18px;white-space:nowrap;font-weight:700;color:#1A1A1A">${m.label}</span><div id="info-mod-check-${m.id}" style="${circle}">${tick}</div></div>`;
   }).join('');
   document.getElementById('modal-info-custom').classList.add('open');
 }
@@ -589,8 +589,17 @@ function toggleInfoModule(id) {
     modules.push(id);
   }
   data.settings.infoModules = modules;
-  // Re-render checkboxes
-  openInfoCustomSheet();
+
+  // Update only this checkbox in-place (no re-render = no jump)
+  const checked = modules.includes(id);
+  const el = document.getElementById('info-mod-check-' + id);
+  if (el) {
+    el.style.border = `2px solid ${checked ? '#1A1A1A' : '#BBBBBB'}`;
+    el.style.background = checked ? '#1A1A1A' : 'transparent';
+    el.innerHTML = checked
+      ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="#fff" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
+      : '';
+  }
 }
 
 function saveInfoModules() {
