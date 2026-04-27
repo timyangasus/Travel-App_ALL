@@ -535,8 +535,72 @@ function saveTripSheet() {
 }
 
 /* ═══════════════════════════════════════
-   ITINERARY
+   INFO MODULES CUSTOMIZATION
 ═══════════════════════════════════════ */
+const INFO_MODULE_DEFS = [
+  { id: 'flight',   label: 'Flight ticket' },
+  { id: 'hotel',    label: 'Hotel' },
+  { id: 'shopping', label: 'Shopping list' },
+  { id: 'ticket',   label: 'Tickets' },
+  { id: 'checklist',label: 'Checklist' },
+  { id: 'notes',    label: 'Notes' },
+  { id: 'map',      label: 'Map' },
+];
+
+const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes'];
+
+function getInfoModules() {
+  if (!data) return DEFAULT_MODULES;
+  if (!data.settings.infoModules) data.settings.infoModules = [...DEFAULT_MODULES];
+  return data.settings.infoModules;
+}
+
+function renderInfoGrid() {
+  if (!data) return;
+  const modules = getInfoModules();
+  INFO_MODULE_DEFS.forEach(m => {
+    const btn = document.getElementById('info-btn-' + m.id);
+    if (btn) btn.style.display = modules.includes(m.id) ? '' : 'none';
+  });
+}
+
+function openInfoCustomSheet() {
+  const modules = getInfoModules();
+  const list = document.getElementById('info-custom-list');
+  list.innerHTML = INFO_MODULE_DEFS.map(m => {
+    const checked = modules.includes(m.id);
+    const border = checked ? '#1A1A1A' : '#BBBBBB';
+    const bg = checked ? '#1A1A1A' : 'transparent';
+    const circle = `width:24px;height:24px;border-radius:50%;border:2px solid ${border};display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${bg}`;
+    const tick = checked ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="#fff" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : '';
+    return `<div class="fsheet-row" style="cursor:pointer" onclick="toggleInfoModule('${m.id}')"><span class="fsheet-label" style="font-size:18px;white-space:nowrap">${m.label}</span><div id="info-mod-check-${m.id}" style="${circle}">${tick}</div></div>`;
+  }).join('');
+  document.getElementById('modal-info-custom').classList.add('open');
+}
+
+
+function toggleInfoModule(id) {
+  const modules = getInfoModules();
+  const idx = modules.indexOf(id);
+  if (idx > -1) {
+    if (modules.length <= 1) { showToast('至少保留一個項目'); return; }
+    modules.splice(idx, 1);
+  } else {
+    modules.push(id);
+  }
+  data.settings.infoModules = modules;
+  // Re-render checkboxes
+  openInfoCustomSheet();
+}
+
+function saveInfoModules() {
+  save();
+  renderInfoGrid();
+  closeModal('modal-info-custom');
+  showToast('已更新');
+}
+
+
 function renderItinerary() {
   if (!data) return;
   renderDayTabs();
@@ -1151,7 +1215,7 @@ function deleteExpense(id) {
    INFO — HUB + SUB SCREENS
 ═══════════════════════════════════════ */
 function renderInfo() {
-  // hub only, sub-screens render on open
+  renderInfoGrid();
 }
 
 function openInfoSub(name) {

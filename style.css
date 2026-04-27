@@ -1426,23 +1426,33 @@ canvas { display: block; width: 100%; height: 100%; }
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 8px;
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   color: #D4AF37;
   letter-spacing: -0.2px;
   transition: opacity 0.12s;
-  padding: 36px 35px 31px;
+  padding: 24px 20px 20px;
 }
 .info-grid-btn:active { opacity: 0.5; }
 .info-grid-icon {
-  width: 81px;
-  height: 81px;
+  width: 60px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.info-grid-icon svg {
+  width: 60px !important;
+  height: 60px !important;
+}
+
+/* Fill empty last cell white when 7 items */
+.info-grid::after {
+  content: '';
+  background: #fff;
 }
 [data-theme='dark'] .info-grid-btn { color: var(--text-primary); }
 .info-grid-icon svg path {
