@@ -175,19 +175,28 @@ function parseTripDates(str) {
 function tripDateDisplay(trip) {
   const s = trip.startDate || '';
   const e = trip.endDate || '';
-  if (s || e) return e ? s + '–' + e : s;
 
-  // Fallback: try to read dates from trip data (migrated trips)
+  // Extract MM/DD from YYYY/MM/DD
+  const mmdd = d => {
+    const m = d.match(/\d{4}\/(\d{2}\/\d{2})/);
+    return m ? m[1] : d;
+  };
+
+  if (s || e) return e ? mmdd(s) + '–' + mmdd(e) : mmdd(s);
+
+  // Fallback: try reading from trip data
   try {
     const raw = localStorage.getItem(TRIP_PREFIX + trip.id);
     if (raw) {
       const td = JSON.parse(raw);
       const d0 = td.days?.[0]?.banner?.date || '';
       const dLast = td.days?.[td.days.length - 1]?.banner?.date || '';
-      // Extract MM/DD from "YYYY/MM/DD（wd）"
       const fmt = d => { const m = d.match(/\d{4}\/(\d{2}\/\d{2})/); return m ? m[1] : ''; };
       const tripDates = td.settings?.tripDates || '';
-      if (tripDates) return tripDates;
+      if (tripDates) {
+        const parts = tripDates.split('–');
+        return parts.map(p => mmdd(p.trim())).join('–');
+      }
       if (d0) return fmt(d0) + (dLast && dLast !== d0 ? '–' + fmt(dLast) : '');
     }
   } catch(e) {}
