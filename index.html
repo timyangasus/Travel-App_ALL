@@ -413,7 +413,7 @@
         </div>
         <div class="set-field">
           <span class="set-field-label">日期</span>
-          <input class="set-field-val" id="set-trip-dates" placeholder="MM/DD-MM/DD" oninput="fmtTripDates(this)" onblur="saveSettings()">
+          <input class="set-field-val" id="set-trip-dates" placeholder="YYYY/MM/DD–MM/DD" oninput="fmtTripDates(this)" onblur="saveSettings()">
         </div>
         <div class="set-field set-field-select" onclick="toggleCurrencyDropdown()">
           <span class="set-field-label">幣別</span>
@@ -659,25 +659,35 @@
         <span class="fsheet-label">日期</span>
         <input class="fsheet-input" id="tf-dates" placeholder="YYYY/MM/DD–MM/DD" inputmode="numeric" oninput="fmtTripSheetDates(this)">
       </div>
-      <div class="fsheet-row set-field-select" onclick="toggleTripCurrencyDropdown()" style="cursor:pointer;position:relative">
+      <div class="fsheet-row" onclick="openTripCurrencySheet()" style="cursor:pointer">
         <span class="fsheet-label">幣別</span>
         <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
           <span id="tf-currency-display" style="font-family:var(--mono);font-size:20px;font-weight:700">NT$ 新台幣</span>
           <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px"><path fill="#1A1A1A" d="M7 10l5 5 5-5z"/></svg>
         </div>
-        <div class="set-currency-dropdown" id="tf-currency-dropdown" style="top:100%;right:0">
-          <div class="set-currency-option" onclick="event.stopPropagation();setTripCurrency('TWD','NT$','新台幣')">NT$　新台幣</div>
-          <div class="set-currency-option" onclick="event.stopPropagation();setTripCurrency('JPY','¥','日圓')">¥　日圓</div>
-          <div class="set-currency-option" onclick="event.stopPropagation();setTripCurrency('USD','$','美金')">$　美金</div>
-          <div class="set-currency-option" onclick="event.stopPropagation();setTripCurrency('EUR','€','歐元')">€　歐元</div>
-          <div class="set-currency-option" onclick="event.stopPropagation();setTripCurrency('HKD','HK$','港幣')">HK$　港幣</div>
-          <div class="set-currency-option" onclick="event.stopPropagation();setTripCurrency('CNY','CN¥','人民幣')">CN¥　人民幣</div>
-          <div class="set-currency-option" onclick="event.stopPropagation();setTripCurrency('THB','฿','泰銖')">฿　泰銖</div>
-        </div>
       </div>
       <div style="padding:16px 20px">
         <button class="modal-btn modal-btn-save" style="width:100%;margin:0" onclick="saveTripSheet()">Add</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TRIP CURRENCY SHEET ═══ -->
+<div class="modal-overlay" id="modal-trip-currency">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px">
+      <span class="modal-title" style="padding:0">選擇幣別</span>
+      <button onclick="closeModal('modal-trip-currency')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary)">×</button>
+    </div>
+    <div id="trip-currency-list">
+      <div class="set-currency-option" onclick="setTripCurrencySheet('TWD','NT$','新台幣')">NT$　新台幣</div>
+      <div class="set-currency-option" onclick="setTripCurrencySheet('JPY','¥','日圓')">¥　日圓</div>
+      <div class="set-currency-option" onclick="setTripCurrencySheet('USD','$','美金')">$　美金</div>
+      <div class="set-currency-option" onclick="setTripCurrencySheet('EUR','€','歐元')">€　歐元</div>
+      <div class="set-currency-option" onclick="setTripCurrencySheet('HKD','HK$','港幣')">HK$　港幣</div>
+      <div class="set-currency-option" onclick="setTripCurrencySheet('CNY','CN¥','人民幣')">CN¥　人民幣</div>
+      <div class="set-currency-option" onclick="setTripCurrencySheet('THB','฿','泰銖')">฿　泰銖</div>
     </div>
   </div>
 </div>

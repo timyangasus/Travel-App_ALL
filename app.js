@@ -429,14 +429,20 @@ function openTripSheet() {
   setTimeout(() => document.getElementById('tf-name').focus(), 340);
 }
 
-function toggleTripCurrencyDropdown() {
-  document.getElementById('tf-currency-dropdown').classList.toggle('open');
+function openTripCurrencySheet() {
+  document.getElementById('modal-trip-currency').classList.add('open');
+}
+
+function setTripCurrencySheet(code, symbol, label) {
+  _tfCurrencyCode = code;
+  document.getElementById('tf-currency-display').textContent = symbol + ' ' + label;
+  closeModal('modal-trip-currency');
 }
 
 function setTripCurrency(code, symbol, label) {
   _tfCurrencyCode = code;
   document.getElementById('tf-currency-display').textContent = symbol + ' ' + label;
-  document.getElementById('tf-currency-dropdown').classList.remove('open');
+  document.getElementById('tf-currency-dropdown')?.classList.remove('open');
 }
 
 function fmtTripSheetDates(el) {
@@ -1963,20 +1969,21 @@ document.addEventListener('click', (e) => {
 });
 
 function fmtTripDates(el) {
-  const digits = el.value.replace(/\D/g, '').slice(0, 8);
-  const fmt = (d4) => {
-    if (d4.length < 3) return d4.slice(0,2) + (d4.length === 2 ? '/' : '');
-    const mo = d4.slice(0,2), dy = d4.slice(2,4);
-    if (d4.length < 4) return mo + '/' + dy;
-    const dt = new Date(new Date().getFullYear(), parseInt(mo)-1, parseInt(dy));
-    const wd = ['日','一','二','三','四','五','六'][dt.getDay()];
-    return mo + '/' + dy + '（' + wd + '）';
-  };
+  // Format: YYYY/MM/DD–MM/DD (same as trip sheet)
+  const digits = el.value.replace(/\D/g, '').slice(0, 12);
+  let result = '';
   if (digits.length <= 4) {
-    el.value = fmt(digits);
+    result = digits;
+  } else if (digits.length <= 6) {
+    result = digits.slice(0,4) + '/' + digits.slice(4);
+  } else if (digits.length <= 8) {
+    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6);
+  } else if (digits.length <= 10) {
+    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6,8) + '–' + digits.slice(8);
   } else {
-    el.value = fmt(digits.slice(0,4)) + '-' + fmt(digits.slice(4,8));
+    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6,8) + '–' + digits.slice(8,10) + '/' + digits.slice(10,12);
   }
+  el.value = result;
 }
 
 function saveSettings() {
