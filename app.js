@@ -288,8 +288,66 @@ function switchTab(tab) {
 }
 
 /* ═══════════════════════════════════════
-   HOME SYNC: pull meta from each trip's settings
+   HOME TRIP FILTER
 ═══════════════════════════════════════ */
+// hiddenTripIds stored in meta
+function getHiddenTrips() {
+  if (!meta.hiddenTrips) meta.hiddenTrips = [];
+  return meta.hiddenTrips;
+}
+
+function openTripFilterSheet() {
+  const hidden = getHiddenTrips();
+  const allTrips = meta.trips || [];
+  const list = document.getElementById('trip-filter-list');
+  list.innerHTML = allTrips.map(trip => {
+    const visible = !hidden.includes(trip.id);
+    const dateStr = tripDateDisplay(trip) || '';
+    return `<div class="fsheet-row" style="cursor:pointer;align-items:center" onclick="toggleTripFilter('${trip.id}')">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;color:#C9A84C;font-family:var(--mono)">${esc(dateStr)}</div>
+        <div style="font-size:17px;font-weight:700;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(trip.name||'未命名')}</div>
+      </div>
+      <span id="tf-cb-${trip.id}" class="info-mod-cb${visible ? ' checked' : ''}">
+        <svg viewBox="0 0 10 10" width="10" height="10" style="visibility:${visible?'visible':'hidden'};display:block">
+          <polyline points="1.5,5 4,8 8.5,2" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </div>`;
+  }).join('');
+  document.getElementById('modal-trip-filter').classList.add('open');
+}
+
+function toggleTripFilter(id) {
+  const hidden = getHiddenTrips();
+  const idx = hidden.indexOf(id);
+  const willShow = idx > -1; // currently hidden → will show
+  if (idx > -1) hidden.splice(idx, 1);
+  else hidden.push(id);
+  meta.hiddenTrips = hidden;
+  // Update checkbox in place
+  const el = document.getElementById('tf-cb-' + id);
+  if (el) {
+    const showing = !hidden.includes(id);
+    el.classList.toggle('checked', showing);
+    const svg = el.querySelector('svg');
+    if (svg) svg.style.visibility = showing ? 'visible' : 'hidden';
+  }
+}
+
+function setAllTripFilter(showAll) {
+  meta.hiddenTrips = showAll ? [] : (meta.trips||[]).map(t=>t.id);
+  saveMeta();
+  openTripFilterSheet();
+}
+
+function saveTripFilter() {
+  saveMeta();
+  closeModal('modal-trip-filter');
+  renderHome();
+}
+
+
 function syncMetaFromTrips() {
   let changed = false;
   (meta.trips || []).forEach(trip => {
@@ -422,8 +480,9 @@ function renderHomeTripList() {
     return new Date(9999, 0, 1); // no date → push to end
   };
 
+  const hidden = getHiddenTrips();
   const trips = (meta.trips || [])
-    .filter(t => tripYear(t) === _homeYear)
+    .filter(t => tripYear(t) === _homeYear && !hidden.includes(t.id))
     .sort((a, b) => parseStartDate(a) - parseStartDate(b));
 
   if (!trips.length) {
@@ -976,7 +1035,15 @@ function renderTimeline() {
     list.innerHTML = `<div class="timeline-empty">點右下角 ＋ 新增行程</div>`;
     return;
   }
-  list.innerHTML = evs.map((ev, i) => `
+  list.innerHTML = evs.map((ev, i) => {
+    const noteHtml = ev.note ? `<div class="timeline-note">${noteToHtml(ev.note)}</div>` : '';
+    const addrHtml = ev.addr ? `<div class="timeline-addr" onclick="openAddr('${esc(ev.addr)}')">${esc(ev.addr)}</div>` : '';
+    const stationHtml = (ev.station || ev.line) ? `
+      <div class="timeline-station-row">
+        ${ev.station ? `<span class="timeline-station-name">${esc(ev.station)}</span>` : ''}
+        ${ev.line ? `<span class="transit-pill" style="background:${ev.lineColor||'#999'}" onclick="openTransit('${esc(ev.station||'')}','${esc(ev.line||'')}')">${esc(ev.line)}</span>` : ''}
+      </div>` : '';
+    return `
     <div class="timeline-item" style="animation-delay:${i * 0.05}s">
       <div class="timeline-left">
         <div class="timeline-dot"></div>
@@ -988,9 +1055,12 @@ function renderTimeline() {
           <button class="t-del-btn" onclick="deleteEvent(${ev.id})">×</button>
         </div>
         <div class="timeline-title" onclick="editEvent(${ev.id})">${esc(ev.title)}</div>
-        ${ev.note ? `<div class="timeline-note">${esc(ev.note)}</div>` : ''}
+        ${noteHtml}
+        ${addrHtml}
+        ${stationHtml}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function formatBannerDate(str) {
@@ -1126,10 +1196,76 @@ function openEventModal(id) {
     document.getElementById('ev-note').value  = '';
   }
   document.getElementById('modal-event').classList.add('open');
+  setTimeout(() => {
+    document.getElementById('ev-time').focus();
+    initAutoResize();
+  }, 340);
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+function initAutoResize() {
+  document.querySelectorAll('.ev-auto').forEach(el => {
+    el.addEventListener('input', () => autoResize(el));
+    autoResize(el);
+  });
+}
+
+let _evColor = '#999';
+
+function toggleEvColorPicker() {
+  const picker = document.getElementById('ev-color-picker');
+  picker.style.display = picker.style.display === 'none' ? 'flex' : 'none';
+}
+
+function setEvColor(hex) {
+  _evColor = hex;
+  document.getElementById('ev-color-swatch').style.background = hex;
+  document.querySelectorAll('.ev-color-opt').forEach(el => {
+    el.classList.toggle('selected', el.style.background === hex || el.style.backgroundColor === hex);
+  });
+  document.getElementById('ev-color-picker').style.display = 'none';
+}
+
+function noteToHtml(text) {
+  // Convert URLs to clickable links
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return esc(text).replace(urlRegex, url => `<a href="${url}" target="_blank" style="color:#2980B9;text-decoration:underline">${url}</a>`);
+}
+
+function openEventModal(id) {
+  editingEventId = id !== undefined ? id : null;
+  document.getElementById('modal-event-title').textContent = id !== undefined ? '編輯行程' : '新增行程';
+  _evColor = '#999';
+  document.getElementById('ev-color-swatch').style.background = '#999';
+  document.getElementById('ev-color-picker').style.display = 'none';
+  document.querySelectorAll('.ev-color-opt').forEach(el => el.classList.remove('selected'));
+
+  if (id !== undefined) {
+    const ev = data.days[currentDay].events.find(e => e.id === id);
+    document.getElementById('ev-time').value    = ev.time;
+    document.getElementById('ev-title').value   = ev.title;
+    document.getElementById('ev-note').value    = ev.note    || '';
+    document.getElementById('ev-addr').value    = ev.addr    || '';
+    document.getElementById('ev-station').value = ev.station || '';
+    document.getElementById('ev-line').value    = ev.line    || '';
+    if (ev.lineColor) {
+      _evColor = ev.lineColor;
+      document.getElementById('ev-color-swatch').style.background = ev.lineColor;
+    }
+  } else {
+    ['ev-time','ev-title','ev-note','ev-addr','ev-station','ev-line'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+  }
+  document.getElementById('modal-event').classList.add('open');
   setTimeout(() => document.getElementById('ev-time').focus(), 340);
 }
 
-function editEvent(id)   { openEventModal(id); }
+function editEvent(id) { openEventModal(id); }
 
 function deleteEvent(id) {
   data.days[currentDay].events = data.days[currentDay].events.filter(e => e.id !== id);
@@ -1138,22 +1274,42 @@ function deleteEvent(id) {
 }
 
 function saveEvent() {
-  const time  = document.getElementById('ev-time').value;
-  const title = document.getElementById('ev-title').value.trim();
+  const time    = document.getElementById('ev-time').value;
+  const title   = document.getElementById('ev-title').value.trim();
   if (!time || !title) return;
-  const note = document.getElementById('ev-note').value.trim();
+  const note    = document.getElementById('ev-note').value.trim();
+  const addr    = document.getElementById('ev-addr').value.trim();
+  const station = document.getElementById('ev-station').value.trim();
+  const line    = document.getElementById('ev-line').value.trim();
+  const lineColor = (station || line) ? _evColor : '';
+
   if (editingEventId !== null) {
     const ev = data.days[currentDay].events.find(e => e.id === editingEventId);
-    if (ev) { ev.time = time; ev.title = title; ev.note = note; }
+    if (ev) { ev.time = time; ev.title = title; ev.note = note; ev.addr = addr; ev.station = station; ev.line = line; ev.lineColor = lineColor; }
   } else {
-    data.days[currentDay].events.push({ id: Date.now(), time, title, note });
+    data.days[currentDay].events.push({ id: Date.now(), time, title, note, addr, station, line, lineColor });
   }
   save();
   closeModal('modal-event');
   renderTimeline();
 }
 
-/* ─── Banner Action Sheet ─── */
+function openAddr(addr) {
+  const url = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
+  window.open(url, '_blank');
+}
+
+function openTransit(station, line) {
+  // Check if map module is enabled
+  const modules = data.settings?.infoModules || [];
+  if (modules.includes('map')) {
+    switchTab('info');
+    openInfoSub('map');
+  }
+  // else: no action
+}
+
+
 function openBannerActionSheet(e) {
   e.stopPropagation();
   document.getElementById('action-sheet-banner').classList.add('open');

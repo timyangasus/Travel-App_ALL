@@ -44,9 +44,14 @@
   <div id="screen-home" class="page">
     <div class="home-topbar">
       <span class="home-brand">Travel Trace</span>
-      <button class="home-add-btn" onclick="openTripSheet()">
-        <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-      </button>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <button class="home-add-btn" onclick="openTripFilterSheet()" title="篩選行程">
+          <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px"><path d="M160-120q-33 0-56.5-23.5T80-200v-560q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v560q0 33-23.5 56.5T800-120H160Zm0-80h640v-560H160v560Zm40-80h200v-80H200v80Zm382-80 198-198-57-57-141 142-57-57-56 57 113 113Zm-382-80h200v-80H200v80Zm0-160h200v-80H200v80Zm-40 400v-560 560Z"/></svg>
+        </button>
+        <button class="home-add-btn" onclick="openTripSheet()">
+          <svg xmlns="http://www.w3.org/2000/svg" height="38px" viewBox="0 -960 960 960" width="38px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+        </button>
+      </div>
     </div>
     <div id="home-pull-indicator" style="display:flex;align-items:center;justify-content:center;height:0;overflow:hidden;transition:height 0.2s;opacity:0.5">
       <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" id="home-pull-icon" style="fill:#C9A84C;transition:transform 0.3s"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 108-114 174t-196 66Z"/></svg>
@@ -559,19 +564,46 @@
       <button onclick="closeModal('modal-event')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary)">×</button>
     </div>
     <div style="padding:0">
-      <div class="fsheet-row">
-        <span class="fsheet-label">時間</span>
-        <input class="fsheet-input" id="ev-time" placeholder="" inputmode="numeric" oninput="fmtEventTime(this)">
+      <div style="padding:12px 20px 0">
+        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">時間</div>
+        <input class="ev-big-input" id="ev-time" placeholder="HH:MM" inputmode="numeric" oninput="fmtEventTime(this)">
       </div>
-      <div class="fsheet-row">
-        <span class="fsheet-label">行程</span>
-        <input class="fsheet-input" id="ev-title" placeholder="">
+      <div style="padding:12px 20px 0">
+        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">行程</div>
+        <textarea class="ev-big-input ev-auto" id="ev-title" placeholder="輸入行程名稱" rows="1"></textarea>
       </div>
-      <div class="fsheet-row" style="align-items:flex-start;padding-top:15px;padding-bottom:15px">
-        <span class="fsheet-label" style="padding-top:4px">行程說明</span>
-        <textarea class="fsheet-input" id="ev-note" placeholder="" style="resize:none;min-height:48px;line-height:1.5"></textarea>
+      <div style="padding:12px 20px 0">
+        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">行程說明</div>
+        <textarea class="ev-big-input ev-auto" id="ev-note" placeholder="輸入行程說明（網址自動轉連結）" rows="1"></textarea>
       </div>
-      <div style="padding:16px 20px">
+      <div style="padding:12px 20px 0">
+        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">地址</div>
+        <textarea class="ev-big-input ev-auto" id="ev-addr" placeholder="輸入地址（點擊跳 Google Maps）" rows="1"></textarea>
+      </div>
+      <div style="padding:12px 20px 0">
+        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">車站</div>
+        <input class="ev-big-input" id="ev-station" placeholder="車站名稱（例：池袋站）">
+      </div>
+      <div style="padding:12px 20px 16px">
+        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">線路名稱</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input class="ev-big-input" id="ev-line" placeholder="線路名稱（例：有樂町線）" style="flex:1">
+          <div id="ev-color-swatch" onclick="toggleEvColorPicker()" style="width:38px;height:38px;border-radius:0;background:#999;cursor:pointer;flex-shrink:0;border:1.5px solid #E0E0E0"></div>
+        </div>
+        <div id="ev-color-picker" style="display:none;flex-wrap:wrap;gap:8px;margin-top:10px">
+          <div class="ev-color-opt" style="background:#C0392B" onclick="setEvColor('#C0392B')"></div>
+          <div class="ev-color-opt" style="background:#2980B9" onclick="setEvColor('#2980B9')"></div>
+          <div class="ev-color-opt" style="background:#27AE60" onclick="setEvColor('#27AE60')"></div>
+          <div class="ev-color-opt" style="background:#E67E22" onclick="setEvColor('#E67E22')"></div>
+          <div class="ev-color-opt" style="background:#8E44AD" onclick="setEvColor('#8E44AD')"></div>
+          <div class="ev-color-opt" style="background:#F1C40F" onclick="setEvColor('#F1C40F')"></div>
+          <div class="ev-color-opt" style="background:#795548" onclick="setEvColor('#795548')"></div>
+          <div class="ev-color-opt" style="background:#E91E63" onclick="setEvColor('#E91E63')"></div>
+          <div class="ev-color-opt" style="background:#00BCD4" onclick="setEvColor('#00BCD4')"></div>
+          <div class="ev-color-opt" style="background:#212121" onclick="setEvColor('#212121')"></div>
+        </div>
+      </div>
+      <div style="padding:0 20px 16px">
         <div class="modal-btn-row" style="padding:0">
           <button class="modal-btn modal-btn-cancel" onclick="closeModal('modal-event')">取消</button>
           <button class="modal-btn modal-btn-save" onclick="saveEvent()">儲存</button>
@@ -671,6 +703,21 @@
       <div style="padding:16px 20px">
         <button class="modal-btn modal-btn-save" style="width:100%;margin:0" onclick="saveTripSheet()">Add</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TRIP FILTER SHEET ═══ -->
+<div class="modal-overlay" id="modal-trip-filter">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px">
+      <span class="modal-title" style="padding:0">顯示行程</span>
+      <button onclick="closeModal('modal-trip-filter')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary)">×</button>
+    </div>
+    <div id="trip-filter-list"></div>
+    <div style="padding:12px 20px 16px;display:flex;gap:10px">
+      <button class="modal-btn modal-btn-cancel" style="flex:1" onclick="setAllTripFilter(true)">全選</button>
+      <button class="modal-btn modal-btn-save" style="flex:1" onclick="saveTripFilter()">完成</button>
     </div>
   </div>
 </div>
