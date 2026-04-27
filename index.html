@@ -189,58 +189,75 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-title" id="flight-sheet-title">新增機票</div>
-      <div class="modal-body" style="padding:0">
+      <div class="modal-body" style="padding:0 20px">
 
-        <div class="fsheet-row">
-          <span class="fsheet-label">航空公司</span>
-          <input class="fsheet-input" id="ff-airline" placeholder="">
-        </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">班機編號</span>
-          <input class="fsheet-input" id="ff-flightNo" placeholder="">
-        </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">班機時間</span>
-          <input class="fsheet-input" id="ff-times" placeholder="" inputmode="numeric"
-            oninput="fmtFlightTimes(this)">
-        </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">出發機場代號</span>
-          <input class="fsheet-input" id="ff-fromCode" placeholder="" style="flex:0 0 80px;text-align:right;text-transform:uppercase">
-        </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">出發機場名稱</span>
-          <input class="fsheet-input" id="ff-fromName" placeholder="" style="text-align:right">
-        </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">出發機場Terminal</span>
-          <input class="fsheet-input" id="ff-fromTerminal" placeholder="" style="flex:0 0 60px;text-align:right">
-        </div>
-        <div class="fsheet-row" style="margin-top:6px">
-          <span class="fsheet-label">抵達機場代號</span>
-          <input class="fsheet-input" id="ff-toCode" placeholder="" style="flex:0 0 80px;text-align:right;text-transform:uppercase">
-        </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">抵達機場名稱</span>
-          <input class="fsheet-input" id="ff-toName" placeholder="" style="text-align:right">
-        </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">抵達機場Terminal</span>
-          <input class="fsheet-input" id="ff-toTerminal" placeholder="" style="flex:0 0 60px;text-align:right">
-        </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">Baggage weight</span>
-          <div style="display:flex;align-items:baseline;gap:4px;justify-content:flex-end;flex:1">
-            <input class="fsheet-input" id="ff-baggage" placeholder="" inputmode="numeric" style="flex:0 0 auto;width:60px;text-align:right">
-            <span style="font-family:var(--mono);font-size:16px;color:var(--text-secondary)">Kg</span>
+        <!-- 航空公司 + 班機編號 -->
+        <div style="display:flex;gap:16px;padding:12px 0 0">
+          <div style="flex:1">
+            <div class="ff-label">航空公司</div>
+            <input class="ff-input" id="ff-airline" placeholder="">
+          </div>
+          <div style="flex:1">
+            <div class="ff-label">班機編號</div>
+            <input class="ff-input" id="ff-flightNo" placeholder="">
           </div>
         </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">Seat</span>
-          <input class="fsheet-input" id="ff-seat" placeholder="">
+
+        <!-- 班機時間 -->
+        <div style="padding:12px 0 0">
+          <div class="ff-label">班機時間</div>
+          <input class="ff-input" id="ff-times" placeholder="hh:mm－hh:mm" inputmode="numeric" oninput="fmtFlightTimes(this)" style="color:#1A1A1A">
         </div>
 
-        <div style="padding:16px 20px">
+        <!-- 出發機場代號 -->
+        <div style="padding:12px 0 0">
+          <div class="ff-label">出發機場代號</div>
+          <input class="ff-input" id="ff-fromCode" placeholder="" style="text-transform:uppercase">
+        </div>
+
+        <!-- 出發機場名稱 + Terminal -->
+        <div style="display:flex;gap:16px;padding:12px 0 0">
+          <div style="flex:2">
+            <div class="ff-label">出發機場名稱</div>
+            <input class="ff-input" id="ff-fromName" placeholder="">
+          </div>
+          <div style="flex:1">
+            <div class="ff-label">Terminal</div>
+            <input class="ff-input" id="ff-fromTerminal" placeholder="">
+          </div>
+        </div>
+
+        <!-- 抵達機場代號 -->
+        <div style="padding:12px 0 0">
+          <div class="ff-label">抵達機場代號</div>
+          <input class="ff-input" id="ff-toCode" placeholder="" style="text-transform:uppercase">
+        </div>
+
+        <!-- 抵達機場名稱 + Terminal -->
+        <div style="display:flex;gap:16px;padding:12px 0 0">
+          <div style="flex:2">
+            <div class="ff-label">抵達機場名稱</div>
+            <input class="ff-input" id="ff-toName" placeholder="">
+          </div>
+          <div style="flex:1">
+            <div class="ff-label">Terminal</div>
+            <input class="ff-input" id="ff-toTerminal" placeholder="">
+          </div>
+        </div>
+
+        <!-- 行李重量 + 座位 -->
+        <div style="display:flex;gap:16px;padding:12px 0 16px">
+          <div style="flex:1">
+            <div class="ff-label">行李重量（kg）</div>
+            <input class="ff-input" id="ff-baggage" placeholder="" inputmode="numeric">
+          </div>
+          <div style="flex:1">
+            <div class="ff-label">座位</div>
+            <input class="ff-input" id="ff-seat" placeholder="">
+          </div>
+        </div>
+
+        <div style="padding:0 0 16px">
           <div class="modal-btn-row" style="padding:0">
             <button class="modal-btn modal-btn-cancel" onclick="closeModal('modal-flight-sheet')">取消</button>
             <button class="modal-btn modal-btn-save" onclick="saveFlightSheet()">儲存</button>
@@ -271,33 +288,30 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-title" id="hotel-sheet-title">新增住宿</div>
+      <div class="modal-body" style="padding:0 20px">
 
-      <div class="modal-body" style="padding:0">
-        <div class="fsheet-row">
-          <span class="fsheet-label">日期</span>
-          <input class="fsheet-input" id="hf-dates" placeholder=""
-            oninput="fmtHotelDates(this)">
+        <div style="padding:12px 0 0">
+          <div class="ff-label">日期</div>
+          <input class="ff-input" id="hf-dates" placeholder="" oninput="fmtHotelDates(this)">
         </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">飯店名稱</span>
-          <input class="fsheet-input" id="hf-name" placeholder="">
+        <div style="padding:12px 0 0">
+          <div class="ff-label">飯店名稱</div>
+          <input class="ff-input" id="hf-name" placeholder="">
         </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">訂單編號</span>
-          <input class="fsheet-input" id="hf-ref" placeholder="">
+        <div style="padding:12px 0 0">
+          <div class="ff-label">訂單編號</div>
+          <input class="ff-input" id="hf-ref" placeholder="">
         </div>
-        <div class="fsheet-row" style="align-items:flex-start;padding-top:18px;padding-bottom:18px">
-          <span class="fsheet-label" style="padding-top:4px">地址</span>
-          <textarea class="fsheet-input" id="hf-addr" placeholder=""
-            style="resize:none;min-height:80px;line-height:1.5"></textarea>
+        <div style="padding:12px 0 0">
+          <div class="ff-label">地址</div>
+          <textarea class="ff-input ev-auto" id="hf-addr" placeholder="" rows="1" style="resize:none;line-height:1.6;overflow:hidden"></textarea>
         </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">總價</span>
-          <input class="fsheet-input" id="hf-price" placeholder="" type="text" inputmode="decimal"
-            oninput="fmtHotelPrice(this)">
+        <div style="padding:12px 0 16px">
+          <div class="ff-label">總價</div>
+          <input class="ff-input" id="hf-price" placeholder="" type="text" inputmode="decimal" oninput="fmtHotelPrice(this)">
         </div>
 
-        <div style="padding:16px 20px">
+        <div style="padding:0 0 16px">
           <div class="modal-btn-row" style="padding:0">
             <button class="modal-btn modal-btn-cancel" onclick="closeModal('modal-hotel-sheet')">取消</button>
             <button class="modal-btn modal-btn-save" id="hotel-sheet-save-btn" onclick="saveHotelSheet()">儲存</button>
@@ -346,35 +360,35 @@
         <span class="modal-title" id="shop-sheet-title" style="padding:0">新增品項</span>
         <button onclick="closeModal('modal-shop-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary)">×</button>
       </div>
-      <div style="padding:0">
-        <div class="fsheet-row">
-          <span class="fsheet-label">項目</span>
-          <input class="fsheet-input" id="sf-name" placeholder="">
+      <div style="padding:0 20px">
+        <div style="padding:12px 0 0">
+          <div class="ff-label">項目</div>
+          <input class="ff-input" id="sf-name" placeholder="">
         </div>
-        <div class="fsheet-row" style="align-items:flex-start;padding-top:15px;padding-bottom:15px">
-          <span class="fsheet-label" style="padding-top:4px">地址</span>
-          <textarea class="fsheet-input" id="sf-addr" placeholder="" style="resize:none;min-height:48px;line-height:1.5"></textarea>
+        <div style="padding:12px 0 0">
+          <div class="ff-label">地址</div>
+          <textarea class="ff-input ev-auto" id="sf-addr" placeholder="" rows="1" style="resize:none;line-height:1.6;overflow:hidden"></textarea>
         </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">營業時間</span>
-          <input class="fsheet-input" id="sf-hours" placeholder="" inputmode="numeric" oninput="fmtShopHours(this)">
+        <div style="padding:12px 0 0">
+          <div class="ff-label">營業時間</div>
+          <input class="ff-input" id="sf-hours" placeholder="" inputmode="numeric" oninput="fmtShopHours(this)">
         </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">網址</span>
-          <input class="fsheet-input" id="sf-link" placeholder="" type="url" inputmode="url">
+        <div style="padding:12px 0 0">
+          <div class="ff-label">網址</div>
+          <input class="ff-input" id="sf-link" placeholder="" type="url" inputmode="url">
         </div>
-        <div class="fsheet-row">
-          <span class="fsheet-label">數量</span>
-          <input class="fsheet-input" id="sf-qty" placeholder="1" type="number" inputmode="numeric" style="width:60px;flex:none;text-align:right">
+        <div style="padding:12px 0 0">
+          <div class="ff-label">數量</div>
+          <input class="ff-input" id="sf-qty" placeholder="" type="number" inputmode="numeric">
         </div>
-        <div class="fsheet-row" style="cursor:pointer" onclick="document.getElementById('sf-photo-input').click()">
-          <span class="fsheet-label">圖檔</span>
+        <div style="padding:12px 0 16px;cursor:pointer" onclick="document.getElementById('sf-photo-input').click()">
+          <div class="ff-label">圖檔</div>
           <div id="sf-photo-preview" class="sf-photo-preview">
             <span class="sf-photo-plus">＋</span>
           </div>
           <input type="file" id="sf-photo-input" accept="image/*" style="display:none" onchange="handleShopPhotoSheet(this)">
         </div>
-        <div style="padding:16px 20px">
+        <div style="padding:0 0 16px">
           <div class="modal-btn-row" style="padding:0">
             <button class="modal-btn modal-btn-cancel" onclick="closeModal('modal-shop-sheet')">取消</button>
             <button class="modal-btn modal-btn-save" onclick="saveShopSheet()">儲存</button>
@@ -565,27 +579,27 @@
     </div>
     <div style="padding:0">
       <div style="padding:12px 20px 0">
-        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">時間</div>
-        <input class="ev-big-input" id="ev-time" placeholder="" inputmode="numeric" oninput="fmtEventTime(this)">
+        <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">時間</div>
+        <input class="ev-big-input" id="ev-time" placeholder="hh:mm" inputmode="numeric" oninput="fmtEventTime(this)">
       </div>
       <div style="padding:12px 20px 0">
-        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">行程</div>
+        <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">行程</div>
         <textarea class="ev-big-input ev-auto" id="ev-title" placeholder="" rows="1"></textarea>
       </div>
       <div style="padding:12px 20px 0">
-        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">行程說明</div>
+        <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">行程說明</div>
         <textarea class="ev-big-input ev-auto" id="ev-note" placeholder="" rows="1"></textarea>
       </div>
       <div style="padding:12px 20px 0">
-        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">地址</div>
+        <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">地址</div>
         <textarea class="ev-big-input ev-auto" id="ev-addr" placeholder="" rows="1"></textarea>
       </div>
       <div style="padding:12px 20px 0">
-        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">車站</div>
+        <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">車站</div>
         <input class="ev-big-input" id="ev-station" placeholder="">
       </div>
       <div style="padding:12px 20px 16px">
-        <div style="font-size:12px;color:#999;font-family:var(--mono);margin-bottom:6px">線路名稱</div>
+        <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">線路名稱</div>
         <div style="display:flex;gap:10px;align-items:center">
           <input class="ev-big-input" id="ev-line" placeholder="" style="flex:1">
           <div id="ev-color-swatch" onclick="toggleEvColorPicker()" style="width:38px;height:38px;border-radius:0;background:#999;cursor:pointer;flex-shrink:0;border:1.5px solid #E0E0E0"></div>
