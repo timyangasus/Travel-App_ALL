@@ -292,7 +292,7 @@
 
         <div style="padding:12px 0 0">
           <div class="ff-label">日期</div>
-          <input class="ff-input" id="hf-dates" placeholder="" oninput="fmtHotelDates(this)">
+          <input class="ff-input" id="hf-dates" placeholder="MM/DD－MM/DD" oninput="fmtHotelDates(this)">
         </div>
         <div style="padding:12px 0 0">
           <div class="ff-label">飯店名稱</div>
@@ -698,23 +698,23 @@
       <span class="modal-title" style="padding:0">新增行程</span>
       <button onclick="closeModal('modal-trip-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary)">×</button>
     </div>
-    <div style="padding:0">
-      <div class="fsheet-row">
-        <span class="fsheet-label">旅遊名稱</span>
-        <input class="fsheet-input" id="tf-name" placeholder="">
+    <div style="padding:0 20px">
+      <div style="padding:12px 0 0">
+        <div class="ff-label">旅遊名稱</div>
+        <input class="ff-input" id="tf-name" placeholder="">
       </div>
-      <div class="fsheet-row">
-        <span class="fsheet-label">日期</span>
-        <input class="fsheet-input" id="tf-dates" placeholder="YYYY/MM/DD–MM/DD" inputmode="numeric" oninput="fmtTripSheetDates(this)">
+      <div style="padding:12px 0 0">
+        <div class="ff-label">日期</div>
+        <input class="ff-input" id="tf-dates" placeholder="YYYY/MM/DD–MM/DD" inputmode="numeric" oninput="fmtTripSheetDates(this)">
       </div>
-      <div class="fsheet-row" onclick="openTripCurrencySheet()" style="cursor:pointer">
-        <span class="fsheet-label">幣別</span>
-        <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
-          <span id="tf-currency-display" style="font-family:var(--mono);font-size:20px;font-weight:700">NT$ 新台幣</span>
+      <div style="padding:12px 0 16px" onclick="openTripCurrencySheet()" style="cursor:pointer">
+        <div class="ff-label">幣別</div>
+        <div style="display:flex;align-items:center;gap:4px;padding:8px 0;border-bottom:1.5px solid #E0E0E0;cursor:pointer" onclick="openTripCurrencySheet()">
+          <span id="tf-currency-display" style="font-family:var(--mono);font-size:16px;font-weight:700;flex:1;color:#1A1A1A">NT$ 新台幣</span>
           <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px"><path fill="#1A1A1A" d="M7 10l5 5 5-5z"/></svg>
         </div>
       </div>
-      <div style="padding:16px 20px">
+      <div style="padding:0 0 16px">
         <button class="modal-btn modal-btn-save" style="width:100%;margin:0" onclick="saveTripSheet()">Add</button>
       </div>
     </div>

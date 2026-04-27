@@ -2178,7 +2178,7 @@ function openHotelSheet(editId) {
   const saveBtn = document.getElementById('hotel-sheet-save-btn');
   if (saveBtn) saveBtn.textContent = editId ? '更新' : '儲存';
   document.getElementById('modal-hotel-sheet').classList.add('open');
-  setTimeout(() => document.getElementById('hf-name')?.focus(), 340);
+  setTimeout(() => document.getElementById('hf-dates')?.focus(), 340);
 }
 
 function saveHotelSheet() {
