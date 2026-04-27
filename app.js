@@ -431,18 +431,52 @@ function setTripCurrency(code, symbol, label) {
 }
 
 function fmtTripSheetDates(el) {
-  const digits = el.value.replace(/\D/g, '').slice(0, 12);
-  const fmtPart = (d) => {
-    if (d.length < 2) return d;
-    if (d.length < 4) return d.slice(0,2) + '/' + d.slice(2);
-    if (d.length < 6) return d.slice(0,2) + '/' + d.slice(2,4) + '/' + d.slice(4);
-    return d.slice(0,2) + '/' + d.slice(2,4) + '/' + d.slice(4,6);
-  };
-  if (digits.length <= 6) {
-    el.value = fmtPart(digits);
+  // Format: YYYY/MM/DD–MM/DD
+  // Input digits only, auto insert slashes and dash
+  const raw = el.value;
+  const digits = raw.replace(/\D/g, '').slice(0, 12);
+  let result = '';
+  if (digits.length <= 4) {
+    result = digits; // YYYY
+  } else if (digits.length <= 6) {
+    result = digits.slice(0,4) + '/' + digits.slice(4); // YYYY/MM
+  } else if (digits.length <= 8) {
+    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6); // YYYY/MM/DD
+  } else if (digits.length <= 10) {
+    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6,8) + '–' + digits.slice(8); // YYYY/MM/DD–MM
   } else {
-    el.value = fmtPart(digits.slice(0,6)) + '–' + fmtPart(digits.slice(6,12));
+    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6,8) + '–' + digits.slice(8,10) + '/' + digits.slice(10,12); // YYYY/MM/DD–MM/DD
   }
+  el.value = result;
+}
+
+function _parseTripSheetDates(raw) {
+  // Parse "YYYY/MM/DD–MM/DD" → { startDate, endDate, days }
+  const parts = raw.split('–');
+  const startStr = parts[0]?.trim() || '';
+  const endStr   = parts[1]?.trim() || '';
+  if (!startStr) return { startDate: '', endDate: '', days: 1 };
+
+  // Parse start: YYYY/MM/DD
+  const sm = startStr.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+  if (!sm) return { startDate: startStr, endDate: endStr, days: 1 };
+  const startDate = new Date(parseInt(sm[1]), parseInt(sm[2])-1, parseInt(sm[3]));
+
+  if (!endStr) return { startDate: startStr, endDate: '', days: 1 };
+
+  // Parse end: MM/DD (same year)
+  const em = endStr.match(/(\d{2})\/(\d{2})/);
+  if (!em) return { startDate: startStr, endDate: endStr, days: 1 };
+  const endDate = new Date(parseInt(sm[1]), parseInt(em[1])-1, parseInt(em[2]));
+
+  // If end month < start month, assume next year
+  if (endDate < startDate) endDate.setFullYear(endDate.getFullYear() + 1);
+
+  const diffMs = endDate - startDate;
+  const days = Math.max(1, Math.round(diffMs / 86400000) + 1);
+
+  const fmt = d => `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+  return { startDate: fmt(startDate), endDate: fmt(endDate), days };
 }
 
 function saveTripSheet() {
@@ -450,28 +484,39 @@ function saveTripSheet() {
   const datesRaw = document.getElementById('tf-dates').value.trim();
   if (!name) { document.getElementById('tf-name').focus(); return; }
 
-  // Parse dates: "YY/MM/DD–YY/MM/DD"
-  const parts = datesRaw.split('–');
-  const startDate = parts[0]?.trim() || '';
-  const endDate   = parts[1]?.trim() || '';
+  const { startDate, endDate, days } = _parseTripSheetDates(datesRaw);
 
   const id = genId();
   const newTrip = { id, name, startDate, endDate, currency: _tfCurrencyCode, coverImg: '' };
   meta.trips.push(newTrip);
   saveMeta();
 
-  // Create empty trip data
+  // Create trip data with correct number of days
   const tripData = freshTripData();
   tripData.settings.tripName  = name;
   tripData.settings.currency  = _tfCurrencyCode;
   tripData.settings.tripDates = datesRaw;
+
+  // Generate day entries based on date range
+  tripData.days = [];
+  tripData.expenses = [];
+  const start = startDate ? new Date(startDate.replace(/\//g, '-')) : null;
+  for (let i = 0; i < days; i++) {
+    let dateStr = '';
+    if (start) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      const wd = ['日','一','二','三','四','五','六'][d.getDay()];
+      dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}（${wd}）`;
+    }
+    tripData.days.push({ banner: { date: dateStr, subtitle: '', photos: [] }, events: [] });
+    tripData.expenses.push([]);
+  }
+
   localStorage.setItem(TRIP_PREFIX + id, JSON.stringify(tripData));
-
   closeModal('modal-trip-sheet');
-
-  // Open the new trip directly
   openTrip(id);
-  showToast('行程已建立');
+  showToast(`行程已建立，共 ${days} 天`);
 }
 
 /* ═══════════════════════════════════════
