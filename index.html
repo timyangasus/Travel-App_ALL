@@ -681,18 +681,15 @@
 
 <!-- ═══ NOTE EDIT SHEET ═══ -->
 <div class="modal-overlay" id="modal-note-sheet">
-  <div class="modal-sheet" style="display:flex;flex-direction:column;max-height:92vh">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;flex-shrink:0">
+  <div class="modal-sheet" style="display:flex;flex-direction:column;max-height:92vh;background:#fff">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;flex-shrink:0;background:#fff">
       <span class="modal-title" style="padding:0" id="note-sheet-title">新增筆記</span>
       <button onclick="closeModal('modal-note-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:0 20px 16px">
+    <div style="flex:1;overflow-y:auto;padding:0 20px 16px;background:#fff">
       <textarea id="note-sheet-content" class="note-sheet-textarea" placeholder="第一行為標題…"></textarea>
     </div>
     <div style="padding:0 20px 20px;flex-shrink:0;background:#fff">
-      <div style="display:flex;gap:10px;margin-bottom:10px" id="note-delete-row">
-        <button class="modal-btn" style="flex:1;background:none;border:1.5px solid #EBEBEB;color:#E53935;font-family:var(--mono);font-size:15px;padding:14px" onclick="deleteCurrentNote()">刪除筆記</button>
-      </div>
       <div style="display:flex;gap:10px">
         <button class="modal-btn modal-btn-cancel" style="flex:1" onclick="closeModal('modal-note-sheet')">取消</button>
         <button class="modal-btn modal-btn-save" style="flex:1" onclick="saveNoteSheet()">儲存</button>
