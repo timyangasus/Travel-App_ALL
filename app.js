@@ -840,7 +840,10 @@ let _reorderOrder = [];
 
 function openReorderSheet() {
   _reorderOrder = data.days.map((_, i) => i);
+  _reorderSelected = null;
   renderReorderList();
+  const label = document.getElementById('reorder-selected-label');
+  if (label) { label.textContent = '點選行程後移動'; label.style.color = '#AAAAAA'; label.style.fontWeight = '400'; }
   document.getElementById('modal-reorder-sheet').classList.add('open');
 }
 
@@ -856,7 +859,7 @@ function renderReorderList() {
       <div class="reorder-row-info">
         <div class="reorder-row-day">DAY ${pos + 1}</div>
         <div class="reorder-row-date">${dateDisplay}</div>
-        ${subtitle ? `<div style="font-size:12px;color:#AAAAAA;font-family:var(--mono);margin-top:2px">${subtitle}</div>` : ''}
+        ${subtitle ? `<div style="font-size:12px;color:#666666;font-family:var(--mono);margin-top:2px">${subtitle}</div>` : ''}
         ${eventCount ? `<div style="font-size:11px;color:#CCCCCC;font-family:var(--mono)">${eventCount} 個行程</div>` : ''}
       </div>
       <div class="reorder-row-handle" data-pos="${pos}">≡</div>
@@ -865,111 +868,74 @@ function renderReorderList() {
   initReorderDrag();
 }
 
-function initReorderDrag() {
+function renderReorderList() {
   const list = document.getElementById('reorder-list');
-  let dragPos = null, startY = 0, dragEl = null, clone = null;
-  const ROW_H = 72;
+  list.innerHTML = _reorderOrder.map((origIdx, pos) => {
+    const day = data.days[origIdx];
+    const rawDate = day.banner?.date || '';
+    const dateDisplay = rawDate.replace(/\d{4}\//, '') || '日期未設定';
+    const subtitle = day.banner?.subtitle || '';
+    const eventCount = (day.events || []).length;
+    const isSelected = _reorderSelected === pos;
+    return `<div class="reorder-row${isSelected ? ' reorder-selected' : ''}" id="rrow-${pos}" onclick="selectReorderRow(${pos})">
+      <div class="reorder-row-info">
+        <div class="reorder-row-day">DAY ${pos + 1}</div>
+        <div class="reorder-row-date">${dateDisplay}</div>
+        ${subtitle ? `<div style="font-size:12px;color:#888;font-family:var(--mono);margin-top:2px">${subtitle}</div>` : ''}
+        ${eventCount ? `<div style="font-size:11px;color:#BBBBBB;font-family:var(--mono)">${eventCount} 個行程</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
 
-  list.querySelectorAll('.reorder-row-handle').forEach(handle => {
-    handle.addEventListener('touchstart', e => {
-      dragPos = parseInt(handle.dataset.pos);
-      dragEl = document.getElementById('rrow-' + dragPos);
-      if (!dragEl) return;
-
-      startY = e.touches[0].clientY;
-
-      // Create floating clone
-      const rect = dragEl.getBoundingClientRect();
-      clone = dragEl.cloneNode(true);
-      clone.style.cssText = `
-        position: fixed;
-        left: ${rect.left}px;
-        top: ${rect.top}px;
-        width: ${rect.width}px;
-        background: #fff;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-        z-index: 9999;
-        pointer-events: none;
-        opacity: 0.95;
-        transition: none;
-      `;
-      document.body.appendChild(clone);
-
-      dragEl.style.opacity = '0.2';
-      e.preventDefault();
-    }, { passive: false });
-  });
-
-  list.addEventListener('touchmove', e => {
-    if (dragPos === null || !clone) return;
-    const currentY = e.touches[0].clientY;
-    const dy = currentY - startY;
-
-    // Move clone
-    const rect = dragEl.getBoundingClientRect();
-    clone.style.top = (rect.top + dy) + 'px';
-
-    // Calculate new position
-    const steps = Math.round(dy / ROW_H);
-    const newPos = Math.max(0, Math.min(_reorderOrder.length - 1, dragPos + steps));
-
-    if (newPos !== dragPos) {
-      const item = _reorderOrder.splice(dragPos, 1)[0];
-      _reorderOrder.splice(newPos, 0, item);
-
-      // Re-render without re-initing drag, just update DOM order
-      const rows = [...list.querySelectorAll('.reorder-row')];
-      // Remove and re-insert in new order
-      list.innerHTML = '';
-      _reorderOrder.forEach((origIdx, pos) => {
-        const day = data.days[origIdx];
-        const rawDate = day.banner?.date || '';
-        const dateDisplay = rawDate.replace(/\d{4}\//, '') || '日期未設定';
-        const subtitle = day.banner?.subtitle || '';
-        const eventCount = (day.events || []).length;
-        const row = document.createElement('div');
-        row.className = 'reorder-row' + (pos === newPos ? ' drag-target' : '');
-        row.id = 'rrow-' + pos;
-        row.innerHTML = `
-          <div class="reorder-row-info">
-            <div class="reorder-row-day">DAY ${pos + 1}</div>
-            <div class="reorder-row-date">${dateDisplay}</div>
-            ${subtitle ? `<div style="font-size:12px;color:#AAAAAA;font-family:var(--mono);margin-top:2px">${subtitle}</div>` : ''}
-            ${eventCount ? `<div style="font-size:11px;color:#CCCCCC;font-family:var(--mono)">${eventCount} 個行程</div>` : ''}
-          </div>
-          <div class="reorder-row-handle" data-pos="${pos}">≡</div>`;
-        list.appendChild(row);
-      });
-
-      // Re-attach handles
-      list.querySelectorAll('.reorder-row-handle').forEach(h => {
-        h.addEventListener('touchstart', () => {}, { passive: false });
-      });
-
-      dragEl = document.getElementById('rrow-' + newPos);
-      if (dragEl) dragEl.style.opacity = '0.2';
-      dragPos = newPos;
-      startY = currentY;
-
-      // Re-init handles
-      initReorderHandles(list);
+function selectReorderRow(pos) {
+  _reorderSelected = (_reorderSelected === pos) ? null : pos;
+  renderReorderList();
+  const label = document.getElementById('reorder-selected-label');
+  if (label) {
+    if (_reorderSelected !== null) {
+      const day = data.days[_reorderOrder[_reorderSelected]];
+      const rawDate = day.banner?.date || '';
+      const dateDisplay = rawDate.replace(/\d{4}\//, '') || '日期未設定';
+      label.textContent = `DAY ${_reorderSelected + 1}  ${dateDisplay}`;
+      label.style.color = '#1A1A1A';
+      label.style.fontWeight = '700';
+    } else {
+      label.textContent = '點選行程後移動';
+      label.style.color = '#AAAAAA';
+      label.style.fontWeight = '400';
     }
-
-    e.preventDefault();
-  }, { passive: false });
-
-  list.addEventListener('touchend', () => {
-    if (clone) { clone.remove(); clone = null; }
-    if (dragEl) { dragEl.style.opacity = '1'; dragEl = null; }
-    dragPos = null;
-  });
-
-  initReorderHandles(list);
+  }
 }
 
-function initReorderHandles(list) {
-  // handles re-attached after re-render — no-op since touchmove is on list
+function reorderMoveSelected(dir) {
+  if (_reorderSelected === null) return;
+  const newPos = _reorderSelected + dir;
+  if (newPos < 0 || newPos >= _reorderOrder.length) return;
+  const tmp = _reorderOrder[_reorderSelected];
+  _reorderOrder[_reorderSelected] = _reorderOrder[newPos];
+  _reorderOrder[newPos] = tmp;
+  _reorderSelected = newPos;
+  renderReorderList();
+  // Update label without toggling selection off
+  const label = document.getElementById('reorder-selected-label');
+  if (label) {
+    const day = data.days[_reorderOrder[_reorderSelected]];
+    const rawDate = day.banner?.date || '';
+    const dateDisplay = rawDate.replace(/\d{4}\//, '') || '日期未設定';
+    label.textContent = `DAY ${_reorderSelected + 1}  ${dateDisplay}`;
+    label.style.color = '#1A1A1A';
+    label.style.fontWeight = '700';
+  }
+  setTimeout(() => {
+    const el = document.getElementById('rrow-' + newPos);
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, 50);
 }
+
+
+function initReorderDrag() {} // no-op
+function initReorderHandles() {} // no-op
 
 function applyReorder() {
   const origContent = data.days.map((d, i) => ({

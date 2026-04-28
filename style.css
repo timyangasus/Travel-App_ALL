@@ -3144,3 +3144,8 @@ canvas { display: block; width: 100%; height: 100%; }
 .reorder-row.drag-target {
   border-top: 2px solid #C9A84C;
 }
+
+.reorder-row.reorder-selected {
+  background: #F8F5EE;
+  border-left: 3px solid #C9A84C;
+}
