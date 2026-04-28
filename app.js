@@ -300,9 +300,14 @@ function openTripFilterSheet() {
   const hidden = getHiddenTrips();
   const allTrips = [...(meta.trips || [])].sort((a, b) => {
     const parseD = trip => {
-      const d = (trip.startDate || '').replace(/[（(][^）)]*[）)]/g, '').trim();
-      const m = d.match(/(\d{4})\/(\d{2})\/(\d{2})/);
-      return m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(9999,0,1);
+      let d = (trip.startDate || '').replace(/[（(][^）)]*[）)]/g, '').trim();
+      // Try YYYY/MM/DD
+      let m = d.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+      if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+      // Try MM/DD — use tripYear to get year
+      m = d.match(/(\d{2})\/(\d{2})/);
+      if (m) return new Date(tripYear(trip), +m[1]-1, +m[2]);
+      return new Date(9999,0,1);
     };
     return parseD(a) - parseD(b);
   });
@@ -312,8 +317,8 @@ function openTripFilterSheet() {
     const dateStr = tripDateDisplay(trip) || '';
     return `<div class="fsheet-row" style="cursor:pointer;align-items:center" onclick="toggleTripFilter('${trip.id}')">
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;color:#C9A84C;font-family:var(--mono)">${esc(dateStr)}</div>
-        <div style="font-size:17px;font-weight:700;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(trip.name||'未命名')}</div>
+        <div style="font-size:15px;color:#C9A84C;font-family:var(--mono)">${esc(dateStr)}</div>
+        <div style="font-size:19px;font-weight:700;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(trip.name||'未命名')}</div>
       </div>
       <span id="tf-cb-${trip.id}" class="info-mod-cb${visible ? ' checked' : ''}">
         <svg viewBox="0 0 10 10" width="10" height="10" style="visibility:${visible?'visible':'hidden'};display:block">
@@ -1481,6 +1486,33 @@ function renderExpense() {
   expenseDay = Math.min(expenseDay, data.days.length - 1);
   renderExpenseDayTabs();
   renderExpenseList();
+  initExpenseSwipe();
+}
+
+let _expSwipeInited = false;
+function initExpenseSwipe() {
+  if (_expSwipeInited) return;
+  _expSwipeInited = false; // allow re-init on trip change
+  const screen = document.getElementById('screen-expense');
+  if (!screen) return;
+  let startX = 0, startY = 0;
+  screen.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  screen.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
+    const total = data.days.length;
+    if (dx < 0) {
+      expenseDay = (expenseDay + 1) % total;
+    } else {
+      expenseDay = (expenseDay - 1 + total) % total;
+    }
+    renderExpenseDayTabs();
+    renderExpenseList();
+  }, { passive: true });
 }
 
 function renderExpenseDayTabs() {
