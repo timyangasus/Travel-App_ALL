@@ -3085,6 +3085,9 @@ canvas { display: block; width: 100%; height: 100%; }
 .cpk-swatch span { display: none; }
 
 /* Expense day tabs — compact, up to 10 before wrap */
+/* Expense screen */
+#screen-expense { background: #fff; }
+
 #screen-expense .day-tab {
   min-width: 36px;
   padding: 10px 16px 12px;

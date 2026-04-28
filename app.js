@@ -1669,6 +1669,25 @@ let expenseDay = 0;
 function renderExpense() {
   if (!data) return;
   expenseDay = Math.min(expenseDay, data.days.length - 1);
+
+  // Auto-jump to today's day if within trip range
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  let matched = false;
+  for (let i = 0; i < data.days.length; i++) {
+    const raw = data.days[i].banner?.date || '';
+    const m = raw.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+    if (m) {
+      const d = new Date(+m[1], +m[2]-1, +m[3]);
+      if (d.getTime() === today.getTime()) {
+        expenseDay = i;
+        matched = true;
+        break;
+      }
+    }
+  }
+  if (!matched) expenseDay = Math.min(expenseDay, data.days.length - 1);
+
   renderExpenseDayTabs();
   renderExpenseList();
   initExpenseSwipe();
@@ -1707,6 +1726,14 @@ function renderExpenseDayTabs() {
   t.innerHTML = data.days.map((_, i) =>
     `<button class="day-tab${i === expenseDay ? ' active' : ''}" onclick="switchExpDay(${i})">${i + 1}</button>`
   ).join('');
+
+  // Update date display above tabs
+  const dateEl = document.getElementById('expense-day-date');
+  if (dateEl && data.days[expenseDay]) {
+    const raw = data.days[expenseDay].banner?.date || '';
+    const dateDisplay = raw.replace(/\d{4}\//, '').trim();
+    dateEl.textContent = dateDisplay || '';
+  }
 }
 
 function switchExpDay(i) {
