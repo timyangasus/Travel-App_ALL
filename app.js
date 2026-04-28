@@ -1335,12 +1335,27 @@ function addDay() {
 
 /* ─── Event Modal ─── */
 function fmtEventTime(el) {
-  const digits = el.value.replace(/\D/g, '').slice(0, 4);
-  if (digits.length >= 3) {
-    el.value = digits.slice(0,2) + ':' + digits.slice(2,4);
-  } else {
-    el.value = digits;
+  const raw = el.value;
+  const digits = raw.replace(/\D/g, '').slice(0, 4);
+  let out = digits;
+
+  if (digits.length === 1) {
+    // If first digit > 2, auto-pad: 8 → 08:
+    if (parseInt(digits) > 2) {
+      out = '0' + digits + ':';
+      el.value = out;
+      return;
+    }
+  } else if (digits.length === 2) {
+    // Auto-insert colon after HH
+    out = digits + ':';
+    el.value = out;
+    return;
+  } else if (digits.length >= 3) {
+    out = digits.slice(0,2) + ':' + digits.slice(2,4);
   }
+
+  el.value = out;
 }
 
 function openEventModal(id) {
@@ -2276,25 +2291,50 @@ function openFlightSheet(editId) {
 }
 
 function fmtFlightTimes(el) {
-  // 收集純數字
-  const digits = el.value.replace(/\D/g, '');
-  if (digits.length <= 4) {
-    // 只有出發時間
-    if (digits.length === 4) {
-      el.value = digits.slice(0,2) + ':' + digits.slice(2,4);
-    }
-  } else {
-    // 有抵達時間
-    const dep = digits.slice(0,4);
-    const arr = digits.slice(4,8);
-    let out = dep.slice(0,2) + ':' + dep.slice(2,4);
-    if (arr.length >= 4) {
-      out += ' — ' + arr.slice(0,2) + ':' + arr.slice(2,4);
-    } else if (arr.length > 0) {
-      out += ' — ' + arr;
-    }
-    el.value = out;
+  const digits = el.value.replace(/\D/g, '').slice(0, 8);
+  const len = digits.length;
+
+  if (len === 0) { el.value = ''; return; }
+
+  // Build departure time
+  let h1 = digits.slice(0, 2);
+  let m1 = digits.slice(2, 4);
+  let h2 = digits.slice(4, 6);
+  let m2 = digits.slice(6, 8);
+
+  // Auto-zero: if first digit > 2, prepend 0
+  if (len === 1 && parseInt(digits[0]) > 2) {
+    el.value = '0' + digits[0] + ':';
+    return;
   }
+
+  if (len <= 2) {
+    el.value = digits;
+    if (len === 2) { el.value = h1 + ':'; }
+    return;
+  }
+
+  if (len <= 4) {
+    let out = h1 + ':' + m1;
+    if (len === 4) out += '－'; // auto-dash after first time complete
+    el.value = out;
+    return;
+  }
+
+  // Building second time
+  let out = h1 + ':' + m1 + '－';
+
+  // Auto-zero second segment
+  if (len === 5 && parseInt(digits[4]) > 2) {
+    out += '0' + digits[4] + ':';
+    el.value = out;
+    return;
+  }
+
+  if (len === 5) { out += h2; el.value = out; return; }
+  if (len === 6) { out += h2 + ':'; el.value = out; return; }
+  out += h2 + ':' + m2;
+  el.value = out;
 }
 
 
