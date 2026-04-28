@@ -2906,6 +2906,7 @@ canvas { display: block; width: 100%; height: 100%; }
   flex-direction: column;
   justify-content: flex-start;
   padding-top: 0;
+  margin-left: 5px;
 }
 
 .home-trip-date {
