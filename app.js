@@ -879,6 +879,7 @@ function deleteDay(i) {
     data.expenses.splice(i, 1);
     currentDay = Math.min(currentDay, data.days.length - 1);
     if (expenseDay >= data.days.length) expenseDay = data.days.length - 1;
+    syncTripDatesFromDays();
     save();
     renderItinerary();
     renderExpenseDayTabs();
@@ -1157,6 +1158,33 @@ function resolvePhoto(val) {
   return val; // ImgBB URL, persisted in data/localStorage
 }
 
+function syncTripDatesFromDays() {
+  if (!data || !data.days.length) return;
+  // Find first and last banner dates
+  let firstDate = null, lastDate = null;
+  for (let i = 0; i < data.days.length; i++) {
+    const d = parseBannerDate(data.days[i].banner.date);
+    if (d) { if (!firstDate) firstDate = d; lastDate = d; }
+  }
+  if (!firstDate) return;
+
+  const fmt = d => `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+  const startStr = fmt(firstDate);
+  const endStr = lastDate && lastDate !== firstDate
+    ? String(lastDate.getMonth()+1).padStart(2,'0') + '/' + String(lastDate.getDate()).padStart(2,'0')
+    : String(firstDate.getMonth()+1).padStart(2,'0') + '/' + String(firstDate.getDate()).padStart(2,'0');
+
+  data.settings.tripDates = `${startStr}–${endStr}`;
+
+  // Also update meta
+  const trip = meta.trips.find(t => t.id === currentTripId);
+  if (trip) {
+    trip.startDate = startStr;
+    trip.endDate = fmt(lastDate || firstDate);
+  }
+  saveMeta();
+}
+
 function addDay() {
   // 先找最後一個有日期的天往後推一天
   let nextDate = '';
@@ -1171,6 +1199,7 @@ function addDay() {
   data.days.push({ banner: { date: nextDate, subtitle: '', photos: [] }, events: [] });
   data.expenses.push([]);
   currentDay = data.days.length - 1;
+  syncTripDatesFromDays();
   save();
   renderItinerary();
   const etabs = document.getElementById('expense-day-tabs');
@@ -2438,14 +2467,74 @@ function fmtTripDates(el) {
 
 function saveSettings() {
   if (!data) return;
+  const oldDates = data.settings.tripDates || '';
   data.settings.tripName  = document.getElementById('set-trip-name')?.value.trim() || '';
   data.settings.tripDates = document.getElementById('set-trip-dates')?.value.trim() || '';
-  // sync back to meta
+
+  // Sync back to meta
   const trip = meta.trips.find(t => t.id === currentTripId);
   if (trip) trip.name = data.settings.tripName;
   saveMeta();
+
+  // Sync days if dates changed
+  if (data.settings.tripDates && data.settings.tripDates !== oldDates) {
+    syncDaysToDateRange(data.settings.tripDates);
+  }
+
   save();
   renderBanner();
+  renderDayTabs();
+}
+
+function syncDaysToDateRange(tripDates) {
+  const { startDate, endDate, days: newCount } = _parseTripSheetDates(tripDates);
+  if (!startDate || newCount < 1) return;
+
+  const startD = new Date(startDate.replace(/\//g, '-'));
+
+  // Build map of existing days by their banner date (YYYY/MM/DD)
+  const existingByDate = {};
+  data.days.forEach(day => {
+    const raw = day.banner?.date || '';
+    // Extract YYYY/MM/DD from banner date like "2026/05/01（五）"
+    const m = raw.match(/(\d{4}\/\d{2}\/\d{2})/);
+    if (m) existingByDate[m[1]] = day;
+  });
+
+  // Build new days array
+  const newDays = [];
+  const newExpenses = [];
+  for (let i = 0; i < newCount; i++) {
+    const d = new Date(startD);
+    d.setDate(d.getDate() + i);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const wd = ['日','一','二','三','四','五','六'][d.getDay()];
+    const dateKey = `${yyyy}/${mm}/${dd}`;
+    const dateStr = `${dateKey}（${wd}）`;
+
+    if (existingByDate[dateKey]) {
+      // Reuse existing day, update banner date
+      const day = existingByDate[dateKey];
+      day.banner.date = dateStr;
+      newDays.push(day);
+    } else {
+      // New blank day
+      newDays.push({ banner: { date: dateStr, subtitle: '', photos: [] }, events: [] });
+    }
+
+    // Preserve expense for this day if it existed
+    const oldIdx = data.days.findIndex(day => {
+      const m = (day.banner?.date || '').match(/(\d{4}\/\d{2}\/\d{2})/);
+      return m && m[1] === dateKey;
+    });
+    newExpenses.push(oldIdx >= 0 ? (data.expenses[oldIdx] || []) : []);
+  }
+
+  data.days = newDays;
+  data.expenses = newExpenses;
+  currentDay = Math.min(currentDay, newDays.length - 1);
 }
 
 function setCurrency(code) {
