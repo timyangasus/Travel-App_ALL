@@ -152,11 +152,8 @@ function freshTripData() {
 function save() {
   if (!currentTripId) return;
   try { localStorage.setItem(TRIP_PREFIX + currentTripId, JSON.stringify(data)); } catch(e) {}
-  // sync meta from current trip settings
   const trip = meta.trips.find(t => t.id === currentTripId);
   if (trip) {
-    const firstPhoto = data.days?.[0]?.banner?.photos?.[0] || '';
-    if (firstPhoto) trip.coverImg = firstPhoto;
     if (data.settings?.tripName) trip.name = data.settings.tripName;
     if (data.settings?.tripDates) {
       const { startDate, endDate } = _parseTripSheetDates(data.settings.tripDates);
@@ -164,6 +161,7 @@ function save() {
       if (endDate)   trip.endDate   = _cleanDate(endDate);
     }
     if (data.settings?.currency) trip.currency = data.settings.currency;
+    // coverImg is managed separately via openTripCoverPicker — do NOT auto-sync from banner
   }
   saveMeta();
 }
@@ -317,8 +315,8 @@ function openTripFilterSheet() {
     const dateStr = tripDateDisplay(trip) || '';
     return `<div class="fsheet-row" style="cursor:pointer;align-items:center" onclick="toggleTripFilter('${trip.id}')">
       <div style="flex:1;min-width:0">
-        <div style="font-size:15px;color:#C9A84C;font-family:var(--mono)">${esc(dateStr)}</div>
-        <div style="font-size:19px;font-weight:700;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(trip.name||'未命名')}</div>
+        <div style="font-size:13px;color:#C9A84C;font-family:var(--mono)">${esc(dateStr)}</div>
+        <div style="font-size:17px;font-weight:700;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(trip.name||'未命名')}</div>
       </div>
       <span id="tf-cb-${trip.id}" class="info-mod-cb${visible ? ' checked' : ''}">
         <svg viewBox="0 0 10 10" width="10" height="10" style="visibility:${visible?'visible':'hidden'};display:block">
@@ -388,12 +386,7 @@ function syncMetaFromTrips() {
         changed = true;
       }
 
-      // Sync cover from first day photo
-      const firstPhoto = td.days?.[0]?.banner?.photos?.[0];
-      if (firstPhoto && firstPhoto !== trip.coverImg) {
-        trip.coverImg = firstPhoto;
-        changed = true;
-      }
+      // coverImg managed separately — do NOT sync from banner photos
     } catch(e) {}
   });
 
