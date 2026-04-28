@@ -1857,7 +1857,7 @@ canvas { display: block; width: 100%; height: 100%; }
 .hotel-card2:first-child { margin-top: 30px; }
 .hotel-card2:active { opacity: 0.8; }
 .hotel2-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.hotel2-dates { font-size: 14px; font-weight: 600; color: var(--text-secondary); font-family: var(--mono); flex: 1; }
+.hotel2-dates { font-size: 16px; font-weight: 700; color: #1A1A1A; font-family: var(--mono); flex: 1; }
 .hotel2-right { display: flex; align-items: center; gap: 8px; }
 .hotel2-nights {
   font-size: 16px; font-weight: 700;
@@ -1875,10 +1875,10 @@ canvas { display: block; width: 100%; height: 100%; }
 .hotel2-name { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; font-family: var(--mono); color: #D4AF37; }
 .hotel2-addr {
   display: flex; align-items: center; gap: 5px;
-  font-size: 13px; color: var(--text-tertiary); font-family: var(--mono);
+  font-size: 13px; color: #555; font-family: var(--mono);
   margin-bottom: 6px; cursor: pointer; line-height: 1.5;
 }
-.hotel2-addr svg path { fill: var(--text-tertiary); }
+.hotel2-addr svg path { fill: #555; }
 .hotel2-ref { margin-bottom: 10px; }
 .hotel2-ref-label { font-size: 11px; color: var(--text-tertiary); font-family: var(--mono); letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
 .hotel2-ref-val { font-size: 16px; font-weight: 700; font-family: var(--mono); color: var(--text-primary); letter-spacing: 0.02em; }
@@ -3068,22 +3068,30 @@ canvas { display: block; width: 100%; height: 100%; }
 /* Color picker sheet */
 .cpk-group-label { display: none; }
 .cpk-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 6px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
 }
 .cpk-swatch {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  aspect-ratio: 1;
+  border-radius: 0;
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.12s;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
-.cpk-swatch:active { transform: scale(0.9); }
-.cpk-swatch.selected { box-shadow: 0 0 0 3px #1A1A1A; }
+.cpk-swatch:active { transform: scale(0.92); }
+.cpk-swatch.selected { box-shadow: inset 0 0 0 3px #fff, 0 0 0 3px #1A1A1A; }
 .cpk-swatch span { display: none; }
+
+/* Expense day tabs — compact, up to 10 before wrap */
+#screen-expense .day-tab {
+  min-width: 28px;
+  padding: 10px 14px 12px;
+  font-size: 16px;
+}
+#screen-expense .day-tab.active {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  line-height: 28px;
+}

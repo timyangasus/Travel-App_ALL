@@ -298,7 +298,14 @@ function getHiddenTrips() {
 
 function openTripFilterSheet() {
   const hidden = getHiddenTrips();
-  const allTrips = meta.trips || [];
+  const allTrips = [...(meta.trips || [])].sort((a, b) => {
+    const parseD = trip => {
+      const d = (trip.startDate || '').replace(/[（(][^）)]*[）)]/g, '').trim();
+      const m = d.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+      return m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(9999,0,1);
+    };
+    return parseD(a) - parseD(b);
+  });
   const list = document.getElementById('trip-filter-list');
   list.innerHTML = allTrips.map(trip => {
     const visible = !hidden.includes(trip.id);
@@ -1484,7 +1491,12 @@ function renderExpenseDayTabs() {
   ).join('');
 }
 
-function switchExpDay(i) { expenseDay = i; renderExpenseDayTabs(); renderExpenseList(); }
+function switchExpDay(i) {
+  const total = data.days.length;
+  expenseDay = ((i % total) + total) % total; // circular
+  renderExpenseDayTabs();
+  renderExpenseList();
+}
 
 function renderExpenseList() {
   const list  = document.getElementById('expense-list');
