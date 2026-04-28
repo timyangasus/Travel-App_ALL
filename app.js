@@ -918,7 +918,7 @@ function selectReorderRow(pos) {
       const day = data.days[_reorderOrder[_reorderSelected]];
       const rawDate = day.banner?.date || '';
       const dateDisplay = rawDate.replace(/\d{4}\//, '') || '日期未設定';
-      label.textContent = `DAY ${_reorderSelected + 1}  ${dateDisplay}`;
+      label.textContent = `DAY ${_reorderSelected + 1}`;
       label.style.color = '#1A1A1A';
       label.style.fontWeight = '700';
     } else {
@@ -944,7 +944,7 @@ function reorderMoveSelected(dir) {
     const day = data.days[_reorderOrder[_reorderSelected]];
     const rawDate = day.banner?.date || '';
     const dateDisplay = rawDate.replace(/\d{4}\//, '') || '日期未設定';
-    label.textContent = `DAY ${_reorderSelected + 1}  ${dateDisplay}`;
+    label.textContent = `DAY ${_reorderSelected + 1}`;
     label.style.color = '#1A1A1A';
     label.style.fontWeight = '700';
   }
