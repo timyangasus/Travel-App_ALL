@@ -315,8 +315,8 @@ function openTripFilterSheet() {
     const dateStr = tripDateDisplay(trip) || '';
     return `<div class="fsheet-row" style="cursor:pointer;align-items:center" onclick="toggleTripFilter('${trip.id}')">
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;color:#C9A84C;font-family:var(--mono)">${esc(dateStr)}</div>
-        <div style="font-size:17px;font-weight:700;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(trip.name||'未命名')}</div>
+        <div style="font-size:15px;color:#C9A84C;font-family:var(--mono);font-weight:700">${esc(dateStr)}</div>
+        <div style="font-size:19px;font-weight:700;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(trip.name||'未命名')}</div>
       </div>
       <span id="tf-cb-${trip.id}" class="info-mod-cb${visible ? ' checked' : ''}">
         <svg viewBox="0 0 10 10" width="10" height="10" style="visibility:${visible?'visible':'hidden'};display:block">
