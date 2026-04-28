@@ -421,11 +421,12 @@
       <button class="sub-back-btn" onclick="closeInfoSub('notes')">
         <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z"/></svg>
       </button>
-      <div class="screen-title">筆記</div>
+      <div class="screen-title" style="flex:1">筆記</div>
+      <button class="sub-header-action" onclick="openNoteSheet(null)">
+        <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 -960 960 960" width="30px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+      </button>
     </div>
-    <div class="info-section">
-      <textarea class="notes-textarea" id="notes-content" placeholder="旅行筆記…" oninput="saveNotes()"></textarea>
-    </div>
+    <div class="info-section" id="notes-card-list" style="padding:16px 20px;display:flex;flex-direction:column;gap:16px"></div>
   </div>
 
   <!-- ═══ SETTINGS ═══ -->
@@ -674,6 +675,28 @@
     <div style="padding:12px 20px 16px;flex-shrink:0;display:flex;gap:10px;background:#fff">
       <button class="modal-btn modal-btn-cancel" style="flex:1" onclick="closeModal('modal-reorder-sheet')">取消</button>
       <button class="modal-btn modal-btn-save" style="flex:1" onclick="applyReorder()">確定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ NOTE EDIT SHEET ═══ -->
+<div class="modal-overlay" id="modal-note-sheet">
+  <div class="modal-sheet" style="display:flex;flex-direction:column;max-height:92vh">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;flex-shrink:0">
+      <span class="modal-title" style="padding:0" id="note-sheet-title">新增筆記</span>
+      <button onclick="closeModal('modal-note-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:0 20px 16px">
+      <textarea id="note-sheet-content" class="note-sheet-textarea" placeholder="第一行為標題…"></textarea>
+    </div>
+    <div style="padding:0 20px 20px;flex-shrink:0;background:#fff">
+      <div style="display:flex;gap:10px;margin-bottom:10px" id="note-delete-row">
+        <button class="modal-btn" style="flex:1;background:none;border:1.5px solid #EBEBEB;color:#E53935;font-family:var(--mono);font-size:15px;padding:14px" onclick="deleteCurrentNote()">刪除筆記</button>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="modal-btn modal-btn-cancel" style="flex:1" onclick="closeModal('modal-note-sheet')">取消</button>
+        <button class="modal-btn modal-btn-save" style="flex:1" onclick="saveNoteSheet()">儲存</button>
+      </div>
     </div>
   </div>
 </div>

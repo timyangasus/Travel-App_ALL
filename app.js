@@ -2127,9 +2127,105 @@ function deleteTicketPhoto(id) {
 }
 
 /* ─── Notes ─── */
-function renderNotes() {
-  document.getElementById('notes-content').value = data.notes || '';
+/* ═══════════════════════════════════════
+   NOTES — card-based
+═══════════════════════════════════════ */
+let _noteEditId = null;
+
+function noteBodyToHtml(text) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return esc(text).replace(urlRegex, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`);
 }
+
+function openNoteSheet(id) {
+  _noteEditId = id;
+  const isNew = id === null;
+  document.getElementById('note-sheet-title').textContent = isNew ? '新增筆記' : '編輯筆記';
+  const delRow = document.getElementById('note-delete-row');
+  if (delRow) delRow.style.display = isNew ? 'none' : 'flex';
+  const content = isNew ? '' : (data.notes.find(n => n.id === id)?.content || '');
+  const ta = document.getElementById('note-sheet-content');
+  ta.value = content;
+  document.getElementById('modal-note-sheet').classList.add('open');
+  setTimeout(() => ta.focus(), 340);
+}
+
+function renderNotes() {
+  if (!data.notes) data.notes = [];
+  if (typeof data.notes === 'string') {
+    const old = data.notes.trim();
+    data.notes = old ? [{ id: Date.now(), content: old }] : [];
+  }
+  const list = document.getElementById('notes-card-list');
+  if (!list) return;
+  if (!data.notes.length) {
+    list.innerHTML = '<div style="color:#CCCCCC;font-family:var(--mono);font-size:14px;text-align:center;padding:40px 0">尚無筆記</div>';
+    return;
+  }
+  list.innerHTML = [...data.notes].reverse().map(n => {
+    const lines = (n.content || '').split('\n');
+    const title = lines[0] || '';
+    const body = lines.slice(1).join('\n').trim();
+    const bodyHtml = body ? noteBodyToHtml(body) : '';
+    return `<div class="note-card" id="ncard-${n.id}">
+      <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:2px 6px">×</button>
+      <div class="note-card-inner" id="ninner-${n.id}">
+        <div class="note-card-title" style="padding-right:28px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
+        ${bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})">${bodyHtml}</div>` : ''}
+        <div class="note-card-fade" id="nfade-${n.id}"></div>
+      </div>
+      <div class="note-card-toggle" id="ntoggle-${n.id}" onclick="toggleNoteCard(${n.id})" style="display:none">展開 ▾</div>
+    </div>`;
+  }).join('');
+
+  requestAnimationFrame(() => {
+    if (!Array.isArray(data.notes)) return;
+    [...data.notes].reverse().forEach(n => {
+      const inner = document.getElementById('ninner-' + n.id);
+      const toggle = document.getElementById('ntoggle-' + n.id);
+      if (inner && toggle && inner.scrollHeight > 100) toggle.style.display = 'block';
+    });
+  });
+}
+
+function toggleNoteCard(id) {
+  const inner = document.getElementById('ninner-' + id);
+  const toggle = document.getElementById('ntoggle-' + id);
+  if (!inner || !toggle) return;
+  const expanded = inner.classList.toggle('expanded');
+  toggle.textContent = expanded ? '收起 ▴' : '展開 ▾';
+}
+
+function confirmDeleteNote(id) {
+  showConfirm('刪除筆記？', '此筆記將永久移除。', () => {
+    data.notes = data.notes.filter(n => n.id !== id);
+    save();
+    renderNotes();
+  });
+}
+
+function saveNoteSheet() {
+  const content = document.getElementById('note-sheet-content').value;
+  if (!content.trim()) { closeModal('modal-note-sheet'); return; }
+  if (!Array.isArray(data.notes)) data.notes = [];
+  if (_noteEditId === null) {
+    data.notes.push({ id: Date.now(), content });
+  } else {
+    const note = data.notes.find(n => n.id === _noteEditId);
+    if (note) note.content = content;
+  }
+  save();
+  closeModal('modal-note-sheet');
+  renderNotes();
+}
+
+function deleteCurrentNote() {
+  if (_noteEditId === null) return;
+  confirmDeleteNote(_noteEditId);
+  closeModal('modal-note-sheet');
+}
+
+function saveNotes() {} // legacy no-op}
 
 function saveNotes() {
   data.notes = document.getElementById('notes-content').value;
