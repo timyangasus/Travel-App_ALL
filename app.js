@@ -1399,52 +1399,6 @@ function openEventModal(id) {
   }, 340);
 }
 
-function initClearButtons(container) {
-  const inputs = (container || document).querySelectorAll('.ff-input, .ev-big-input');
-  inputs.forEach(input => {
-    // Skip if already wrapped or is textarea with auto-resize
-    if (input.parentElement.classList.contains('input-wrap')) return;
-    if (input.tagName === 'TEXTAREA') return; // skip textareas
-
-    const wrap = document.createElement('div');
-    wrap.className = 'input-wrap';
-    wrap.style.flex = input.style.flex || '';
-    input.parentNode.insertBefore(wrap, input);
-    wrap.appendChild(input);
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'input-clear-btn';
-    btn.textContent = '×';
-    btn.onclick = (e) => {
-      e.preventDefault();
-      input.value = '';
-      btn.style.display = 'none';
-      input.focus();
-      input.dispatchEvent(new Event('input'));
-    };
-    wrap.appendChild(btn);
-
-    const update = () => {
-      btn.style.display = input.value ? 'block' : 'none';
-    };
-    input.addEventListener('input', update);
-    input.addEventListener('focus', update);
-    update();
-  });
-}
-
-// Init clear buttons whenever a modal opens
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.modal-overlay').forEach(modal => {
-    new MutationObserver(() => {
-      if (modal.classList.contains('open')) {
-        setTimeout(() => initClearButtons(modal), 60);
-      }
-    }).observe(modal, { attributes: true, attributeFilter: ['class'] });
-  });
-});
-
 function autoResize(el) {
   el.style.height = 'auto';
   el.style.height = el.scrollHeight + 'px';
@@ -3248,51 +3202,76 @@ applyTheme('light');
 switchTab('home');
 
 
+
+
+
+
 /* ═══════════════════════════════════════
-   GLOBAL INPUT CLEAR BUTTONS
+   INPUT CLEAR BUTTONS v3
+   - Wrap each input/textarea in .field-wrap
+   - × positioned absolute inside wrapper
+   - Show only on focus + has value
+   - Hide on blur
 ═══════════════════════════════════════ */
 function initInputClearBtns(root) {
   const target = root || document;
-  target.querySelectorAll('input.ff-input, input.ev-big-input').forEach(input => {
-    if (input.dataset.clearInited) return;
-    input.dataset.clearInited = '1';
+
+  // Remove ALL previous field-x and input-clear-btn buttons
+  target.querySelectorAll('.field-x, .input-clear-btn').forEach(b => b.remove());
+
+  // Reset init flag so we can re-init
+  target.querySelectorAll('[data-xv3]').forEach(el => delete el.dataset.xv3);
+
+  const selector = 'input.ff-input, input.ev-big-input, textarea.ff-input, textarea.ev-big-input, textarea.note-sheet-textarea';
+
+  target.querySelectorAll(selector).forEach(field => {
+    const parent = field.parentNode;
+
+    // Wrap just the field in a relative container for correct positioning
+    const wrap = document.createElement('span');
+    wrap.style.cssText = 'position:relative;display:block;width:100%';
+    parent.insertBefore(wrap, field);
+    wrap.appendChild(field);
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'input-clear-btn';
+    btn.className = 'field-x';
     btn.textContent = '×';
     btn.tabIndex = -1;
+    if (field.tagName === 'TEXTAREA') {
+      btn.style.top = '10px';
+      btn.style.transform = 'none';
+    }
+    wrap.appendChild(btn);
 
-    input.parentNode.style.position = 'relative';
-    input.style.paddingRight = '20px';
-    input.parentNode.appendChild(btn);
+    if (field.tagName !== 'TEXTAREA') {
+      field.style.paddingRight = '22px';
+    }
 
-    const update = () => {
-      btn.classList.toggle('visible', input.value.length > 0);
-    };
+    const show = () => btn.classList.toggle('show', field.value.length > 0);
+    const hide = () => btn.classList.remove('show');
 
-    input.addEventListener('input', update);
-    input.addEventListener('focus', update);
-    input.addEventListener('blur', () => setTimeout(update, 150));
-
-    btn.addEventListener('mousedown', e => e.preventDefault());
-    btn.addEventListener('click', () => {
-      input.value = '';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.focus();
-      update();
+    field.addEventListener('focus', show);
+    field.addEventListener('input', () => {
+      if (document.activeElement === field) show();
     });
-
-    update();
+    field.addEventListener('blur', () => setTimeout(hide, 150));
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    btn.addEventListener('click', () => {
+      field.value = '';
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.focus();
+      hide();
+    });
   });
 }
 
-// Init on modal open
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.modal-overlay').forEach(modal => {
-    const observer = new MutationObserver(() => {
+    const obs = new MutationObserver(() => {
       if (modal.classList.contains('open')) initInputClearBtns(modal);
     });
-    observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+    obs.observe(modal, { attributes: true, attributeFilter: ['class'] });
   });
 });
