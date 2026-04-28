@@ -833,6 +833,99 @@ function saveInfoModules() {
 }
 
 
+/* ═══════════════════════════════════════
+   REORDER DAYS SHEET
+═══════════════════════════════════════ */
+let _reorderOrder = [];
+
+function openReorderSheet() {
+  _reorderOrder = data.days.map((_, i) => i);
+  renderReorderList();
+  document.getElementById('modal-reorder-sheet').classList.add('open');
+}
+
+function renderReorderList() {
+  const list = document.getElementById('reorder-list');
+  list.innerHTML = _reorderOrder.map((origIdx, pos) => {
+    const day = data.days[origIdx];
+    const rawDate = day.banner?.date || '';
+    const dateDisplay = rawDate.replace(/\d{4}\//, '').replace(/（[^）]*）/, m => m) || '日期未設定';
+    const subtitle = day.banner?.subtitle || '';
+    const eventCount = (day.events || []).length;
+    return `<div class="reorder-row" id="rrow-${pos}">
+      <div class="reorder-row-info">
+        <div class="reorder-row-day">DAY ${pos + 1}</div>
+        <div class="reorder-row-date">${dateDisplay}</div>
+        ${subtitle ? `<div style="font-size:12px;color:#AAAAAA;font-family:var(--mono);margin-top:2px">${subtitle}</div>` : ''}
+        ${eventCount ? `<div style="font-size:11px;color:#CCCCCC;font-family:var(--mono)">${eventCount} 個行程</div>` : ''}
+      </div>
+      <div class="reorder-row-handle" data-pos="${pos}">≡</div>
+    </div>`;
+  }).join('');
+  initReorderDrag();
+}
+
+function initReorderDrag() {
+  const list = document.getElementById('reorder-list');
+  let dragPos = null, startY = 0, dragEl = null;
+  const ROW_H = 64;
+
+  list.querySelectorAll('.reorder-row-handle').forEach(handle => {
+    handle.addEventListener('touchstart', e => {
+      dragPos = parseInt(handle.dataset.pos);
+      dragEl = document.getElementById('rrow-' + dragPos);
+      if (dragEl) dragEl.classList.add('dragging');
+      startY = e.touches[0].clientY;
+      e.preventDefault();
+    }, { passive: false });
+  });
+
+  list.addEventListener('touchmove', e => {
+    if (dragPos === null) return;
+    const currentY = e.touches[0].clientY;
+    const steps = Math.round((currentY - startY) / ROW_H);
+    if (steps !== 0) {
+      const newPos = Math.max(0, Math.min(_reorderOrder.length - 1, dragPos + steps));
+      if (newPos !== dragPos) {
+        const item = _reorderOrder.splice(dragPos, 1)[0];
+        _reorderOrder.splice(newPos, 0, item);
+        dragPos = newPos;
+        startY = currentY;
+        renderReorderList();
+      }
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  list.addEventListener('touchend', () => {
+    if (dragEl) { dragEl.classList.remove('dragging'); dragEl = null; }
+    dragPos = null;
+  });
+}
+
+function applyReorder() {
+  const origContent = data.days.map((d, i) => ({
+    events:   [...(d.events || [])],
+    photos:   [...(d.banner?.photos || [])],
+    subtitle: d.banner?.subtitle || '',
+    expenses: [...(data.expenses[i] || [])],
+  }));
+
+  _reorderOrder.forEach((origIdx, newPos) => {
+    const src = origContent[origIdx];
+    data.days[newPos].events          = src.events;
+    data.days[newPos].banner.photos   = src.photos;
+    data.days[newPos].banner.subtitle = src.subtitle;
+    data.expenses[newPos]             = src.expenses;
+  });
+
+  save();
+  closeModal('modal-reorder-sheet');
+  renderItinerary();
+  renderExpenseDayTabs();
+  showToast('行程順序已更新');
+}
+
 function renderItinerary() {
   if (!data) return;
   renderDayTabs();
