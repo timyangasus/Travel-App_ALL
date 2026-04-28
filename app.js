@@ -1492,7 +1492,7 @@ function renderExpense() {
 let _expSwipeInited = false;
 function initExpenseSwipe() {
   if (_expSwipeInited) return;
-  _expSwipeInited = false; // allow re-init on trip change
+  _expSwipeInited = true;
   const screen = document.getElementById('screen-expense');
   if (!screen) return;
   let startX = 0, startY = 0;
@@ -1501,6 +1501,7 @@ function initExpenseSwipe() {
     startY = e.touches[0].clientY;
   }, { passive: true });
   screen.addEventListener('touchend', e => {
+    if (!data) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
