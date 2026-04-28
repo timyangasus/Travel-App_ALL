@@ -645,22 +645,43 @@ function setTripCurrency(code, symbol, label) {
 }
 
 function fmtTripSheetDates(el) {
-  // Format: YYYY/MM/DD–MM/DD
-  // Input digits only, auto insert slashes and dash
-  const raw = el.value;
-  const digits = raw.replace(/\D/g, '').slice(0, 12);
-  let result = '';
-  if (digits.length <= 4) {
-    result = digits; // YYYY
-  } else if (digits.length <= 6) {
-    result = digits.slice(0,4) + '/' + digits.slice(4); // YYYY/MM
-  } else if (digits.length <= 8) {
-    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6); // YYYY/MM/DD
-  } else if (digits.length <= 10) {
-    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6,8) + '–' + digits.slice(8); // YYYY/MM/DD–MM
-  } else {
-    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6,8) + '–' + digits.slice(8,10) + '/' + digits.slice(10,12); // YYYY/MM/DD–MM/DD
+  const digits = el.value.replace(/\D/g, '').slice(0, 12);
+  const len = digits.length;
+  if (len === 0) { el.value = ''; return; }
+
+  const y = digits.slice(0, 4);
+  const mo = digits.slice(4, 6);
+  const d1 = digits.slice(6, 8);
+  const mo2 = digits.slice(8, 10);
+  const d2 = digits.slice(10, 12);
+
+  // Auto-zero month (position 5): if first digit of month > 1, prepend 0
+  if (len === 5 && parseInt(digits[4]) > 1) {
+    el.value = y + '/0' + digits[4] + '/';
+    return;
   }
+  // Auto-zero day1 (position 7): if first digit of day > 3, prepend 0
+  if (len === 7 && parseInt(digits[6]) > 3) {
+    el.value = y + '/' + mo + '/0' + digits[6] + '–';
+    return;
+  }
+  // Auto-zero month2 (position 9): if first digit > 1, prepend 0
+  if (len === 9 && parseInt(digits[8]) > 1) {
+    el.value = y + '/' + mo + '/' + d1 + '–0' + digits[8] + '/';
+    return;
+  }
+  // Auto-zero day2 (position 11): if first digit > 3, prepend 0
+  if (len === 11 && parseInt(digits[10]) > 3) {
+    el.value = y + '/' + mo + '/' + d1 + '–' + mo2 + '/0' + digits[10];
+    return;
+  }
+
+  let result = '';
+  if (len <= 4)       result = y;
+  else if (len <= 6)  result = y + '/' + mo;
+  else if (len <= 8)  result = y + '/' + mo + '/' + d1;
+  else if (len <= 10) result = y + '/' + mo + '/' + d1 + '–' + mo2;
+  else                result = y + '/' + mo + '/' + d1 + '–' + mo2 + '/' + d2;
   el.value = result;
 }
 
@@ -2198,7 +2219,14 @@ function renderNotes() {
     [...data.notes].reverse().forEach(n => {
       const inner = document.getElementById('ninner-' + n.id);
       const toggle = document.getElementById('ntoggle-' + n.id);
-      if (inner && toggle && inner.scrollHeight > 100) toggle.style.display = 'block';
+      const fade = document.getElementById('nfade-' + n.id);
+      if (!inner || !toggle) return;
+      if (inner.scrollHeight > 100) {
+        toggle.style.display = 'block';
+        if (fade) fade.style.display = 'block';
+      } else {
+        if (fade) fade.style.display = 'none';
+      }
     });
   });
 }
@@ -2711,20 +2739,35 @@ document.addEventListener('click', (e) => {
 });
 
 function fmtTripDates(el) {
-  // Format: YYYY/MM/DD–MM/DD (same as trip sheet)
   const digits = el.value.replace(/\D/g, '').slice(0, 12);
-  let result = '';
-  if (digits.length <= 4) {
-    result = digits;
-  } else if (digits.length <= 6) {
-    result = digits.slice(0,4) + '/' + digits.slice(4);
-  } else if (digits.length <= 8) {
-    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6);
-  } else if (digits.length <= 10) {
-    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6,8) + '–' + digits.slice(8);
-  } else {
-    result = digits.slice(0,4) + '/' + digits.slice(4,6) + '/' + digits.slice(6,8) + '–' + digits.slice(8,10) + '/' + digits.slice(10,12);
+  const len = digits.length;
+  if (len === 0) { el.value = ''; return; }
+
+  const y = digits.slice(0, 4);
+  const mo = digits.slice(4, 6);
+  const d1 = digits.slice(6, 8);
+  const mo2 = digits.slice(8, 10);
+  const d2 = digits.slice(10, 12);
+
+  if (len === 5 && parseInt(digits[4]) > 1) {
+    el.value = y + '/0' + digits[4] + '/'; return;
   }
+  if (len === 7 && parseInt(digits[6]) > 3) {
+    el.value = y + '/' + mo + '/0' + digits[6] + '–'; return;
+  }
+  if (len === 9 && parseInt(digits[8]) > 1) {
+    el.value = y + '/' + mo + '/' + d1 + '–0' + digits[8] + '/'; return;
+  }
+  if (len === 11 && parseInt(digits[10]) > 3) {
+    el.value = y + '/' + mo + '/' + d1 + '–' + mo2 + '/0' + digits[10]; return;
+  }
+
+  let result = '';
+  if (len <= 4)       result = y;
+  else if (len <= 6)  result = y + '/' + mo;
+  else if (len <= 8)  result = y + '/' + mo + '/' + d1;
+  else if (len <= 10) result = y + '/' + mo + '/' + d1 + '–' + mo2;
+  else                result = y + '/' + mo + '/' + d1 + '–' + mo2 + '/' + d2;
   el.value = result;
 }
 
