@@ -1934,18 +1934,17 @@ function _mapApply(smooth) {
 }
 
 function mapResetView() {
-  // Fit image height to viewer
   const viewer = document.getElementById('map-viewer');
   const img    = document.getElementById('map-img');
   if (!viewer || !img) return;
   const vw = viewer.clientWidth, vh = viewer.clientHeight;
   const iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
-  // Scale so image height = viewer height
   const scaleH = vh / (vw * (ih / iw));
-  _mapScale = scaleH;
-  _mapTx = 0;
-  _mapTy = 0;
-  _mapConstrain();
+  _mapScale = Math.min(scaleH, 1);
+  const renderedW = vw * _mapScale;
+  const renderedH = vw * (ih / iw) * _mapScale;
+  _mapTx = (vw - renderedW) / 2;
+  _mapTy = (vh - renderedH) / 2;
   _mapApply(true);
 }
 
@@ -2062,14 +2061,18 @@ function _mapLoadImage(url) {
   img.style.transform = '';
 
   img.onload = () => {
-    // Fit height to viewer
     const vw = viewer.clientWidth, vh = viewer.clientHeight;
-    const ih = img.naturalHeight || 1;
     const iw = img.naturalWidth  || vw;
+    const ih = img.naturalHeight || vh;
+    // Scale to fit height; if image is wider than tall, fit width instead
     const scaleH = vh / (vw * (ih / iw));
-    _mapScale = scaleH;
-    _mapTx = 0; _mapTy = 0;
-    _mapConstrain();
+    const scaleW = 1; // img CSS width = 100% of viewer at scale 1
+    _mapScale = Math.min(scaleH, scaleW);
+    // Centre: rendered size at chosen scale
+    const renderedW = vw * _mapScale;
+    const renderedH = vw * (ih / iw) * _mapScale;
+    _mapTx = (vw - renderedW) / 2;
+    _mapTy = (vh - renderedH) / 2;
     _mapApply(false);
     mapInitPanZoom();
   };
