@@ -1865,28 +1865,26 @@ function renderMapSub() {
 }
 
 function onMapActionBtn() {
-  const maps = data.maps || [];
-  // Both empty and has-map → open add sheet (title changes)
-  const titleEl = document.getElementById('map-add-sheet-title');
-  titleEl.textContent = maps.length > 0 ? '換一張地圖' : '新增地圖';
-  document.getElementById('map-add-name').value = '';
-  document.getElementById('map-add-url').value  = '';
-  document.getElementById('modal-map-add').classList.add('open');
-  setTimeout(() => initInputClearBtns(document.getElementById('modal-map-add')), 100);
-}
-
-function saveMapAdd() {
-  const name = document.getElementById('map-add-name').value.trim();
-  const url  = document.getElementById('map-add-url').value.trim();
-  if (!url) { showToast('請輸入圖片網址'); return; }
-  if (!data.maps) data.maps = [];
-  // Replace or add
-  data.maps = [{ name: name || '地圖', url }];
-  save();
-  closeModal('modal-map-add');
-  renderMapSub();
-  // init pan/zoom after image loads
-  setTimeout(mapInitPanZoom, 200);
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    showUploadStatus('上傳地圖中…');
+    try {
+      const url = await uploadToImgBB(file);
+      if (!data.maps) data.maps = [];
+      data.maps = [{ name: file.name || '地圖', url }];
+      save();
+      showUploadStatus('');
+      renderMapSub();
+    } catch(e) {
+      showUploadStatus('');
+      showToast('上傳失敗，請再試一次');
+    }
+  };
+  input.click();
 }
 
 /* ─── Pan / Zoom Engine (曼谷地圖寫法) ─── */
