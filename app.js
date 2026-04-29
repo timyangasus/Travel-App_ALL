@@ -495,6 +495,12 @@ function renderHomeTripList() {
     return;
   }
 
+  const cancelBtn = _tripDeleteMode
+    ? `<div style="position:fixed;bottom:0;left:0;right:0;z-index:200;padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px));background:#fff;border-top:0.5px solid #E0E0E0">
+        <button onclick="toggleTripDeleteMode()" style="width:100%;padding:16px 0;background:#1A1A1A;color:#fff;border:none;border-radius:0;font-size:16px;font-weight:600;font-family:var(--mono);cursor:pointer;letter-spacing:0.02em">取消</button>
+      </div>`
+    : '';
+
   el.innerHTML = '<div class="home-trip-list-topline"></div>' + trips.map(trip => {
     const dateStr = tripDateDisplay(trip) || '';
     const hasImg = !!trip.coverImg;
@@ -503,8 +509,8 @@ function renderHomeTripList() {
       : `background:#C9A84C`;
     return `
       <div class="home-trip-row" data-id="${trip.id}">
-        <div class="home-trip-row-inner" onclick="openTrip('${trip.id}')">
-          <div class="home-trip-cover" style="${coverBg}" onclick="event.stopPropagation();openTripCoverPicker('${trip.id}')"></div>
+        <div class="home-trip-row-inner" onclick="${_tripDeleteMode ? '' : `openTrip('${trip.id}')`}">
+          <div class="home-trip-cover" style="${coverBg}" onclick="event.stopPropagation();${_tripDeleteMode ? '' : `openTripCoverPicker('${trip.id}')`}"></div>
           <div class="home-trip-body" style="margin-left:5px">
             <div class="home-trip-date">${esc(dateStr)}</div>
             <div class="home-trip-name">${esc(trip.name || '未命名行程')}</div>
@@ -513,7 +519,7 @@ function renderHomeTripList() {
         </div>
         <div class="home-trip-row-bottom-line"></div>
       </div>`;
-  }).join('');
+  }).join('') + cancelBtn;
 
   // Year swipe
   initHomeYearSwipe();
@@ -3328,3 +3334,216 @@ document.addEventListener('DOMContentLoaded', () => {
     obs.observe(modal, { attributes: true, attributeFilter: ['class'] });
   });
 });
+
+/* ═══════════════════════════════════════
+   MAP MODULE
+═══════════════════════════════════════ */
+
+/* ─── 取得/存地圖資料 ─── */
+function getMaps() {
+  if (!data) return [];
+  if (!data.maps) data.maps = [];
+  return data.maps;
+}
+
+/* ─── 新增地圖照片 ─── */
+async function addMapPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  showUploadStatus('上傳中...');
+  try {
+    const url = await uploadToImgBB(file);
+    const name = file.name.replace(/\.[^.]+$/, '') || '地圖';
+    getMaps().push({ id: Date.now(), name, url });
+    save();
+    renderMapList();
+    showToast('地圖已新增');
+  } catch(err) {
+    alert('上傳失敗：' + err.message);
+  } finally {
+    showUploadStatus('');
+  }
+}
+
+/* ─── 渲染地圖列表 ─── */
+function renderMapList() {
+  const maps = getMaps();
+  const el = document.getElementById('map-list-view');
+  if (!el) return;
+  if (!maps.length) {
+    el.innerHTML = `<div class="map-empty">點右上角 ＋ 新增地圖</div>`;
+    return;
+  }
+  el.innerHTML = maps.map((m, i) => `
+    <div class="map-thumb-card" onclick="openMapViewer(${i})">
+      <img src="${esc(m.url)}" alt="${esc(m.name)}">
+      <div class="map-thumb-label">${esc(m.name)}</div>
+      <button class="map-thumb-del" onclick="event.stopPropagation();deleteMap(${i})">×</button>
+    </div>`).join('');
+}
+
+/* ─── 刪除地圖 ─── */
+function deleteMap(i) {
+  showConfirm('刪除地圖', '確定刪除此地圖？', () => {
+    getMaps().splice(i, 1);
+    save();
+    renderMapList();
+  });
+}
+
+/* ─── 開啟全螢幕地圖檢視 ─── */
+function openMapViewer(i) {
+  const m = getMaps()[i];
+  if (!m) return;
+  document.getElementById('map-viewer-title').textContent = m.name;
+  document.getElementById('map-img').src = m.url;
+  document.getElementById('map-list-view').style.display = 'none';
+  document.getElementById('map-viewer').style.display = 'flex';
+  // reset zoom
+  _mapSc = 1; _mapTx = 0; _mapTy = 0;
+  _mapApply(false);
+}
+
+/* ─── 關閉全螢幕地圖 ─── */
+function closeMapViewer() {
+  document.getElementById('map-viewer').style.display = 'none';
+  document.getElementById('map-list-view').style.display = 'flex';
+}
+
+/* ─── 地圖 pinch-zoom + pan 邏輯（移植自曼谷 app）─── */
+var _mapSc = 1, _mapTx = 0, _mapTy = 0;
+var _mapMAX = 6;
+
+function _mapClamp(v, a, b) { return Math.min(Math.max(v, a), b); }
+
+function _mapApply(smooth) {
+  var box = document.getElementById('map-box');
+  var img = document.getElementById('map-img');
+  if (!box || !img) return;
+  var vw = box.offsetWidth, vh = box.offsetHeight;
+  var iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
+  var rw = vw * _mapSc, rh = vw * (ih / iw) * _mapSc;
+  _mapTx = _mapClamp(_mapTx, Math.min(0, vw - rw), 0);
+  _mapTy = _mapClamp(_mapTy, Math.min(0, vh - rh), 0);
+  img.style.transition = smooth ? 'transform .18s ease' : 'none';
+  img.style.transform = 'translate(' + _mapTx + 'px,' + _mapTy + 'px) scale(' + _mapSc + ')';
+}
+
+function _mapZoomAt(px, py, factor) {
+  var ns = _mapClamp(_mapSc * factor, 1, _mapMAX);
+  _mapTx = px - (px - _mapTx) * (ns / _mapSc);
+  _mapTy = py - (py - _mapTy) * (ns / _mapSc);
+  _mapSc = ns;
+  _mapApply(true);
+}
+
+(function initMapGestures() {
+  document.addEventListener('DOMContentLoaded', function() {
+    var box = document.getElementById('map-box');
+    if (!box) return;
+
+    var dg = false, sx = 0, sy = 0, mvx = 0, mvy = 0;
+    var lx = 0, ly = 0, lt = 0, lt2 = null, raf = null;
+
+    function momentum() {
+      cancelAnimationFrame(raf);
+      var d = 0.88;
+      (function tick() {
+        if (Math.abs(mvx) < 0.3 && Math.abs(mvy) < 0.3) return;
+        _mapTx += mvx; _mapTy += mvy;
+        mvx *= d; mvy *= d;
+        _mapApply(false);
+        raf = requestAnimationFrame(tick);
+      })();
+    }
+
+    box.addEventListener('touchstart', function(e) {
+      cancelAnimationFrame(raf); mvx = mvy = 0;
+      if (e.touches.length === 1) {
+        dg = true;
+        sx = e.touches[0].clientX - _mapTx;
+        sy = e.touches[0].clientY - _mapTy;
+        lx = e.touches[0].clientX; ly = e.touches[0].clientY; lt = Date.now();
+      } else { dg = false; lt2 = e.touches; }
+      e.preventDefault();
+    }, { passive: false });
+
+    box.addEventListener('touchmove', function(e) {
+      if (e.touches.length === 1 && dg) {
+        var now = Date.now(), nx = e.touches[0].clientX, ny = e.touches[0].clientY;
+        var dt = Math.max(now - lt, 1);
+        mvx = (nx - lx) / dt * 12; mvy = (ny - ly) / dt * 12;
+        lx = nx; ly = ny; lt = now;
+        _mapTx = nx - sx; _mapTy = ny - sy;
+        _mapApply(false);
+      } else if (e.touches.length === 2 && lt2) {
+        var t0 = e.touches[0], t1 = e.touches[1];
+        var p0 = lt2[0], p1 = lt2[1];
+        var pd = Math.hypot(p0.clientX - p1.clientX, p0.clientY - p1.clientY);
+        var cd = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+        var mx = (t0.clientX + t1.clientX) / 2, my = (t0.clientY + t1.clientY) / 2;
+        var r = box.getBoundingClientRect();
+        _mapZoomAt(mx - r.left, my - r.top, cd / pd);
+        _mapTx += (mx - (p0.clientX + p1.clientX) / 2);
+        _mapTy += (my - (p0.clientY + p1.clientY) / 2);
+        lt2 = e.touches;
+        _mapApply(false);
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    box.addEventListener('touchend', function(e) {
+      dg = false;
+      lt2 = e.touches.length ? e.touches : null;
+      momentum();
+    });
+
+    box.addEventListener('mousedown', function(e) {
+      cancelAnimationFrame(raf); mvx = mvy = 0; dg = true;
+      sx = e.clientX - _mapTx; sy = e.clientY - _mapTy;
+      lx = e.clientX; ly = e.clientY; lt = Date.now();
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!dg) return;
+      var now = Date.now(), dt = Math.max(now - lt, 1);
+      mvx = (e.clientX - lx) / dt * 12; mvy = (e.clientY - ly) / dt * 12;
+      lx = e.clientX; ly = e.clientY; lt = now;
+      _mapTx = e.clientX - sx; _mapTy = e.clientY - sy;
+      _mapApply(false);
+    });
+    window.addEventListener('mouseup', function() { if (dg) { dg = false; momentum(); } });
+
+    box.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      var r = box.getBoundingClientRect();
+      _mapZoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 0.9);
+    }, { passive: false });
+
+    document.getElementById('map-zi').onclick = function() {
+      var r = document.getElementById('map-box').getBoundingClientRect();
+      _mapZoomAt(r.width / 2, r.height / 2, 1.35);
+    };
+    document.getElementById('map-zo').onclick = function() {
+      var r = document.getElementById('map-box').getBoundingClientRect();
+      _mapZoomAt(r.width / 2, r.height / 2, 1 / 1.35);
+    };
+    document.getElementById('map-zr').onclick = function() {
+      _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapApply(true);
+    };
+  });
+})();
+
+/* ─── 開啟地圖 sub-screen 時渲染列表 ─── */
+const _origOpenInfoSub2 = window.openInfoSub;
+window.openInfoSub = function(name) {
+  _origOpenInfoSub2(name);
+  if (name === 'map') {
+    // 確保 viewer 關閉、列表顯示
+    const viewer = document.getElementById('map-viewer');
+    const listEl = document.getElementById('map-list-view');
+    if (viewer) viewer.style.display = 'none';
+    if (listEl) listEl.style.display = 'flex';
+    renderMapList();
+  }
+};

@@ -425,6 +425,42 @@
     <div class="info-section" id="notes-card-list" style="padding:30px 20px 16px;display:flex;flex-direction:column;gap:16px"></div>
   </div>
 
+  <!-- ═══ INFO SUB: MAP ═══ -->
+  <div id="screen-info-map" class="page" style="flex-direction:column">
+    <div class="screen-header sub-header" style="flex-shrink:0">
+      <button class="sub-back-btn" onclick="closeInfoSub('map')">
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z"/></svg>
+      </button>
+      <div class="screen-title" style="flex:1;font-family:var(--mono)">Map</div>
+      <label class="sub-header-action" title="新增地圖" style="cursor:pointer">
+        <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 -960 960 960" width="30px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+        <input type="file" accept="image/*" style="display:none" onchange="addMapPhoto(this)">
+      </label>
+    </div>
+
+    <!-- 地圖列表 / 地圖檢視 -->
+    <div id="map-list-view" style="flex:1;overflow-y:auto;padding:16px 20px 24px;display:flex;flex-direction:column;gap:12px"></div>
+
+    <!-- 全螢幕地圖檢視（pinch-zoom + pan） -->
+    <div id="map-viewer" style="display:none;flex:1;flex-direction:column;min-height:0">
+      <div style="display:flex;align-items:center;padding:10px 16px;flex-shrink:0;border-bottom:0.5px solid var(--border-thin)">
+        <button onclick="closeMapViewer()" style="background:none;border:none;cursor:pointer;padding:4px 8px 4px 0;font-size:14px;color:#1A1A1A;font-family:var(--mono);display:flex;align-items:center;gap:6px">
+          <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px"><path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z"/></svg>
+          返回
+        </button>
+        <div id="map-viewer-title" style="flex:1;font-size:14px;font-weight:700;font-family:var(--mono);color:#1A1A1A;text-align:center;padding-right:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+      </div>
+      <div id="map-box" style="flex:1;min-height:0;position:relative;overflow:hidden;background:#F0EDE8;touch-action:none;cursor:grab">
+        <img id="map-img" style="position:absolute;top:0;left:0;width:100%;transform-origin:0 0;pointer-events:none;user-select:none;-webkit-user-drag:none;" src="" alt="">
+        <div style="position:absolute;bottom:16px;right:16px;display:flex;flex-direction:column;gap:6px;z-index:5">
+          <button id="map-zi" class="map-zoom-btn">＋</button>
+          <button id="map-zo" class="map-zoom-btn">－</button>
+          <button id="map-zr" class="map-zoom-btn" style="font-size:13px">↺</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ SETTINGS ═══ -->
   <div id="screen-settings" class="page">
     <div class="screen-header">
