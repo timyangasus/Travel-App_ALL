@@ -3378,7 +3378,7 @@ function renderMap() {
     if (imgEl.src !== url) {
       imgEl.src = url;
       _mapSc = 1; _mapTx = 0; _mapTy = 0;
-      imgEl.onload = () => _mapApply(false);
+      imgEl.onload = function() { _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapApply(false); };
     }
   } else {
     emptyEl.style.display = 'flex';
@@ -3398,11 +3398,17 @@ function _mapApply(smooth) {
   if (!box || !img) return;
   var vw = box.offsetWidth, vh = box.offsetHeight;
   var iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
-  var rw = vw * _mapSc, rh = vw * (ih / iw) * _mapSc;
+  // 以高度為基準：圖片 height=100% 時的自然寬度
+  var baseW = vh * (iw / ih);
+  var rw = baseW * _mapSc, rh = vh * _mapSc;
   _mapTx = _mapClamp(_mapTx, Math.min(0, vw - rw), 0);
   _mapTy = _mapClamp(_mapTy, Math.min(0, vh - rh), 0);
   img.style.transition = smooth ? 'transform .18s ease' : 'none';
   img.style.transform = 'translate(' + _mapTx + 'px,' + _mapTy + 'px) scale(' + _mapSc + ')';
+}
+
+function mapResetZoom() {
+  _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapApply(true);
 }
 
 function _mapZoomAt(px, py, factor) {
@@ -3495,9 +3501,7 @@ function _mapZoomAt(px, py, factor) {
       _mapZoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 0.9);
     }, { passive: false });
 
-    document.getElementById('map-zr').onclick = function() {
-      _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapApply(true);
-    };
+    document.getElementById('map-zr').onclick = null; // handled by inline onclick
   });
 })();
 
