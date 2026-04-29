@@ -2473,6 +2473,7 @@ function deleteTicketPhoto(id) {
    NOTES — card-based
 ═══════════════════════════════════════ */
 let _noteEditId = null;
+let _noteImages = []; // staging images in sheet
 
 function noteBodyToHtml(text) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -2485,9 +2486,12 @@ function openNoteSheet(id) {
   document.getElementById('note-sheet-title').textContent = isNew ? '新增筆記' : '編輯筆記';
   const delRow = document.getElementById('note-delete-row');
   if (delRow) delRow.style.display = isNew ? 'none' : 'flex';
-  const content = isNew ? '' : (data.notes.find(n => n.id === id)?.content || '');
+  const note = isNew ? null : data.notes.find(n => n.id === id);
   const ta = document.getElementById('note-sheet-content');
-  ta.value = content;
+  ta.value = note?.content || '';
+  // Load existing images into staging
+  _noteImages = note?.images ? [...note.images] : [];
+  _renderNoteImgPreview();
   document.getElementById('modal-note-sheet').classList.add('open');
   setTimeout(() => ta.focus(), 340);
 }
@@ -2509,11 +2513,17 @@ function renderNotes() {
     const title = lines[0] || '';
     const body = lines.slice(1).join('\n').trim();
     const bodyHtml = body ? noteBodyToHtml(body) : '';
+    const imgsHtml = (n.images && n.images.length)
+      ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${n.images.map(url =>
+          `<img src="${url}" style="max-width:100%;border-radius:8px;display:block" onclick="event.stopPropagation()">`
+        ).join('')}</div>`
+      : '';
     return `<div class="note-card" id="ncard-${n.id}">
       <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:2px 6px">×</button>
       <div class="note-card-inner" id="ninner-${n.id}">
         <div class="note-card-title" style="padding-right:28px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
         ${bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})">${bodyHtml}</div>` : ''}
+        ${imgsHtml}
         <div class="note-card-fade" id="nfade-${n.id}"></div>
       </div>
       <div class="note-card-toggle" id="ntoggle-${n.id}" onclick="toggleNoteCard(${n.id})" style="display:none">展開 ▾</div>
@@ -2557,17 +2567,56 @@ function confirmDeleteNote(id) {
 
 function saveNoteSheet() {
   const content = document.getElementById('note-sheet-content').value;
-  if (!content.trim()) { closeModal('modal-note-sheet'); return; }
+  if (!content.trim() && _noteImages.length === 0) { closeModal('modal-note-sheet'); return; }
   if (!Array.isArray(data.notes)) data.notes = [];
   if (_noteEditId === null) {
-    data.notes.push({ id: Date.now(), content });
+    data.notes.push({ id: Date.now(), content, images: [..._noteImages] });
   } else {
     const note = data.notes.find(n => n.id === _noteEditId);
-    if (note) note.content = content;
+    if (note) { note.content = content; note.images = [..._noteImages]; }
   }
+  _noteImages = [];
   save();
   closeModal('modal-note-sheet');
   renderNotes();
+}
+
+function noteInsertImage() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    showUploadStatus('上傳圖片中…');
+    try {
+      const url = await uploadToImgBB(file);
+      _noteImages.push(url);
+      _renderNoteImgPreview();
+      showUploadStatus('');
+    } catch(e) {
+      showUploadStatus('');
+      showToast('上傳失敗，請再試一次');
+    }
+  };
+  input.click();
+}
+
+function _renderNoteImgPreview() {
+  const wrap = document.getElementById('note-img-preview');
+  if (!wrap) return;
+  if (_noteImages.length === 0) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = _noteImages.map((url, i) =>
+    `<div style="position:relative;display:inline-block">
+      <img src="${url}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;display:block">
+      <button onclick="_removeNoteImg(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#1A1A1A;border:none;color:#fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">×</button>
+    </div>`
+  ).join('');
+}
+
+function _removeNoteImg(idx) {
+  _noteImages.splice(idx, 1);
+  _renderNoteImgPreview();
 }
 
 function deleteCurrentNote() {
