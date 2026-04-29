@@ -2476,8 +2476,25 @@ let _noteEditId = null;
 let _noteImages = []; // staging images in sheet
 
 function noteBodyToHtml(text) {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return esc(text).replace(urlRegex, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`);
+  // Split by [[IMG:url]] markers to interleave text and images
+  const segments = text.split(/\[\[IMG:([^\]]+)\]\]/);
+  // segments alternates: text, url, text, url, ...
+  let html = '';
+  for (let i = 0; i < segments.length; i++) {
+    if (i % 2 === 0) {
+      // text segment
+      const t = segments[i].trim();
+      if (t) {
+        const escaped = esc(t).replace(/(https?:\/\/[^\s]+)/g, url =>
+          `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`);
+        html += `<span style="white-space:pre-wrap">${escaped}</span>`;
+      }
+    } else {
+      // image url segment
+      html += `<img src="${segments[i]}" style="max-width:100%;border-radius:8px;display:block;margin:8px 0" onclick="event.stopPropagation()">`;
+    }
+  }
+  return html;
 }
 
 function openNoteSheet(id) {
@@ -2488,12 +2505,20 @@ function openNoteSheet(id) {
   if (delRow) delRow.style.display = isNew ? 'none' : 'flex';
   const note = isNew ? null : data.notes.find(n => n.id === id);
   const ta = document.getElementById('note-sheet-content');
-  ta.value = note?.content || '';
-  // Load existing images into staging
-  _noteImages = note?.images ? [...note.images] : [];
+  // Merge legacy images into content as [[IMG:]] markers at end (one-time migration)
+  let noteContent = note?.content || '';
+  if (note?.images?.length && !noteContent.includes('[[IMG:')) {
+    noteContent += '
+' + note.images.map(u => `[[IMG:${u}]]`).join('
+');
+  }
+  ta.value = noteContent;
+  // Cursor to beginning
+  ta.setSelectionRange(0, 0);
+  // Render inline preview
   _renderNoteImgPreview();
   document.getElementById('modal-note-sheet').classList.add('open');
-  setTimeout(() => ta.focus(), 340);
+  setTimeout(() => { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }, 340);
 }
 
 function renderNotes() {
@@ -2512,18 +2537,19 @@ function renderNotes() {
     const lines = (n.content || '').split('\n');
     const title = lines[0] || '';
     const body = lines.slice(1).join('\n').trim();
-    const bodyHtml = body ? noteBodyToHtml(body) : '';
-    const imgsHtml = (n.images && n.images.length)
-      ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${n.images.map(url =>
-          `<img src="${url}" style="max-width:100%;border-radius:8px;display:block" onclick="event.stopPropagation()">`
-        ).join('')}</div>`
-      : '';
+    // Merge legacy images into body text for rendering
+    let fullBody = body;
+    if (n.images?.length && !fullBody.includes('[[IMG:')) {
+      fullBody += '
+' + n.images.map(u => `[[IMG:${u}]]`).join('
+');
+    }
+    const bodyHtml = fullBody ? noteBodyToHtml(fullBody) : '';
     return `<div class="note-card" id="ncard-${n.id}">
       <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:2px 6px">×</button>
       <div class="note-card-inner" id="ninner-${n.id}">
         <div class="note-card-title" style="padding-right:28px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
         ${bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})">${bodyHtml}</div>` : ''}
-        ${imgsHtml}
         <div class="note-card-fade" id="nfade-${n.id}"></div>
       </div>
       <div class="note-card-toggle" id="ntoggle-${n.id}" onclick="toggleNoteCard(${n.id})" style="display:none">展開 ▾</div>
@@ -2567,15 +2593,14 @@ function confirmDeleteNote(id) {
 
 function saveNoteSheet() {
   const content = document.getElementById('note-sheet-content').value;
-  if (!content.trim() && _noteImages.length === 0) { closeModal('modal-note-sheet'); return; }
+  if (!content.trim()) { closeModal('modal-note-sheet'); return; }
   if (!Array.isArray(data.notes)) data.notes = [];
   if (_noteEditId === null) {
-    data.notes.push({ id: Date.now(), content, images: [..._noteImages] });
+    data.notes.push({ id: Date.now(), content });
   } else {
     const note = data.notes.find(n => n.id === _noteEditId);
-    if (note) { note.content = content; note.images = [..._noteImages]; }
+    if (note) note.content = content;
   }
-  _noteImages = [];
   save();
   closeModal('modal-note-sheet');
   renderNotes();
@@ -2591,9 +2616,20 @@ function noteInsertImage() {
     showUploadStatus('上傳圖片中…');
     try {
       const url = await uploadToImgBB(file);
-      _noteImages.push(url);
-      _renderNoteImgPreview();
       showUploadStatus('');
+      // Insert [[IMG:url]] at cursor position in textarea
+      const ta = document.getElementById('note-sheet-content');
+      const start = ta.selectionStart;
+      const end   = ta.selectionEnd;
+      const marker = `
+[[IMG:${url}]]
+`;
+      ta.value = ta.value.slice(0, start) + marker + ta.value.slice(end);
+      const newPos = start + marker.length;
+      ta.setSelectionRange(newPos, newPos);
+      ta.focus();
+      // Show inline preview in textarea area
+      _renderNoteImgPreview();
     } catch(e) {
       showUploadStatus('');
       showToast('上傳失敗，請再試一次');
@@ -2603,19 +2639,30 @@ function noteInsertImage() {
 }
 
 function _renderNoteImgPreview() {
+  // Parse [[IMG:url]] from textarea and show thumbnails below
+  const ta = document.getElementById('note-sheet-content');
   const wrap = document.getElementById('note-img-preview');
-  if (!wrap) return;
-  if (_noteImages.length === 0) { wrap.innerHTML = ''; return; }
-  wrap.innerHTML = _noteImages.map((url, i) =>
-    `<div style="position:relative;display:inline-block">
+  if (!ta || !wrap) return;
+  const matches = [...ta.value.matchAll(/\[\[IMG:([^\]]+)\]\]/g)];
+  if (!matches.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = matches.map((m, i) => {
+    const url = m[1];
+    return `<div style="position:relative;display:inline-block">
       <img src="${url}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;display:block">
       <button onclick="_removeNoteImg(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#1A1A1A;border:none;color:#fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">×</button>
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
 }
 
 function _removeNoteImg(idx) {
-  _noteImages.splice(idx, 1);
+  // Remove the idx-th [[IMG:...]] from textarea
+  const ta = document.getElementById('note-sheet-content');
+  let count = 0;
+  ta.value = ta.value.replace(/
+?\[\[IMG:[^\]]+\]\]
+?/g, match => {
+    return count++ === idx ? '' : match;
+  });
   _renderNoteImgPreview();
 }
 
