@@ -3264,8 +3264,6 @@ textarea ~ .field-x {
 #screen-info-map {
   display: none;
   flex-direction: column;
-  /* Override page padding-bottom so viewer fills to tab bar */
-  padding-bottom: var(--tab-height) !important;
   overflow: hidden;
 }
 #screen-info-map.active {

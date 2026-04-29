@@ -1841,27 +1841,36 @@ function renderMapSub() {
   const maps = data.maps || [];
   const hasMap = maps.length > 0;
 
-  const emptyEl   = document.getElementById('map-empty-state');
-  const viewerEl  = document.getElementById('map-viewer');
-  const iconAdd   = document.getElementById('map-action-icon-add');
+  const emptyEl     = document.getElementById('map-empty-state');
+  const viewerEl    = document.getElementById('map-viewer');
+  const iconAdd     = document.getElementById('map-action-icon-add');
   const iconRefresh = document.getElementById('map-action-icon-refresh');
 
   if (hasMap) {
-    // Show viewer, hide empty
-    emptyEl.style.display  = 'none';
-    viewerEl.style.display = 'block';
-    iconAdd.style.display  = 'none';
+    emptyEl.style.display     = 'none';
+    viewerEl.style.display    = 'block';
+    iconAdd.style.display     = 'none';
     iconRefresh.style.display = '';
-    // Load current map (always first for now)
-    const m = maps[maps.length - 1]; // most recent = current
+    // Position viewer: top = below header, bottom = above tab bar
+    _mapSizeViewer();
+    const m = maps[maps.length - 1];
     _mapLoadImage(m.url);
   } else {
-    // Show empty state
-    emptyEl.style.display  = 'flex';
-    viewerEl.style.display = 'none';
-    iconAdd.style.display  = '';
+    emptyEl.style.display     = 'flex';
+    viewerEl.style.display    = 'none';
+    iconAdd.style.display     = '';
     iconRefresh.style.display = 'none';
   }
+}
+
+function _mapSizeViewer() {
+  const header   = document.getElementById('map-sub-header');
+  const viewerEl = document.getElementById('map-viewer');
+  if (!header || !viewerEl) return;
+  const headerH = header.getBoundingClientRect().height || (44 + parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-top')) || 88);
+  const tabH    = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tab-height')) || 83;
+  viewerEl.style.top    = (headerH + 30) + 'px';
+  viewerEl.style.bottom = tabH + 'px';
 }
 
 function onMapActionBtn() {
@@ -1939,12 +1948,10 @@ function mapResetView() {
   if (!viewer || !img) return;
   const vw = viewer.clientWidth, vh = viewer.clientHeight;
   const iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
-  const scaleH = vh / (vw * (ih / iw));
-  _mapScale = Math.min(scaleH, 1);
+  _mapScale = vh / (vw * (ih / iw));
   const renderedW = vw * _mapScale;
-  const renderedH = vw * (ih / iw) * _mapScale;
   _mapTx = (vw - renderedW) / 2;
-  _mapTy = (vh - renderedH) / 2;
+  _mapTy = 0;
   _mapApply(true);
 }
 
@@ -2061,20 +2068,20 @@ function _mapLoadImage(url) {
   img.style.transform = '';
 
   img.onload = () => {
-    const vw = viewer.clientWidth, vh = viewer.clientHeight;
-    const iw = img.naturalWidth  || vw;
-    const ih = img.naturalHeight || vh;
-    // Scale to fit height; if image is wider than tall, fit width instead
-    const scaleH = vh / (vw * (ih / iw));
-    const scaleW = 1; // img CSS width = 100% of viewer at scale 1
-    _mapScale = Math.min(scaleH, scaleW);
-    // Centre: rendered size at chosen scale
-    const renderedW = vw * _mapScale;
-    const renderedH = vw * (ih / iw) * _mapScale;
-    _mapTx = (vw - renderedW) / 2;
-    _mapTy = (vh - renderedH) / 2;
-    _mapApply(false);
-    mapInitPanZoom();
+    // rAF ensures viewer has its final dimensions after layout
+    requestAnimationFrame(() => {
+      const vw = viewer.clientWidth, vh = viewer.clientHeight;
+      const iw = img.naturalWidth  || vw;
+      const ih = img.naturalHeight || vh;
+      // Always fit height — image fills viewer top to bottom, no gap
+      _mapScale = vh / (vw * (ih / iw));
+      const renderedW = vw * _mapScale;
+      // Centre horizontally
+      _mapTx = (vw - renderedW) / 2;
+      _mapTy = 0;
+      _mapApply(false);
+      mapInitPanZoom();
+    });
   };
   img.onerror = () => showToast('地圖圖片載入失敗');
   img.src = url;
