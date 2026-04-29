@@ -3375,10 +3375,25 @@ function renderMap() {
   if (url) {
     emptyEl.style.display = 'none';
     boxEl.style.display   = 'flex';
-    if (imgEl.src !== url) {
+    _mapFitW = 0; _mapFitH = 0;
+    if (imgEl.getAttribute('data-src') !== url) {
+      imgEl.setAttribute('data-src', url);
       imgEl.src = url;
-      _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapFitW = 0; _mapFitH = 0;
-      imgEl.onload = function() { _mapInitSize(); _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapApply(false); };
+      imgEl.onload = function() {
+        // 等瀏覽器算好 box 尺寸再 init
+        requestAnimationFrame(function() {
+          _mapSc = 1;
+          _mapInitSize();
+          _mapApply(false);
+        });
+      };
+    } else if (imgEl.complete && imgEl.naturalWidth) {
+      // 已載入（切換回來時）
+      requestAnimationFrame(function() {
+        _mapSc = 1;
+        _mapInitSize();
+        _mapApply(false);
+      });
     }
   } else {
     emptyEl.style.display = 'flex';
@@ -3428,7 +3443,11 @@ function _mapApply(smooth) {
 }
 
 function mapResetZoom() {
-  _mapSc = 1; _mapInitSize(); _mapApply(true);
+  _mapSc = 1;
+  requestAnimationFrame(function() {
+    _mapInitSize();
+    _mapApply(true);
+  });
 }
 
 function _mapZoomAt(px, py, factor) {
