@@ -3377,8 +3377,8 @@ function renderMap() {
     boxEl.style.display   = 'flex';
     if (imgEl.src !== url) {
       imgEl.src = url;
-      _mapSc = 1; _mapTx = 0; _mapTy = 0;
-      imgEl.onload = function() { _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapApply(false); };
+      _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapFitW = 0; _mapFitH = 0;
+      imgEl.onload = function() { _mapInitSize(); _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapApply(false); };
     }
   } else {
     emptyEl.style.display = 'flex';
@@ -3392,23 +3392,43 @@ var _mapMAX = 6;
 
 function _mapClamp(v, a, b) { return Math.min(Math.max(v, a), b); }
 
+var _mapFitW = 0, _mapFitH = 0; // 初始 fit 後的圖片像素尺寸
+
+function _mapInitSize() {
+  var box = document.getElementById('map-box');
+  var img = document.getElementById('map-img');
+  if (!box || !img || !img.naturalWidth) return;
+  var vw = box.offsetWidth, vh = box.offsetHeight;
+  var iw = img.naturalWidth, ih = img.naturalHeight;
+  _mapFitH = vh;
+  _mapFitW = vh * iw / ih;
+  img.style.width  = _mapFitW + 'px';
+  img.style.height = _mapFitH + 'px';
+  // 水平置中
+  _mapTx = (_mapFitW > vw) ? 0 : (vw - _mapFitW) / 2;
+  _mapTy = 0;
+}
+
 function _mapApply(smooth) {
   var box = document.getElementById('map-box');
   var img = document.getElementById('map-img');
   if (!box || !img) return;
   var vw = box.offsetWidth, vh = box.offsetHeight;
-  var iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
-  // 以高度為基準：圖片 height=100% 時的自然寬度
-  var baseW = vh * (iw / ih);
-  var rw = baseW * _mapSc, rh = vh * _mapSc;
-  _mapTx = _mapClamp(_mapTx, Math.min(0, vw - rw), 0);
-  _mapTy = _mapClamp(_mapTy, Math.min(0, vh - rh), 0);
+  var rw = _mapFitW * _mapSc, rh = _mapFitH * _mapSc;
+  if (!rw || !rh) return;
+  // 若縮放後圖比 box 小，保持置中；否則限制不超出邊界
+  var minTx = rw < vw ? (vw - rw) / 2 : Math.min(0, vw - rw);
+  var maxTx = rw < vw ? (vw - rw) / 2 : 0;
+  var minTy = rh < vh ? (vh - rh) / 2 : Math.min(0, vh - rh);
+  var maxTy = rh < vh ? (vh - rh) / 2 : 0;
+  _mapTx = _mapClamp(_mapTx, minTx, maxTx);
+  _mapTy = _mapClamp(_mapTy, minTy, maxTy);
   img.style.transition = smooth ? 'transform .18s ease' : 'none';
   img.style.transform = 'translate(' + _mapTx + 'px,' + _mapTy + 'px) scale(' + _mapSc + ')';
 }
 
 function mapResetZoom() {
-  _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapApply(true);
+  _mapSc = 1; _mapInitSize(); _mapApply(true);
 }
 
 function _mapZoomAt(px, py, factor) {
@@ -3501,7 +3521,7 @@ function _mapZoomAt(px, py, factor) {
       _mapZoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 0.9);
     }, { passive: false });
 
-    document.getElementById('map-zr').onclick = null; // handled by inline onclick
+    // map-zr handled by inline onclick="mapResetZoom()"
   });
 })();
 
