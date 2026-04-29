@@ -1206,7 +1206,7 @@ function renderTimeline() {
     const addrHtml = ev.addr ? `<div class="timeline-addr" onclick="openAddr('${esc(ev.addr)}')">${esc(ev.addr)}</div>` : '';
     const stationHtml = (ev.station || ev.line) ? `
       <div class="timeline-station-row">
-        ${ev.station ? `<span class="timeline-station-name">${esc(ev.station)}</span>` : ''}
+        ${ev.station ? `<span class="timeline-station-name" onclick="openTransit('${esc(ev.station||'')}','${esc(ev.line||'')}')" style="cursor:pointer">${esc(ev.station)}</span>` : ''}
         ${ev.line ? `<span class="transit-pill" style="background:${ev.lineColor||'#999'}" onclick="openTransit('${esc(ev.station||'')}','${esc(ev.line||'')}')">${esc(ev.line)}</span>` : ''}
       </div>` : '';
     return `
@@ -1516,13 +1516,13 @@ function openAddr(addr) {
 }
 
 function openTransit(station, line) {
-  // Check if map module is enabled
   const modules = data.settings?.infoModules || [];
-  if (modules.includes('map')) {
-    switchTab('info');
-    openInfoSub('map');
-  }
-  // else: no action
+  if (!modules.includes('map')) return;
+  switchTab('info');
+  // 直接呼叫原始 openInfoSub 切換畫面，再開地圖跳 pin
+  document.getElementById('screen-info').classList.remove('active');
+  document.getElementById('screen-info-map').classList.add('active');
+  _mapOpen(getMapUrl(), station);
 }
 
 
@@ -3339,104 +3339,310 @@ document.addEventListener('DOMContentLoaded', () => {
    MAP MODULE
 ═══════════════════════════════════════ */
 function getMapUrl(){return(data&&data.mapUrl)?data.mapUrl:'';}
+function getMapPins(){if(!data)return[];if(!data.mapPins)data.mapPins=[];return data.mapPins;}
 
 async function addMapPhoto(input){
-  var file=input.files[0]; if(!file)return; input.value='';
+  var file=input.files[0];if(!file)return;input.value='';
   showUploadStatus('上傳中...');
   try{
     var url=await uploadToImgBB(file);
-    data.mapUrl=url; save(); showToast('地圖已更新');
+    data.mapUrl=url;save();showToast('地圖已更新');
     _mapOpen(url);
   }catch(err){alert('上傳失敗：'+err.message);}
   finally{showUploadStatus('');}
 }
 
-/* 完全照曼谷 ap() 邏輯，加置中 */
+/* ─── 狀態 ─── */
+var _mSc=1,_mTx=0,_mTy=0,_mMAX=6;
+function _mClamp(v,a,b){return Math.min(Math.max(v,a),b);}
+
+/* ─── 開啟地圖 ─── */
+window._mapOpen=function(url, jumpPin){
+  var empty=document.getElementById('map-empty-view');
+  var box=document.getElementById('map-box');
+  var img=document.getElementById('map-img');
+  if(!box||!img)return;
+  if(!url){empty.style.display='flex';box.style.display='none';return;}
+  empty.style.display='none';
+  box.style.display='flex';
+
+  function applyCenter(){
+    var vw=box.offsetWidth,vh=box.offsetHeight;
+    var iw=img.naturalWidth,ih=img.naturalHeight;
+    if(!vw||!vh||!iw||!ih){setTimeout(applyCenter,30);return;}
+    var baseW=vh*(iw/ih);
+    _mSc=1;
+    _mTx=baseW<vw?(vw-baseW)/2:0;
+    _mTy=0;
+    _mApply(false);
+    _mRenderPins();
+    if(jumpPin) _mJumpToPin(jumpPin, vw, vh, iw, ih);
+  }
+
+  if(img.src===url&&img.complete&&img.naturalWidth){
+    applyCenter();
+  }else{
+    img.onload=applyCenter;
+    img.src=url;
+  }
+};
+
+/* ─── Apply transform ─── */
+function _mApply(smooth){
+  var box=document.getElementById('map-box');
+  var img=document.getElementById('map-img');
+  if(!box||!img)return;
+  var vw=box.offsetWidth,vh=box.offsetHeight;
+  var iw=img.naturalWidth||vw,ih=img.naturalHeight||vh;
+  var baseW=vh*(iw/ih);
+  var renderedW=baseW*_mSc,renderedH=vh*_mSc;
+  var minTx=renderedW<vw?(vw-renderedW)/2:Math.min(0,vw-renderedW);
+  var maxTx=renderedW<vw?(vw-renderedW)/2:0;
+  var minTy=renderedH<vh?(vh-renderedH)/2:Math.min(0,vh-renderedH);
+  var maxTy=renderedH<vh?(vh-renderedH)/2:0;
+  _mTx=_mClamp(_mTx,minTx,maxTx);
+  _mTy=_mClamp(_mTy,minTy,maxTy);
+  img.style.transition=smooth?'transform 0.18s cubic-bezier(0.25,0.46,0.45,0.94)':'none';
+  img.style.transform='translate('+_mTx+'px,'+_mTy+'px) scale('+_mSc+')';
+  _mRenderPins();
+}
+
+function _mZoomAt(px,py,f){
+  var ns=_mClamp(_mSc*f,1,_mMAX);
+  _mTx=px-(px-_mTx)*(ns/_mSc);
+  _mTy=py-(py-_mTy)*(ns/_mSc);
+  _mSc=ns;_mApply(false);
+}
+
+window.mapReset=function(){
+  var box=document.getElementById('map-box');
+  var img=document.getElementById('map-img');
+  if(!box||!img||!img.naturalWidth)return;
+  var vw=box.offsetWidth,vh=box.offsetHeight;
+  var iw=img.naturalWidth,ih=img.naturalHeight;
+  var baseW=vh*(iw/ih);
+  _mSc=1;_mTx=baseW<vw?(vw-baseW)/2:0;_mTy=0;
+  _mApply(true);
+};
+
+/* ─── Pin 跳轉 ─── */
+function _mJumpToPin(pinName, vw, vh, iw, ih){
+  var pins=getMapPins();
+  var pin=pins.find(function(p){return p.name===pinName;});
+  if(!pin)return;
+  var baseW=vh*(iw/ih);
+  // pin 在圖上的像素位置（scale=1）
+  var px=pin.fx*baseW, py=pin.fy*vh;
+  // zoom in to 3x，置中到 pin
+  var targetSc=3;
+  _mSc=targetSc;
+  _mTx=vw/2-px*targetSc;
+  _mTy=vh/2-py*targetSc;
+  _mApply(true);
+}
+
+/* ─── Pin 渲染 ─── */
+function _mRenderPins(){
+  var box=document.getElementById('map-box');
+  var img=document.getElementById('map-img');
+  if(!box||!img||!img.naturalWidth)return;
+  var vw=box.offsetWidth,vh=box.offsetHeight;
+  var iw=img.naturalWidth,ih=img.naturalHeight;
+  var baseW=vh*(iw/ih);
+
+  // 清掉舊 pins
+  box.querySelectorAll('.map-pin').forEach(function(el){el.remove();});
+
+  getMapPins().forEach(function(pin){
+    // 算出 pin 在畫面上的位置
+    var px=pin.fx*baseW*_mSc+_mTx;
+    var py=pin.fy*vh*_mSc+_mTy;
+    var el=document.createElement('div');
+    el.className='map-pin';
+    el.style.cssText='position:absolute;z-index:20;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;';
+    el.style.left=px+'px';
+    el.style.top=py+'px';
+    el.innerHTML=
+      '<div style="background:#C9A84C;color:#fff;font-size:10px;font-weight:700;font-family:var(--mono);padding:2px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3)">'+
+        esc(pin.name)+
+      '</div>'+
+      '<div style="width:8px;height:8px;background:#C9A84C;border-radius:50%;margin:2px auto 0;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>';
+    // 長按刪除
+    var pressTimer=null;
+    el.addEventListener('pointerdown',function(e){
+      e.stopPropagation();
+      pressTimer=setTimeout(function(){
+        pressTimer=null;
+        showConfirm('刪除 Pin','確定刪除「'+pin.name+'」？',function(){
+          data.mapPins=data.mapPins.filter(function(p){return p.id!==pin.id;});
+          save();_mRenderPins();
+        });
+      },600);
+    });
+    el.addEventListener('pointerup',function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}});
+    el.addEventListener('pointerleave',function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}});
+    box.appendChild(el);
+  });
+}
+
+/* ─── 長按地圖新增 Pin ─── */
 (function(){
-  var sc=1,tx=0,ty=0,MAX=6;
-  function cl(v,a,b){return Math.min(Math.max(v,a),b);}
-
-  function ap(sm){
-    var box=document.getElementById('map-box');
-    var img=document.getElementById('map-img');
-    if(!box||!img||!img.naturalWidth)return;
-    var vw=box.offsetWidth, vh=box.offsetHeight;
-    var iw=img.naturalWidth, ih=img.naturalHeight;
-    // 以高度 fit
-    var baseW=vh*(iw/ih);
-    var rw=baseW*sc, rh=vh*sc;
-    // 水平置中 clamp
-    var minX= rw<vw ? (vw-rw)/2 : cl(tx,vw-rw,0);
-    // 如果 sc=1 且圖比 box 窄，強制置中
-    if(sc===1 && baseW<vw){tx=(vw-baseW)/2; ty=0;}
-    else{tx=cl(tx,Math.min(0,vw-rw),0); ty=cl(ty,Math.min(0,vh-rh),0);}
-    img.style.transition=sm?'transform .18s ease':'none';
-    img.style.transform='translate('+tx+'px,'+ty+'px) scale('+sc+')';
-  }
-
-  function za(px,py,f){
-    var box=document.getElementById('map-box');
-    var img=document.getElementById('map-img');
-    if(!box||!img||!img.naturalWidth)return;
-    var vw=box.offsetWidth, vh=box.offsetHeight;
-    var iw=img.naturalWidth, ih=img.naturalHeight;
-    var baseW=vh*(iw/ih);
-    var ns=cl(sc*f,1,MAX);
-    tx=px-(px-tx)*(ns/sc); ty=py-(py-ty)*(ns/sc);
-    sc=ns; ap(true);
-  }
-
-  window.mapReset=function(){
-    var box=document.getElementById('map-box');
-    var img=document.getElementById('map-img');
-    if(!box||!img||!img.naturalWidth)return;
-    var vw=box.offsetWidth, vh=box.offsetHeight;
-    var iw=img.naturalWidth, ih=img.naturalHeight;
-    var baseW=vh*(iw/ih);
-    sc=1; tx= baseW<vw ? (vw-baseW)/2 : 0; ty=0; ap(true);
-  };
-
-  window._mapOpen=function(url){
-    var empty=document.getElementById('map-empty-view');
-    var box=document.getElementById('map-box');
-    var img=document.getElementById('map-img');
-    if(!box||!img)return;
-    if(!url){empty.style.display='flex';box.style.display='none';return;}
-    empty.style.display='none'; box.style.display='flex';
-    sc=1; tx=0; ty=0;
-    function init(){
-      var vw=box.offsetWidth, vh=box.offsetHeight;
-      var iw=img.naturalWidth, ih=img.naturalHeight;
-      if(!vw||!vh||!iw||!ih){setTimeout(init,30);return;}
-      // 以高度 fit，設 img 尺寸
-      var baseW=vh*(iw/ih);
-      img.style.width=baseW+'px';
-      img.style.height=vh+'px';
-      sc=1;
-      tx= baseW<vw ? (vw-baseW)/2 : 0;
-      ty=0;
-      ap(false);
-    }
-    if(img.src===url&&img.complete&&img.naturalWidth){init();}
-    else{img.onload=init; img.src=url;}
-  };
-
-  var dg=false,sx=0,sy=0,lx=0,ly=0,lt=0,mvx=0,mvy=0,lt2=null,raf=null;
-  function mo(){cancelAnimationFrame(raf);var d=.88;(function t(){if(Math.abs(mvx)<.3&&Math.abs(mvy)<.3)return;tx+=mvx;ty+=mvy;mvx*=d;mvy*=d;ap(false);raf=requestAnimationFrame(t);})();}
-
   document.addEventListener('DOMContentLoaded',function(){
     var box=document.getElementById('map-box');
     if(!box)return;
-    box.addEventListener('touchstart',function(e){cancelAnimationFrame(raf);mvx=mvy=0;if(e.touches.length===1){dg=true;sx=e.touches[0].clientX-tx;sy=e.touches[0].clientY-ty;lx=e.touches[0].clientX;ly=e.touches[0].clientY;lt=Date.now();}else{dg=false;lt2=e.touches;}e.preventDefault();},{passive:false});
-    box.addEventListener('touchmove',function(e){if(e.touches.length===1&&dg){var now=Date.now(),nx=e.touches[0].clientX,ny=e.touches[0].clientY,dt=Math.max(now-lt,1);mvx=(nx-lx)/dt*12;mvy=(ny-ly)/dt*12;lx=nx;ly=ny;lt=now;tx=nx-sx;ty=ny-sy;ap(false);}else if(e.touches.length===2&&lt2){var t0=e.touches[0],t1=e.touches[1],p0=lt2[0],p1=lt2[1];var pd=Math.hypot(p0.clientX-p1.clientX,p0.clientY-p1.clientY),cd=Math.hypot(t0.clientX-t1.clientX,t0.clientY-t1.clientY);var mx=(t0.clientX+t1.clientX)/2,my=(t0.clientY+t1.clientY)/2,r=box.getBoundingClientRect();za(mx-r.left,my-r.top,cd/pd);tx+=(mx-(p0.clientX+p1.clientX)/2);ty+=(my-(p0.clientY+p1.clientY)/2);lt2=e.touches;ap(false);}e.preventDefault();},{passive:false});
-    box.addEventListener('touchend',function(e){dg=false;lt2=e.touches.length?e.touches:null;mo();});
-    box.addEventListener('mousedown',function(e){cancelAnimationFrame(raf);mvx=mvy=0;dg=true;sx=e.clientX-tx;sy=e.clientY-ty;lx=e.clientX;ly=e.clientY;lt=Date.now();});
-    window.addEventListener('mousemove',function(e){if(!dg)return;var now=Date.now(),dt=Math.max(now-lt,1);mvx=(e.clientX-lx)/dt*12;mvy=(e.clientY-ly)/dt*12;lx=e.clientX;ly=e.clientY;lt=now;tx=e.clientX-sx;ty=e.clientY-sy;ap(false);});
-    window.addEventListener('mouseup',function(){if(dg){dg=false;mo();}});
-    box.addEventListener('wheel',function(e){e.preventDefault();var r=box.getBoundingClientRect();za(e.clientX-r.left,e.clientY-r.top,e.deltaY<0?1.12:.9);},{passive:false});
+
+    var pressTimer=null, pressX=0, pressY=0, moved=false;
+
+    box.addEventListener('pointerdown',function(e){
+      if(e.target.closest('.map-pin'))return;
+      moved=false;
+      pressX=e.clientX; pressY=e.clientY;
+      pressTimer=setTimeout(function(){
+        pressTimer=null;
+        // 計算 fx,fy
+        var img=document.getElementById('map-img');
+        if(!img||!img.naturalWidth)return;
+        var r=box.getBoundingClientRect();
+        var vw=box.offsetWidth,vh=box.offsetHeight;
+        var iw=img.naturalWidth,ih=img.naturalHeight;
+        var baseW=vh*(iw/ih);
+        var lx=pressX-r.left, ly=pressY-r.top;
+        var fx=(lx-_mTx)/(_mSc*baseW);
+        var fy=(ly-_mTy)/(_mSc*vh);
+        if(fx<0||fx>1||fy<0||fy>1)return;
+        // 彈出輸入框
+        _mShowPinInput(fx,fy,lx,ly);
+      },600);
+    });
+    box.addEventListener('pointermove',function(e){
+      if(Math.abs(e.clientX-pressX)>8||Math.abs(e.clientY-pressY)>8){
+        moved=true;
+        if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}
+      }
+    });
+    box.addEventListener('pointerup',function(){
+      if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}
+    });
   });
 })();
 
+function _mShowPinInput(fx,fy,lx,ly){
+  // 移除已有的輸入框
+  var old=document.getElementById('map-pin-input-wrap');
+  if(old)old.remove();
+  var box=document.getElementById('map-box');
+
+  var wrap=document.createElement('div');
+  wrap.id='map-pin-input-wrap';
+  wrap.style.cssText='position:absolute;z-index:30;background:#fff;border-radius:10px;padding:10px 12px;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;gap:8px;align-items:center;';
+  // 位置：點擊處附近
+  var bw=box.offsetWidth,bh=box.offsetHeight;
+  var wLeft=Math.min(lx,bw-200);
+  var wTop=ly-60;
+  if(wTop<8)wTop=ly+20;
+  wrap.style.left=wLeft+'px';
+  wrap.style.top=wTop+'px';
+
+  var inp=document.createElement('input');
+  inp.type='text';
+  inp.placeholder='站名';
+  inp.style.cssText='border:none;border-bottom:1.5px solid #C9A84C;outline:none;font-size:14px;font-family:var(--mono);width:120px;padding:2px 0;';
+
+  var btn=document.createElement('button');
+  btn.textContent='確定';
+  btn.style.cssText='background:#1A1A1A;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:13px;font-family:var(--mono);cursor:pointer;';
+  btn.onclick=function(){
+    var name=inp.value.trim();
+    if(!name){inp.focus();return;}
+    if(!data.mapPins)data.mapPins=[];
+    data.mapPins.push({id:Date.now(),name:name,fx:fx,fy:fy});
+    save();wrap.remove();_mRenderPins();
+    showToast('已新增 Pin：'+name);
+  };
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter')btn.onclick();});
+
+  var cancel=document.createElement('button');
+  cancel.textContent='×';
+  cancel.style.cssText='background:none;border:none;font-size:18px;color:#999;cursor:pointer;padding:0 2px;';
+  cancel.onclick=function(){wrap.remove();};
+
+  wrap.appendChild(inp);wrap.appendChild(btn);wrap.appendChild(cancel);
+  box.appendChild(wrap);
+  setTimeout(function(){inp.focus();},50);
+}
+
+/* ─── 手勢 ─── */
+(function(){
+  document.addEventListener('DOMContentLoaded',function(){
+    var box=document.getElementById('map-box');
+    if(!box)return;
+    var dragging=false,startX=0,startY=0,lastTouches=null;
+    var mvx=0,mvy=0,lmx=0,lmy=0,lmt=0,rafId=null;
+
+    function momentum(){
+      cancelAnimationFrame(rafId);var d=0.88;
+      (function tick(){
+        if(Math.abs(mvx)<0.3&&Math.abs(mvy)<0.3)return;
+        _mTx+=mvx;_mTy+=mvy;mvx*=d;mvy*=d;
+        _mApply(false);rafId=requestAnimationFrame(tick);
+      })();
+    }
+
+    box.addEventListener('touchstart',function(e){
+      cancelAnimationFrame(rafId);mvx=mvy=0;
+      if(e.touches.length===1){
+        dragging=true;
+        startX=e.touches[0].clientX-_mTx;startY=e.touches[0].clientY-_mTy;
+        lmx=e.touches[0].clientX;lmy=e.touches[0].clientY;lmt=Date.now();
+      }else{dragging=false;lastTouches=e.touches;}
+      e.preventDefault();
+    },{passive:false});
+
+    box.addEventListener('touchmove',function(e){
+      if(e.touches.length===1&&dragging){
+        var now=Date.now(),nx=e.touches[0].clientX,ny=e.touches[0].clientY,dt=Math.max(now-lmt,1);
+        mvx=(nx-lmx)/dt*12;mvy=(ny-lmy)/dt*12;lmx=nx;lmy=ny;lmt=now;
+        _mTx=nx-startX;_mTy=ny-startY;_mApply(false);
+      }else if(e.touches.length===2&&lastTouches){
+        var t0=e.touches[0],t1=e.touches[1],p0=lastTouches[0],p1=lastTouches[1];
+        var pd=Math.hypot(p0.clientX-p1.clientX,p0.clientY-p1.clientY);
+        var cd=Math.hypot(t0.clientX-t1.clientX,t0.clientY-t1.clientY);
+        var mx=(t0.clientX+t1.clientX)/2,my=(t0.clientY+t1.clientY)/2;
+        var r=box.getBoundingClientRect();
+        _mZoomAt(mx-r.left,my-r.top,cd/pd);
+        _mTx+=(mx-(p0.clientX+p1.clientX)/2);
+        _mTy+=(my-(p0.clientY+p1.clientY)/2);
+        lastTouches=e.touches;_mApply(false);
+      }
+      e.preventDefault();
+    },{passive:false});
+
+    box.addEventListener('touchend',function(e){
+      dragging=false;lastTouches=e.touches.length?e.touches:null;momentum();
+    });
+    box.addEventListener('mousedown',function(e){
+      if(e.target.closest('.map-pin')||e.target.closest('#map-pin-input-wrap'))return;
+      cancelAnimationFrame(rafId);mvx=mvy=0;dragging=true;
+      startX=e.clientX-_mTx;startY=e.clientY-_mTy;
+      lmx=e.clientX;lmy=e.clientY;lmt=Date.now();
+    });
+    window.addEventListener('mousemove',function(e){
+      if(!dragging)return;
+      var now=Date.now(),dt=Math.max(now-lmt,1);
+      mvx=(e.clientX-lmx)/dt*12;mvy=(e.clientY-lmy)/dt*12;
+      lmx=e.clientX;lmy=e.clientY;lmt=now;
+      _mTx=e.clientX-startX;_mTy=e.clientY-startY;_mApply(false);
+    });
+    window.addEventListener('mouseup',function(){if(dragging){dragging=false;momentum();}});
+    box.addEventListener('wheel',function(e){
+      e.preventDefault();
+      var r=box.getBoundingClientRect();
+      _mZoomAt(e.clientX-r.left,e.clientY-r.top,e.deltaY<0?1.12:0.9);
+    },{passive:false});
+  });
+})();
+
+/* ─── openInfoSub hook ─── */
 const _orig_ois2=window.openInfoSub;
 window.openInfoSub=function(name){
   _orig_ois2(name);
