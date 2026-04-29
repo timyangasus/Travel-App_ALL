@@ -3198,7 +3198,7 @@ canvas { display: block; width: 100%; height: 100%; }
 .note-card-toggle:active { color: #888; }
 .note-card-title {
   font-family: var(--mono);
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 700;
   color: #1A1A1A;
   margin-bottom: 8px;
@@ -3207,8 +3207,8 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .note-card-body {
   font-family: var(--mono);
-  font-size: 17px;
-  color: #1A1A1A;
+  font-size: 13px;
+  color: #666;
   line-height: 1.65;
   word-break: break-word;
   white-space: pre-wrap;
@@ -3262,25 +3262,11 @@ textarea ~ .field-x {
 
 /* ===================== MAP SUB-SCREEN ===================== */
 #screen-info-map {
-  display: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  overflow: hidden !important;
-  overscroll-behavior: none !important;
-  -webkit-overflow-scrolling: auto !important;
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: var(--tab-height) !important;
-  z-index: 10;
+  display: none;
+  flex-direction: column;
 }
 #screen-info-map.active {
-  display: block !important;
-}
-#map-sub-header {
-  position: relative;
-  z-index: 2;
+  display: flex;
 }
 /* Prevent page scroll on map viewer */
 #map-viewer {

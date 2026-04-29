@@ -1841,61 +1841,52 @@ function renderMapSub() {
   const maps = data.maps || [];
   const hasMap = maps.length > 0;
 
-  const emptyEl     = document.getElementById('map-empty-state');
-  const viewerEl    = document.getElementById('map-viewer');
-  const iconAdd     = document.getElementById('map-action-icon-add');
+  const emptyEl   = document.getElementById('map-empty-state');
+  const viewerEl  = document.getElementById('map-viewer');
+  const iconAdd   = document.getElementById('map-action-icon-add');
   const iconRefresh = document.getElementById('map-action-icon-refresh');
 
   if (hasMap) {
-    emptyEl.style.display     = 'none';
-    viewerEl.style.display    = 'block';
-    iconAdd.style.display     = 'none';
+    // Show viewer, hide empty
+    emptyEl.style.display  = 'none';
+    viewerEl.style.display = 'block';
+    iconAdd.style.display  = 'none';
     iconRefresh.style.display = '';
-    // Position viewer: top = below header, bottom = above tab bar
-    _mapSizeViewer();
-    const m = maps[maps.length - 1];
+    // Load current map (always first for now)
+    const m = maps[maps.length - 1]; // most recent = current
     _mapLoadImage(m.url);
   } else {
-    emptyEl.style.display     = 'flex';
-    viewerEl.style.display    = 'none';
-    iconAdd.style.display     = '';
+    // Show empty state
+    emptyEl.style.display  = 'flex';
+    viewerEl.style.display = 'none';
+    iconAdd.style.display  = '';
     iconRefresh.style.display = 'none';
   }
 }
 
-function _mapSizeViewer() {
-  const header   = document.getElementById('map-sub-header');
-  const viewerEl = document.getElementById('map-viewer');
-  if (!header || !viewerEl) return;
-  requestAnimationFrame(() => {
-    const topPx = header.getBoundingClientRect().height + 15; // 15px gap below header
-    viewerEl.style.top    = topPx + 'px';
-    viewerEl.style.bottom = '0';
-    viewerEl.style.height = '';
-  });
+function onMapActionBtn() {
+  const maps = data.maps || [];
+  // Both empty and has-map → open add sheet (title changes)
+  const titleEl = document.getElementById('map-add-sheet-title');
+  titleEl.textContent = maps.length > 0 ? '換一張地圖' : '新增地圖';
+  document.getElementById('map-add-name').value = '';
+  document.getElementById('map-add-url').value  = '';
+  document.getElementById('modal-map-add').classList.add('open');
+  setTimeout(() => initInputClearBtns(document.getElementById('modal-map-add')), 100);
 }
 
-function onMapActionBtn() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.onchange = async () => {
-    const file = input.files[0];
-    if (!file) return;
-    showUploadStatus('上傳地圖中…');
-    try {
-      const url = await uploadToImgBB(file);
-      if (!data.maps) data.maps = [];
-      data.maps = [{ name: file.name || '地圖', url }];
-      save();
-      showUploadStatus('');
-      renderMapSub();
-    } catch(e) {
-      showUploadStatus('');
-      showToast('上傳失敗，請再試一次');
-    }
-  };
-  input.click();
+function saveMapAdd() {
+  const name = document.getElementById('map-add-name').value.trim();
+  const url  = document.getElementById('map-add-url').value.trim();
+  if (!url) { showToast('請輸入圖片網址'); return; }
+  if (!data.maps) data.maps = [];
+  // Replace or add
+  data.maps = [{ name: name || '地圖', url }];
+  save();
+  closeModal('modal-map-add');
+  renderMapSub();
+  // init pan/zoom after image loads
+  setTimeout(mapInitPanZoom, 200);
 }
 
 /* ─── Pan / Zoom Engine (曼谷地圖寫法) ─── */
@@ -1915,8 +1906,9 @@ function _mapGetMinScale() {
   const vh = viewer.clientHeight;
   const iw = img.naturalWidth;
   const ih = img.naturalHeight;
-  // Min scale = fit height exactly — cannot zoom out further
-  return vh / (vw * (ih / iw));
+  // Fit image height to viewer height
+  const scaleByH = vh / (vw * (ih / iw));
+  return Math.min(1, scaleByH);
 }
 
 function _mapClamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
@@ -1944,21 +1936,19 @@ function _mapApply(smooth) {
 }
 
 function mapResetView() {
+  // Fit image height to viewer
   const viewer = document.getElementById('map-viewer');
   const img    = document.getElementById('map-img');
   if (!viewer || !img) return;
-  _mapSizeViewer();
-  requestAnimationFrame(() => {
-    const vw = viewer.clientWidth;
-    const vh = viewer.clientHeight;
-    const iw = img.naturalWidth  || vw;
-    const ih = img.naturalHeight || vh;
-    _mapScale = vh / (vw * (ih / iw));
-    const renderedW = vw * _mapScale;
-    _mapTx = (vw - renderedW) / 2;
-    _mapTy = 0;
-    _mapApply(true);
-  });
+  const vw = viewer.clientWidth, vh = viewer.clientHeight;
+  const iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
+  // Scale so image height = viewer height
+  const scaleH = vh / (vw * (ih / iw));
+  _mapScale = scaleH;
+  _mapTx = 0;
+  _mapTy = 0;
+  _mapConstrain();
+  _mapApply(true);
 }
 
 function _mapZoomAt(px, py, factor) {
@@ -2074,20 +2064,16 @@ function _mapLoadImage(url) {
   img.style.transform = '';
 
   img.onload = () => {
-    // rAF ensures viewer has its final dimensions after layout
-    requestAnimationFrame(() => {
-      const vw = viewer.clientWidth, vh = viewer.clientHeight;
-      const iw = img.naturalWidth  || vw;
-      const ih = img.naturalHeight || vh;
-      // Always fit height — image fills viewer top to bottom, no gap
-      _mapScale = vh / (vw * (ih / iw));
-      const renderedW = vw * _mapScale;
-      // Centre horizontally
-      _mapTx = (vw - renderedW) / 2;
-      _mapTy = 0;
-      _mapApply(false);
-      mapInitPanZoom();
-    });
+    // Fit height to viewer
+    const vw = viewer.clientWidth, vh = viewer.clientHeight;
+    const ih = img.naturalHeight || 1;
+    const iw = img.naturalWidth  || vw;
+    const scaleH = vh / (vw * (ih / iw));
+    _mapScale = scaleH;
+    _mapTx = 0; _mapTy = 0;
+    _mapConstrain();
+    _mapApply(false);
+    mapInitPanZoom();
   };
   img.onerror = () => showToast('地圖圖片載入失敗');
   img.src = url;
@@ -2473,28 +2459,10 @@ function deleteTicketPhoto(id) {
    NOTES — card-based
 ═══════════════════════════════════════ */
 let _noteEditId = null;
-let _noteImages = []; // staging images in sheet
 
 function noteBodyToHtml(text) {
-  // Split by [[IMG:url]] markers to interleave text and images
-  const segments = text.split(/\[\[IMG:([^\]]+)\]\]/);
-  // segments alternates: text, url, text, url, ...
-  let html = '';
-  for (let i = 0; i < segments.length; i++) {
-    if (i % 2 === 0) {
-      // text segment
-      const t = segments[i].trim();
-      if (t) {
-        const escaped = esc(t).replace(/(https?:\/\/[^\s]+)/g, url =>
-          `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`);
-        html += `<span style="white-space:pre-wrap">${escaped}</span>`;
-      }
-    } else {
-      // image url segment
-      html += `<img src="${segments[i]}" style="max-width:100%;border-radius:8px;display:block;margin:8px 0" onclick="event.stopPropagation()">`;
-    }
-  }
-  return html;
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return esc(text).replace(urlRegex, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`);
 }
 
 function openNoteSheet(id) {
@@ -2503,22 +2471,11 @@ function openNoteSheet(id) {
   document.getElementById('note-sheet-title').textContent = isNew ? '新增筆記' : '編輯筆記';
   const delRow = document.getElementById('note-delete-row');
   if (delRow) delRow.style.display = isNew ? 'none' : 'flex';
-  const note = isNew ? null : data.notes.find(n => n.id === id);
+  const content = isNew ? '' : (data.notes.find(n => n.id === id)?.content || '');
   const ta = document.getElementById('note-sheet-content');
-  // Merge legacy images into content as [[IMG:]] markers at end (one-time migration)
-  let noteContent = note?.content || '';
-  if (note?.images?.length && !noteContent.includes('[[IMG:')) {
-    noteContent += '
-' + note.images.map(u => `[[IMG:${u}]]`).join('
-');
-  }
-  ta.value = noteContent;
-  // Cursor to beginning
-  ta.setSelectionRange(0, 0);
-  // Render inline preview
-  _renderNoteImgPreview();
+  ta.value = content;
   document.getElementById('modal-note-sheet').classList.add('open');
-  setTimeout(() => { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }, 340);
+  setTimeout(() => ta.focus(), 340);
 }
 
 function renderNotes() {
@@ -2537,14 +2494,7 @@ function renderNotes() {
     const lines = (n.content || '').split('\n');
     const title = lines[0] || '';
     const body = lines.slice(1).join('\n').trim();
-    // Merge legacy images into body text for rendering
-    let fullBody = body;
-    if (n.images?.length && !fullBody.includes('[[IMG:')) {
-      fullBody += '
-' + n.images.map(u => `[[IMG:${u}]]`).join('
-');
-    }
-    const bodyHtml = fullBody ? noteBodyToHtml(fullBody) : '';
+    const bodyHtml = body ? noteBodyToHtml(body) : '';
     return `<div class="note-card" id="ncard-${n.id}">
       <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:2px 6px">×</button>
       <div class="note-card-inner" id="ninner-${n.id}">
@@ -2574,13 +2524,11 @@ function renderNotes() {
 }
 
 function toggleNoteCard(id) {
-  const inner  = document.getElementById('ninner-'  + id);
+  const inner = document.getElementById('ninner-' + id);
   const toggle = document.getElementById('ntoggle-' + id);
-  const fade   = document.getElementById('nfade-'   + id);
   if (!inner || !toggle) return;
   const expanded = inner.classList.toggle('expanded');
   toggle.textContent = expanded ? '收起 ▴' : '展開 ▾';
-  if (fade) fade.style.display = expanded ? 'none' : 'block';
 }
 
 function confirmDeleteNote(id) {
@@ -2604,66 +2552,6 @@ function saveNoteSheet() {
   save();
   closeModal('modal-note-sheet');
   renderNotes();
-}
-
-function noteInsertImage() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.onchange = async () => {
-    const file = input.files[0];
-    if (!file) return;
-    showUploadStatus('上傳圖片中…');
-    try {
-      const url = await uploadToImgBB(file);
-      showUploadStatus('');
-      // Insert [[IMG:url]] at cursor position in textarea
-      const ta = document.getElementById('note-sheet-content');
-      const start = ta.selectionStart;
-      const end   = ta.selectionEnd;
-      const marker = `
-[[IMG:${url}]]
-`;
-      ta.value = ta.value.slice(0, start) + marker + ta.value.slice(end);
-      const newPos = start + marker.length;
-      ta.setSelectionRange(newPos, newPos);
-      ta.focus();
-      // Show inline preview in textarea area
-      _renderNoteImgPreview();
-    } catch(e) {
-      showUploadStatus('');
-      showToast('上傳失敗，請再試一次');
-    }
-  };
-  input.click();
-}
-
-function _renderNoteImgPreview() {
-  // Parse [[IMG:url]] from textarea and show thumbnails below
-  const ta = document.getElementById('note-sheet-content');
-  const wrap = document.getElementById('note-img-preview');
-  if (!ta || !wrap) return;
-  const matches = [...ta.value.matchAll(/\[\[IMG:([^\]]+)\]\]/g)];
-  if (!matches.length) { wrap.innerHTML = ''; return; }
-  wrap.innerHTML = matches.map((m, i) => {
-    const url = m[1];
-    return `<div style="position:relative;display:inline-block">
-      <img src="${url}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;display:block">
-      <button onclick="_removeNoteImg(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#1A1A1A;border:none;color:#fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">×</button>
-    </div>`;
-  }).join('');
-}
-
-function _removeNoteImg(idx) {
-  // Remove the idx-th [[IMG:...]] from textarea
-  const ta = document.getElementById('note-sheet-content');
-  let count = 0;
-  ta.value = ta.value.replace(/
-?\[\[IMG:[^\]]+\]\]
-?/g, match => {
-    return count++ === idx ? '' : match;
-  });
-  _renderNoteImgPreview();
 }
 
 function deleteCurrentNote() {
@@ -3426,7 +3314,7 @@ function clearAllData() {
 
 /* ─── Info Sub-Screen Swipe Gesture ─── */
 (function() {
-  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes']; // map excluded from swipe
+  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes', 'map'];
   let _currentInfoSub = null;
   let _startX = 0, _startY = 0;
   const THRESHOLD = 50;
@@ -3440,12 +3328,14 @@ function clearAllData() {
   };
 
   function swipeInfoSub(dir) {
-    if (!_currentInfoSub || _currentInfoSub === 'map') return; // map: no swipe
+    if (!_currentInfoSub) return;
     const idx = INFO_SUBS.indexOf(_currentInfoSub);
     if (idx === -1) return;
-    const nextIdx = (idx + dir + INFO_SUBS.length) % INFO_SUBS.length; // wrapping, map excluded
+    const nextIdx = (idx + dir + INFO_SUBS.length) % INFO_SUBS.length;
     const nextName = INFO_SUBS[nextIdx];
+    // 關掉目前的
     document.getElementById('screen-info-' + _currentInfoSub)?.classList.remove('active');
+    // 開啟下一個
     _currentInfoSub = nextName;
     _origOpenInfoSub(nextName);
   }
