@@ -3413,14 +3413,15 @@ function _mapInitSize() {
   var box = document.getElementById('map-box');
   var img = document.getElementById('map-img');
   if (!box || !img || !img.naturalWidth) return;
-  var vw = box.offsetWidth, vh = box.offsetHeight;
+  var r = box.getBoundingClientRect();
+  var vw = r.width, vh = r.height;
+  if (!vw || !vh) return; // 還沒佈局完，放棄
   var iw = img.naturalWidth, ih = img.naturalHeight;
   _mapFitH = vh;
   _mapFitW = vh * iw / ih;
   img.style.width  = _mapFitW + 'px';
   img.style.height = _mapFitH + 'px';
-  // 水平置中
-  _mapTx = (_mapFitW > vw) ? 0 : (vw - _mapFitW) / 2;
+  _mapTx = _mapFitW > vw ? 0 : (vw - _mapFitW) / 2;
   _mapTy = 0;
 }
 
@@ -3428,10 +3429,10 @@ function _mapApply(smooth) {
   var box = document.getElementById('map-box');
   var img = document.getElementById('map-img');
   if (!box || !img) return;
-  var vw = box.offsetWidth, vh = box.offsetHeight;
+  var r = box.getBoundingClientRect();
+  var vw = r.width, vh = r.height;
   var rw = _mapFitW * _mapSc, rh = _mapFitH * _mapSc;
-  if (!rw || !rh) return;
-  // 若縮放後圖比 box 小，保持置中；否則限制不超出邊界
+  if (!rw || !rh || !vw || !vh) return;
   var minTx = rw < vw ? (vw - rw) / 2 : Math.min(0, vw - rw);
   var maxTx = rw < vw ? (vw - rw) / 2 : 0;
   var minTy = rh < vh ? (vh - rh) / 2 : Math.min(0, vh - rh);
@@ -3445,8 +3446,10 @@ function _mapApply(smooth) {
 function mapResetZoom() {
   _mapSc = 1;
   requestAnimationFrame(function() {
-    _mapInitSize();
-    _mapApply(true);
+    requestAnimationFrame(function() {
+      _mapInitSize();
+      _mapApply(true);
+    });
   });
 }
 
@@ -3549,6 +3552,37 @@ const _origOpenInfoSub2 = window.openInfoSub;
 window.openInfoSub = function(name) {
   _origOpenInfoSub2(name);
   if (name === 'map') {
-    renderMap();
+    const url = getMapUrl();
+    const emptyEl = document.getElementById('map-empty-view');
+    const boxEl   = document.getElementById('map-box');
+    const imgEl   = document.getElementById('map-img');
+    if (!emptyEl || !boxEl || !imgEl) return;
+
+    if (url) {
+      emptyEl.style.display = 'none';
+      boxEl.style.display   = 'flex';
+
+      function doInit() {
+        // 雙層 rAF：第一層等 display:flex 生效，第二層等尺寸計算完
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            _mapSc = 1;
+            _mapInitSize();
+            _mapApply(false);
+          });
+        });
+      }
+
+      if (imgEl.getAttribute('data-src') !== url) {
+        imgEl.setAttribute('data-src', url);
+        imgEl.src = url;
+        imgEl.onload = doInit;
+      } else {
+        doInit();
+      }
+    } else {
+      emptyEl.style.display = 'flex';
+      boxEl.style.display   = 'none';
+    }
   }
 };
