@@ -3336,16 +3336,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ═══════════════════════════════════════
-   MAP MODULE
+   MAP MODULE — 完整重寫
 ═══════════════════════════════════════ */
 
-/* ─── 取得/存地圖（單張）─── */
 function getMapUrl() {
-  if (!data) return '';
-  return data.mapUrl || '';
+  return (data && data.mapUrl) ? data.mapUrl : '';
 }
 
-/* ─── 新增/替換地圖照片 ─── */
 async function addMapPhoto(input) {
   const file = input.files[0];
   if (!file) return;
@@ -3355,8 +3352,8 @@ async function addMapPhoto(input) {
     const url = await uploadToImgBB(file);
     data.mapUrl = url;
     save();
-    renderMap();
     showToast('地圖已更新');
+    _mapShow(url);
   } catch(err) {
     alert('上傳失敗：' + err.message);
   } finally {
@@ -3364,225 +3361,92 @@ async function addMapPhoto(input) {
   }
 }
 
-/* ─── 渲染地圖（有圖直接滿版，無圖顯示空白提示）─── */
-function renderMap() {
-  const url = getMapUrl();
-  const emptyEl = document.getElementById('map-empty-view');
-  const boxEl   = document.getElementById('map-box');
-  const imgEl   = document.getElementById('map-img');
-  if (!emptyEl || !boxEl || !imgEl) return;
+var _mSc = 1, _mTx = 0, _mTy = 0, _mIW = 0, _mIH = 0;
+function _mClamp(v,a,b){return Math.max(a,Math.min(b,v));}
 
-  if (url) {
-    emptyEl.style.display = 'none';
-    boxEl.style.display   = 'flex';
-    _mapFitW = 0; _mapFitH = 0;
-    if (imgEl.getAttribute('data-src') !== url) {
-      imgEl.setAttribute('data-src', url);
-      imgEl.src = url;
-      imgEl.onload = function() {
-        // 等瀏覽器算好 box 尺寸再 init
-        requestAnimationFrame(function() {
-          _mapSc = 1;
-          _mapInitSize();
-          _mapApply(false);
-        });
-      };
-    } else if (imgEl.complete && imgEl.naturalWidth) {
-      // 已載入（切換回來時）
-      requestAnimationFrame(function() {
-        _mapSc = 1;
-        _mapInitSize();
-        _mapApply(false);
-      });
-    }
+function _mapShow(url) {
+  var empty = document.getElementById('map-empty-view');
+  var box   = document.getElementById('map-box');
+  var img   = document.getElementById('map-img');
+  if (!box||!img) return;
+  if (!url) { empty.style.display='flex'; box.style.display='none'; return; }
+  empty.style.display = 'none';
+  box.style.display   = 'flex';
+  function doLayout() {
+    setTimeout(function(){
+      var bx = box.getBoundingClientRect();
+      if (!bx.width || !bx.height) { setTimeout(doLayout, 50); return; }
+      _mIH = bx.height;
+      _mIW = _mIH * img.naturalWidth / img.naturalHeight;
+      img.style.width  = _mIW + 'px';
+      img.style.height = _mIH + 'px';
+      _mSc = 1;
+      _mTx = _mIW < bx.width ? (bx.width - _mIW) / 2 : 0;
+      _mTy = 0;
+      _mApply(false);
+    }, 80);
+  }
+  if (img.src === url && img.complete && img.naturalWidth) {
+    doLayout();
   } else {
-    emptyEl.style.display = 'flex';
-    boxEl.style.display   = 'none';
+    img.onload = doLayout;
+    img.src = url;
   }
 }
 
-/* ─── 地圖 pinch-zoom + pan 邏輯（移植自曼谷 app）─── */
-var _mapSc = 1, _mapTx = 0, _mapTy = 0;
-var _mapMAX = 6;
-
-function _mapClamp(v, a, b) { return Math.min(Math.max(v, a), b); }
-
-var _mapFitW = 0, _mapFitH = 0; // 初始 fit 後的圖片像素尺寸
-
-function _mapInitSize() {
+function _mApply(smooth) {
   var box = document.getElementById('map-box');
   var img = document.getElementById('map-img');
-  if (!box || !img || !img.naturalWidth) return;
-  var r = box.getBoundingClientRect();
-  var vw = r.width, vh = r.height;
-  if (!vw || !vh) return; // 還沒佈局完，放棄
-  var iw = img.naturalWidth, ih = img.naturalHeight;
-  _mapFitH = vh;
-  _mapFitW = vh * iw / ih;
-  img.style.width  = _mapFitW + 'px';
-  img.style.height = _mapFitH + 'px';
-  _mapTx = _mapFitW > vw ? 0 : (vw - _mapFitW) / 2;
-  _mapTy = 0;
+  if (!box||!img||!_mIW||!_mIH) return;
+  var bx = box.getBoundingClientRect();
+  var bw = bx.width, bh = bx.height;
+  var rw = _mIW*_mSc, rh = _mIH*_mSc;
+  _mTx = _mClamp(_mTx, rw<bw?(bw-rw)/2:bw-rw, rw<bw?(bw-rw)/2:0);
+  _mTy = _mClamp(_mTy, rh<bh?(bh-rh)/2:bh-rh, rh<bh?(bh-rh)/2:0);
+  img.style.transition = smooth ? 'transform .15s ease' : 'none';
+  img.style.transform  = 'translate('+_mTx+'px,'+_mTy+'px) scale('+_mSc+')';
 }
 
-function _mapApply(smooth) {
+function mapReset() {
   var box = document.getElementById('map-box');
   var img = document.getElementById('map-img');
-  if (!box || !img) return;
-  var r = box.getBoundingClientRect();
-  var vw = r.width, vh = r.height;
-  var rw = _mapFitW * _mapSc, rh = _mapFitH * _mapSc;
-  if (!rw || !rh || !vw || !vh) return;
-  var minTx = rw < vw ? (vw - rw) / 2 : Math.min(0, vw - rw);
-  var maxTx = rw < vw ? (vw - rw) / 2 : 0;
-  var minTy = rh < vh ? (vh - rh) / 2 : Math.min(0, vh - rh);
-  var maxTy = rh < vh ? (vh - rh) / 2 : 0;
-  _mapTx = _mapClamp(_mapTx, minTx, maxTx);
-  _mapTy = _mapClamp(_mapTy, minTy, maxTy);
-  img.style.transition = smooth ? 'transform .18s ease' : 'none';
-  img.style.transform = 'translate(' + _mapTx + 'px,' + _mapTy + 'px) scale(' + _mapSc + ')';
+  if (!box||!img||!img.naturalWidth) return;
+  var bx = box.getBoundingClientRect();
+  _mIH = bx.height;
+  _mIW = _mIH * img.naturalWidth / img.naturalHeight;
+  img.style.width  = _mIW + 'px';
+  img.style.height = _mIH + 'px';
+  _mSc = 1;
+  _mTx = _mIW < bx.width ? (bx.width - _mIW) / 2 : 0;
+  _mTy = 0;
+  _mApply(true);
 }
 
-function mapResetZoom() {
-  _mapSc = 1;
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      _mapInitSize();
-      _mapApply(true);
-    });
-  });
+function _mZoomAt(px,py,f) {
+  var ns=_mClamp(_mSc*f,1,6);
+  _mTx=px-(px-_mTx)*(ns/_mSc);
+  _mTy=py-(py-_mTy)*(ns/_mSc);
+  _mSc=ns; _mApply(false);
 }
 
-function _mapZoomAt(px, py, factor) {
-  var ns = _mapClamp(_mapSc * factor, 1, _mapMAX);
-  _mapTx = px - (px - _mapTx) * (ns / _mapSc);
-  _mapTy = py - (py - _mapTy) * (ns / _mapSc);
-  _mapSc = ns;
-  _mapApply(false);
-}
-
-(function initMapGestures() {
-  document.addEventListener('DOMContentLoaded', function() {
-    var box = document.getElementById('map-box');
-    if (!box) return;
-
-    var dg = false, sx = 0, sy = 0, mvx = 0, mvy = 0;
-    var lx = 0, ly = 0, lt = 0, lt2 = null, raf = null;
-
-    function momentum() {
-      cancelAnimationFrame(raf);
-      var d = 0.88;
-      (function tick() {
-        if (Math.abs(mvx) < 0.3 && Math.abs(mvy) < 0.3) return;
-        _mapTx += mvx; _mapTy += mvy;
-        mvx *= d; mvy *= d;
-        _mapApply(false);
-        raf = requestAnimationFrame(tick);
-      })();
-    }
-
-    box.addEventListener('touchstart', function(e) {
-      cancelAnimationFrame(raf); mvx = mvy = 0;
-      if (e.touches.length === 1) {
-        dg = true;
-        sx = e.touches[0].clientX - _mapTx;
-        sy = e.touches[0].clientY - _mapTy;
-        lx = e.touches[0].clientX; ly = e.touches[0].clientY; lt = Date.now();
-      } else { dg = false; lt2 = e.touches; }
-      e.preventDefault();
-    }, { passive: false });
-
-    box.addEventListener('touchmove', function(e) {
-      if (e.touches.length === 1 && dg) {
-        var now = Date.now(), nx = e.touches[0].clientX, ny = e.touches[0].clientY;
-        var dt = Math.max(now - lt, 1);
-        mvx = (nx - lx) / dt * 12; mvy = (ny - ly) / dt * 12;
-        lx = nx; ly = ny; lt = now;
-        _mapTx = nx - sx; _mapTy = ny - sy;
-        _mapApply(false);
-      } else if (e.touches.length === 2 && lt2) {
-        var t0 = e.touches[0], t1 = e.touches[1];
-        var p0 = lt2[0], p1 = lt2[1];
-        var pd = Math.hypot(p0.clientX - p1.clientX, p0.clientY - p1.clientY);
-        var cd = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
-        var mx = (t0.clientX + t1.clientX) / 2, my = (t0.clientY + t1.clientY) / 2;
-        var r = box.getBoundingClientRect();
-        _mapZoomAt(mx - r.left, my - r.top, cd / pd);
-        _mapTx += (mx - (p0.clientX + p1.clientX) / 2);
-        _mapTy += (my - (p0.clientY + p1.clientY) / 2);
-        lt2 = e.touches;
-        _mapApply(false);
-      }
-      e.preventDefault();
-    }, { passive: false });
-
-    box.addEventListener('touchend', function(e) {
-      dg = false;
-      lt2 = e.touches.length ? e.touches : null;
-      momentum();
-    });
-
-    box.addEventListener('mousedown', function(e) {
-      cancelAnimationFrame(raf); mvx = mvy = 0; dg = true;
-      sx = e.clientX - _mapTx; sy = e.clientY - _mapTy;
-      lx = e.clientX; ly = e.clientY; lt = Date.now();
-    });
-    window.addEventListener('mousemove', function(e) {
-      if (!dg) return;
-      var now = Date.now(), dt = Math.max(now - lt, 1);
-      mvx = (e.clientX - lx) / dt * 12; mvy = (e.clientY - ly) / dt * 12;
-      lx = e.clientX; ly = e.clientY; lt = now;
-      _mapTx = e.clientX - sx; _mapTy = e.clientY - sy;
-      _mapApply(false);
-    });
-    window.addEventListener('mouseup', function() { if (dg) { dg = false; momentum(); } });
-
-    box.addEventListener('wheel', function(e) {
-      e.preventDefault();
-      var r = box.getBoundingClientRect();
-      _mapZoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 0.9);
-    }, { passive: false });
-
-    // map-zr handled by inline onclick="mapResetZoom()"
+(function(){
+  document.addEventListener('DOMContentLoaded',function(){
+    var box=document.getElementById('map-box');
+    if(!box)return;
+    var dg=false,sx=0,sy=0,lx=0,ly=0,lt=0,mvx=0,mvy=0,lt2=null,raf=null;
+    function mo(){cancelAnimationFrame(raf);var d=0.88;(function t(){if(Math.abs(mvx)<0.3&&Math.abs(mvy)<0.3)return;_mTx+=mvx;_mTy+=mvy;mvx*=d;mvy*=d;_mApply(false);raf=requestAnimationFrame(t);})();}
+    box.addEventListener('touchstart',function(e){cancelAnimationFrame(raf);mvx=mvy=0;if(e.touches.length===1){dg=true;sx=e.touches[0].clientX-_mTx;sy=e.touches[0].clientY-_mTy;lx=e.touches[0].clientX;ly=e.touches[0].clientY;lt=Date.now();}else{dg=false;lt2=e.touches;}e.preventDefault();},{passive:false});
+    box.addEventListener('touchmove',function(e){if(e.touches.length===1&&dg){var now=Date.now(),nx=e.touches[0].clientX,ny=e.touches[0].clientY,dt=Math.max(now-lt,1);mvx=(nx-lx)/dt*12;mvy=(ny-ly)/dt*12;lx=nx;ly=ny;lt=now;_mTx=nx-sx;_mTy=ny-sy;_mApply(false);}else if(e.touches.length===2&&lt2){var t0=e.touches[0],t1=e.touches[1],p0=lt2[0],p1=lt2[1];var pd=Math.hypot(p0.clientX-p1.clientX,p0.clientY-p1.clientY),cd=Math.hypot(t0.clientX-t1.clientX,t0.clientY-t1.clientY);var mx=(t0.clientX+t1.clientX)/2,my=(t0.clientY+t1.clientY)/2,r=box.getBoundingClientRect();_mZoomAt(mx-r.left,my-r.top,cd/pd);_mTx+=mx-(p0.clientX+p1.clientX)/2;_mTy+=my-(p0.clientY+p1.clientY)/2;lt2=e.touches;_mApply(false);}e.preventDefault();},{passive:false});
+    box.addEventListener('touchend',function(e){dg=false;lt2=e.touches.length?e.touches:null;mo();});
+    box.addEventListener('mousedown',function(e){cancelAnimationFrame(raf);mvx=mvy=0;dg=true;sx=e.clientX-_mTx;sy=e.clientY-_mTy;lx=e.clientX;ly=e.clientY;lt=Date.now();});
+    window.addEventListener('mousemove',function(e){if(!dg)return;var now=Date.now(),dt=Math.max(now-lt,1);mvx=(e.clientX-lx)/dt*12;mvy=(e.clientY-ly)/dt*12;lx=e.clientX;ly=e.clientY;lt=now;_mTx=e.clientX-sx;_mTy=e.clientY-sy;_mApply(false);});
+    window.addEventListener('mouseup',function(){if(dg){dg=false;mo();}});
+    box.addEventListener('wheel',function(e){e.preventDefault();var r=box.getBoundingClientRect();_mZoomAt(e.clientX-r.left,e.clientY-r.top,e.deltaY<0?1.12:0.9);},{passive:false});
   });
 })();
 
-/* ─── 開啟地圖 sub-screen 時直接渲染 ─── */
-const _origOpenInfoSub2 = window.openInfoSub;
+const _orig_ois2 = window.openInfoSub;
 window.openInfoSub = function(name) {
-  _origOpenInfoSub2(name);
-  if (name === 'map') {
-    const url = getMapUrl();
-    const emptyEl = document.getElementById('map-empty-view');
-    const boxEl   = document.getElementById('map-box');
-    const imgEl   = document.getElementById('map-img');
-    if (!emptyEl || !boxEl || !imgEl) return;
-
-    if (url) {
-      emptyEl.style.display = 'none';
-      boxEl.style.display   = 'flex';
-
-      function doInit() {
-        // 雙層 rAF：第一層等 display:flex 生效，第二層等尺寸計算完
-        requestAnimationFrame(function() {
-          requestAnimationFrame(function() {
-            _mapSc = 1;
-            _mapInitSize();
-            _mapApply(false);
-          });
-        });
-      }
-
-      if (imgEl.getAttribute('data-src') !== url) {
-        imgEl.setAttribute('data-src', url);
-        imgEl.src = url;
-        imgEl.onload = doInit;
-      } else {
-        doInit();
-      }
-    } else {
-      emptyEl.style.display = 'flex';
-      boxEl.style.display   = 'none';
-    }
-  }
+  _orig_ois2(name);
+  if (name === 'map') _mapShow(getMapUrl());
 };
