@@ -3279,6 +3279,8 @@ function initInputClearBtns(root) {
 
     if (field.tagName !== 'TEXTAREA') {
       field.style.paddingRight = '22px';
+    } else {
+      field.style.paddingRight = '28px';
     }
 
     const show = () => btn.classList.toggle('show', field.value.length > 0);
