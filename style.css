@@ -3342,3 +3342,8 @@ textarea ~ .field-x {
   justify-content: center;
   cursor: pointer;
 }
+
+/* Map screen 不需要 padding-bottom，地圖貼齊 tab bar */
+#screen-info-map {
+  padding-bottom: 0 !important;
+}

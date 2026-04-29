@@ -3339,14 +3339,13 @@ document.addEventListener('DOMContentLoaded', () => {
    MAP MODULE
 ═══════════════════════════════════════ */
 
-/* ─── 取得/存地圖資料 ─── */
-function getMaps() {
-  if (!data) return [];
-  if (!data.maps) data.maps = [];
-  return data.maps;
+/* ─── 取得/存地圖（單張）─── */
+function getMapUrl() {
+  if (!data) return '';
+  return data.mapUrl || '';
 }
 
-/* ─── 新增地圖照片 ─── */
+/* ─── 新增/替換地圖照片 ─── */
 async function addMapPhoto(input) {
   const file = input.files[0];
   if (!file) return;
@@ -3354,11 +3353,10 @@ async function addMapPhoto(input) {
   showUploadStatus('上傳中...');
   try {
     const url = await uploadToImgBB(file);
-    const name = file.name.replace(/\.[^.]+$/, '') || '地圖';
-    getMaps().push({ id: Date.now(), name, url });
+    data.mapUrl = url;
     save();
-    renderMapList();
-    showToast('地圖已新增');
+    renderMap();
+    showToast('地圖已更新');
   } catch(err) {
     alert('上傳失敗：' + err.message);
   } finally {
@@ -3366,49 +3364,26 @@ async function addMapPhoto(input) {
   }
 }
 
-/* ─── 渲染地圖列表 ─── */
-function renderMapList() {
-  const maps = getMaps();
-  const el = document.getElementById('map-list-view');
-  if (!el) return;
-  if (!maps.length) {
-    el.innerHTML = `<div class="map-empty">點右上角 ＋ 新增地圖</div>`;
-    return;
+/* ─── 渲染地圖（有圖直接滿版，無圖顯示空白提示）─── */
+function renderMap() {
+  const url = getMapUrl();
+  const emptyEl = document.getElementById('map-empty-view');
+  const boxEl   = document.getElementById('map-box');
+  const imgEl   = document.getElementById('map-img');
+  if (!emptyEl || !boxEl || !imgEl) return;
+
+  if (url) {
+    emptyEl.style.display = 'none';
+    boxEl.style.display   = 'flex';
+    if (imgEl.src !== url) {
+      imgEl.src = url;
+      _mapSc = 1; _mapTx = 0; _mapTy = 0;
+      imgEl.onload = () => _mapApply(false);
+    }
+  } else {
+    emptyEl.style.display = 'flex';
+    boxEl.style.display   = 'none';
   }
-  el.innerHTML = maps.map((m, i) => `
-    <div class="map-thumb-card" onclick="openMapViewer(${i})">
-      <img src="${esc(m.url)}" alt="${esc(m.name)}">
-      <div class="map-thumb-label">${esc(m.name)}</div>
-      <button class="map-thumb-del" onclick="event.stopPropagation();deleteMap(${i})">×</button>
-    </div>`).join('');
-}
-
-/* ─── 刪除地圖 ─── */
-function deleteMap(i) {
-  showConfirm('刪除地圖', '確定刪除此地圖？', () => {
-    getMaps().splice(i, 1);
-    save();
-    renderMapList();
-  });
-}
-
-/* ─── 開啟全螢幕地圖檢視 ─── */
-function openMapViewer(i) {
-  const m = getMaps()[i];
-  if (!m) return;
-  document.getElementById('map-viewer-title').textContent = m.name;
-  document.getElementById('map-img').src = m.url;
-  document.getElementById('map-list-view').style.display = 'none';
-  document.getElementById('map-viewer').style.display = 'flex';
-  // reset zoom
-  _mapSc = 1; _mapTx = 0; _mapTy = 0;
-  _mapApply(false);
-}
-
-/* ─── 關閉全螢幕地圖 ─── */
-function closeMapViewer() {
-  document.getElementById('map-viewer').style.display = 'none';
-  document.getElementById('map-list-view').style.display = 'flex';
 }
 
 /* ─── 地圖 pinch-zoom + pan 邏輯（移植自曼谷 app）─── */
@@ -3435,7 +3410,7 @@ function _mapZoomAt(px, py, factor) {
   _mapTx = px - (px - _mapTx) * (ns / _mapSc);
   _mapTy = py - (py - _mapTy) * (ns / _mapSc);
   _mapSc = ns;
-  _mapApply(true);
+  _mapApply(false);
 }
 
 (function initMapGestures() {
@@ -3520,30 +3495,17 @@ function _mapZoomAt(px, py, factor) {
       _mapZoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 0.9);
     }, { passive: false });
 
-    document.getElementById('map-zi').onclick = function() {
-      var r = document.getElementById('map-box').getBoundingClientRect();
-      _mapZoomAt(r.width / 2, r.height / 2, 1.35);
-    };
-    document.getElementById('map-zo').onclick = function() {
-      var r = document.getElementById('map-box').getBoundingClientRect();
-      _mapZoomAt(r.width / 2, r.height / 2, 1 / 1.35);
-    };
     document.getElementById('map-zr').onclick = function() {
       _mapSc = 1; _mapTx = 0; _mapTy = 0; _mapApply(true);
     };
   });
 })();
 
-/* ─── 開啟地圖 sub-screen 時渲染列表 ─── */
+/* ─── 開啟地圖 sub-screen 時直接渲染 ─── */
 const _origOpenInfoSub2 = window.openInfoSub;
 window.openInfoSub = function(name) {
   _origOpenInfoSub2(name);
   if (name === 'map') {
-    // 確保 viewer 關閉、列表顯示
-    const viewer = document.getElementById('map-viewer');
-    const listEl = document.getElementById('map-list-view');
-    if (viewer) viewer.style.display = 'none';
-    if (listEl) listEl.style.display = 'flex';
-    renderMapList();
+    renderMap();
   }
 };
