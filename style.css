@@ -3262,26 +3262,22 @@ textarea ~ .field-x {
 
 /* ===================== MAP SUB-SCREEN ===================== */
 #screen-info-map {
-  display: none;
+  /* Override ALL .page styles */
+  display: none !important;
+  padding: 0 !important;
+  overflow: hidden !important;
   position: absolute !important;
-  inset: 0;
-  /* leave room for tab bar at bottom */
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
   bottom: var(--tab-height) !important;
-  overflow: hidden;
 }
 #screen-info-map.active {
-  display: block;
+  display: block !important;
 }
 #map-sub-header {
   position: relative;
   z-index: 2;
-}
-#screen-info-map #map-viewer {
-  position: absolute !important;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
 }
 /* Prevent page scroll on map viewer */
 #map-viewer {

@@ -1868,15 +1868,10 @@ function _mapSizeViewer() {
   const viewerEl = document.getElementById('map-viewer');
   if (!header || !viewerEl) return;
   requestAnimationFrame(() => {
-    const headerRect = header.getBoundingClientRect();
-    // top of viewer = bottom of header (relative to screen-info-map which is at top=0)
-    const topPx = headerRect.height + 30; // 30px gap below header
-    // height = window height - header - tab bar - safe area
-    const tabH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tab-height')) || 83;
-    const heightPx = window.innerHeight - headerRect.bottom - tabH;
+    const topPx = header.getBoundingClientRect().height + 15; // 15px gap below header
     viewerEl.style.top    = topPx + 'px';
-    viewerEl.style.height = heightPx + 'px';
-    viewerEl.style.bottom = 'auto';
+    viewerEl.style.bottom = '0';
+    viewerEl.style.height = '';
   });
 }
 
