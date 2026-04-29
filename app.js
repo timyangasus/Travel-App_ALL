@@ -1947,13 +1947,18 @@ function mapResetView() {
   const viewer = document.getElementById('map-viewer');
   const img    = document.getElementById('map-img');
   if (!viewer || !img) return;
-  const vw = viewer.clientWidth, vh = viewer.clientHeight;
-  const iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
-  _mapScale = vh / (vw * (ih / iw));
-  const renderedW = vw * _mapScale;
-  _mapTx = (vw - renderedW) / 2;
-  _mapTy = 0;
-  _mapApply(true);
+  _mapSizeViewer();
+  requestAnimationFrame(() => {
+    const vw = viewer.clientWidth;
+    const vh = viewer.clientHeight;
+    const iw = img.naturalWidth  || vw;
+    const ih = img.naturalHeight || vh;
+    _mapScale = vh / (vw * (ih / iw));
+    const renderedW = vw * _mapScale;
+    _mapTx = (vw - renderedW) / 2;
+    _mapTy = 0;
+    _mapApply(true);
+  });
 }
 
 function _mapZoomAt(px, py, factor) {

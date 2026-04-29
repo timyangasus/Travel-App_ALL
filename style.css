@@ -3262,15 +3262,18 @@ textarea ~ .field-x {
 
 /* ===================== MAP SUB-SCREEN ===================== */
 #screen-info-map {
-  /* Override ALL .page styles */
   display: none !important;
   padding: 0 !important;
+  margin: 0 !important;
   overflow: hidden !important;
-  position: absolute !important;
+  overscroll-behavior: none !important;
+  -webkit-overflow-scrolling: auto !important;
+  position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: var(--tab-height) !important;
+  z-index: 10;
 }
 #screen-info-map.active {
   display: block !important;
