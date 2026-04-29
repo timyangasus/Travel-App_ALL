@@ -2538,11 +2538,13 @@ function renderNotes() {
 }
 
 function toggleNoteCard(id) {
-  const inner = document.getElementById('ninner-' + id);
+  const inner  = document.getElementById('ninner-'  + id);
   const toggle = document.getElementById('ntoggle-' + id);
+  const fade   = document.getElementById('nfade-'   + id);
   if (!inner || !toggle) return;
   const expanded = inner.classList.toggle('expanded');
   toggle.textContent = expanded ? '收起 ▴' : '展開 ▾';
+  if (fade) fade.style.display = expanded ? 'none' : 'block';
 }
 
 function confirmDeleteNote(id) {
