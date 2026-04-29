@@ -2014,7 +2014,16 @@ function openShopSheet(idx) {
 
   document.getElementById('shop-sheet-title').textContent = isNew ? '新增品項' : '編輯品項';
   document.getElementById('modal-shop-sheet').classList.add('open');
-  setTimeout(() => document.getElementById('sf-name')?.focus(), 340);
+  setTimeout(() => {
+    document.getElementById('sf-name')?.focus();
+    document.querySelectorAll('#modal-shop-sheet .ev-auto').forEach(el => autoResize(el));
+    document.querySelectorAll('#modal-shop-sheet .ev-auto').forEach(el => {
+      if (!el.dataset.autoInited) {
+        el.dataset.autoInited = '1';
+        el.addEventListener('input', () => autoResize(el));
+      }
+    });
+  }, 340);
 }
 
 function saveShopSheet() {
@@ -2576,7 +2585,16 @@ function openHotelSheet(editId) {
   const saveBtn = document.getElementById('hotel-sheet-save-btn');
   if (saveBtn) saveBtn.textContent = editId ? '更新' : '儲存';
   document.getElementById('modal-hotel-sheet').classList.add('open');
-  setTimeout(() => document.getElementById('hf-dates')?.focus(), 340);
+  setTimeout(() => {
+    document.getElementById('hf-dates')?.focus();
+    document.querySelectorAll('#modal-hotel-sheet .ev-auto').forEach(el => autoResize(el));
+    document.querySelectorAll('#modal-hotel-sheet .ev-auto').forEach(el => {
+      if (!el.dataset.autoInited) {
+        el.dataset.autoInited = '1';
+        el.addEventListener('input', () => autoResize(el));
+      }
+    });
+  }, 340);
 }
 
 function saveHotelSheet() {
