@@ -1871,7 +1871,7 @@ function onMapActionBtn() {
   titleEl.textContent = maps.length > 0 ? '換一張地圖' : '新增地圖';
   document.getElementById('map-add-name').value = '';
   document.getElementById('map-add-url').value  = '';
-  openModal('modal-map-add');
+  document.getElementById('modal-map-add').classList.add('open');
   setTimeout(() => initInputClearBtns(document.getElementById('modal-map-add')), 100);
 }
 
