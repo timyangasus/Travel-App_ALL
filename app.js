@@ -3345,8 +3345,7 @@ function clearAllData() {
     if (!_currentInfoSub || _currentInfoSub === 'map') return; // map: no swipe
     const idx = INFO_SUBS.indexOf(_currentInfoSub);
     if (idx === -1) return;
-    const nextIdx = idx + dir;
-    if (nextIdx < 0 || nextIdx >= INFO_SUBS.length) return; // non-wrapping
+    const nextIdx = (idx + dir + INFO_SUBS.length) % INFO_SUBS.length; // wrapping, map excluded
     const nextName = INFO_SUBS[nextIdx];
     document.getElementById('screen-info-' + _currentInfoSub)?.classList.remove('active');
     _currentInfoSub = nextName;
