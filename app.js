@@ -1867,10 +1867,11 @@ function _mapSizeViewer() {
   const header   = document.getElementById('map-sub-header');
   const viewerEl = document.getElementById('map-viewer');
   if (!header || !viewerEl) return;
-  const headerH = header.getBoundingClientRect().height || (44 + parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-top')) || 88);
-  const tabH    = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tab-height')) || 83;
-  viewerEl.style.top    = (headerH + 30) + 'px';
-  viewerEl.style.bottom = tabH + 'px';
+  // viewer top = below header (header is position:relative inside absolute parent)
+  requestAnimationFrame(() => {
+    const headerH = header.getBoundingClientRect().height;
+    viewerEl.style.top = headerH + 'px';
+  });
 }
 
 function onMapActionBtn() {

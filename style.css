@@ -3263,11 +3263,25 @@ textarea ~ .field-x {
 /* ===================== MAP SUB-SCREEN ===================== */
 #screen-info-map {
   display: none;
-  flex-direction: column;
+  position: absolute !important;
+  inset: 0;
+  /* leave room for tab bar at bottom */
+  bottom: var(--tab-height) !important;
   overflow: hidden;
 }
 #screen-info-map.active {
-  display: flex;
+  display: block;
+}
+#map-sub-header {
+  position: relative;
+  z-index: 2;
+}
+#screen-info-map #map-viewer {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 /* Prevent page scroll on map viewer */
 #map-viewer {
