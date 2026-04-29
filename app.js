@@ -1867,10 +1867,16 @@ function _mapSizeViewer() {
   const header   = document.getElementById('map-sub-header');
   const viewerEl = document.getElementById('map-viewer');
   if (!header || !viewerEl) return;
-  // viewer top = below header (header is position:relative inside absolute parent)
   requestAnimationFrame(() => {
-    const headerH = header.getBoundingClientRect().height;
-    viewerEl.style.top = headerH + 'px';
+    const headerRect = header.getBoundingClientRect();
+    // top of viewer = bottom of header (relative to screen-info-map which is at top=0)
+    const topPx = headerRect.height + 30; // 30px gap below header
+    // height = window height - header - tab bar - safe area
+    const tabH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tab-height')) || 83;
+    const heightPx = window.innerHeight - headerRect.bottom - tabH;
+    viewerEl.style.top    = topPx + 'px';
+    viewerEl.style.height = heightPx + 'px';
+    viewerEl.style.bottom = 'auto';
   });
 }
 
@@ -1914,9 +1920,8 @@ function _mapGetMinScale() {
   const vh = viewer.clientHeight;
   const iw = img.naturalWidth;
   const ih = img.naturalHeight;
-  // Fit image height to viewer height
-  const scaleByH = vh / (vw * (ih / iw));
-  return Math.min(1, scaleByH);
+  // Min scale = fit height exactly — cannot zoom out further
+  return vh / (vw * (ih / iw));
 }
 
 function _mapClamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
@@ -3323,7 +3328,7 @@ function clearAllData() {
 
 /* ─── Info Sub-Screen Swipe Gesture ─── */
 (function() {
-  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes', 'map'];
+  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes']; // map excluded from swipe
   let _currentInfoSub = null;
   let _startX = 0, _startY = 0;
   const THRESHOLD = 50;
@@ -3337,14 +3342,13 @@ function clearAllData() {
   };
 
   function swipeInfoSub(dir) {
-    if (!_currentInfoSub) return;
+    if (!_currentInfoSub || _currentInfoSub === 'map') return; // map: no swipe
     const idx = INFO_SUBS.indexOf(_currentInfoSub);
     if (idx === -1) return;
-    const nextIdx = (idx + dir + INFO_SUBS.length) % INFO_SUBS.length;
+    const nextIdx = idx + dir;
+    if (nextIdx < 0 || nextIdx >= INFO_SUBS.length) return; // non-wrapping
     const nextName = INFO_SUBS[nextIdx];
-    // 關掉目前的
     document.getElementById('screen-info-' + _currentInfoSub)?.classList.remove('active');
-    // 開啟下一個
     _currentInfoSub = nextName;
     _origOpenInfoSub(nextName);
   }
