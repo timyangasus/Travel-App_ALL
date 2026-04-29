@@ -99,35 +99,17 @@
     </div>
 
     <!-- Map Viewer (hidden until map loaded) -->
-    <div id="map-viewer" style="display:none;position:relative;flex:1;overflow:hidden;background:#F0F0F0;touch-action:none">
+    <div id="map-viewer" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;background:#F0F0F0;touch-action:none">
       <img id="map-img" src="" alt="map"
         style="position:absolute;top:0;left:0;width:100%;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;display:block"/>
-      <!-- Reset 1:1 button -->
+      <!-- Reset button -->
       <button id="map-reset-btn" onclick="mapResetView()"
-        style="position:absolute;bottom:20px;right:16px;z-index:10;width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.95);border:1px solid rgba(0,0,0,0.10);box-shadow:0 2px 8px rgba(0,0,0,0.12);font-size:10px;font-weight:700;color:#555;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--mono);letter-spacing:-0.3px;-webkit-tap-highlight-color:transparent">
-        1:1
+        style="position:absolute;bottom:20px;right:16px;z-index:10;width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.95);border:1px solid rgba(0,0,0,0.10);box-shadow:0 2px 8px rgba(0,0,0,0.12);cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent">
+        <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px" fill="#555"><path d="M200-120q-33 0-56.5-23.5T120-200v-160h80v160h160v80H200Zm400 0v-80h160v-160h80v160q0 33-23.5 56.5T760-120H600ZM120-600v-160q0-33 23.5-56.5T200-840h160v80H200v160h-80Zm640 0v-160H600v-80h160q33 0 56.5 23.5T840-760v160h-80Z"/></svg>
       </button>
     </div>
   </div>
 
-  <!-- ═══ MAP ADD SHEET ═══ -->
-  <div class="modal-overlay" id="modal-map-add">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-title" id="map-add-sheet-title">新增地圖</div>
-      <div class="modal-body" style="padding:0 20px">
-        <div style="padding:16px 0 8px">
-          <div class="ff-label">地圖名稱</div>
-          <input class="ff-input" id="map-add-name" placeholder="例：東京地鐵路線圖">
-        </div>
-        <div style="padding:8px 0 24px">
-          <div class="ff-label">圖片網址（URL）</div>
-          <input class="ff-input" id="map-add-url" placeholder="https://" type="url" inputmode="url">
-        </div>
-        <button class="modal-btn modal-btn-save" style="width:100%;margin:0 0 16px" onclick="saveMapAdd()">儲存</button>
-      </div>
-    </div>
-  </div>
 
   <!-- ═══ EXPENSE ═══ -->
   <div id="screen-expense" class="page">
@@ -734,12 +716,23 @@
   <div class="modal-sheet" style="display:flex;flex-direction:column;max-height:92vh;background:#fff">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;flex-shrink:0;background:#fff">
       <span class="modal-title" style="padding:0" id="note-sheet-title">新增筆記</span>
-      <button onclick="closeModal('modal-note-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <!-- 插入圖片 icon -->
+        <button onclick="noteInsertImage()" style="background:none;border:none;cursor:pointer;padding:2px;color:#BBBBBB;display:flex;align-items:center" title="插入圖片">
+          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/></svg>
+        </button>
+        <button onclick="closeModal('modal-note-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
+      </div>
     </div>
     <div style="flex:1;overflow-y:auto;padding:0 20px 16px;background:#fff">
       <textarea id="note-sheet-content" class="note-sheet-textarea" placeholder="第一行為標題…"></textarea>
+      <!-- 縮圖列 -->
+      <div id="note-img-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
     </div>
     <div style="padding:0 20px 20px;flex-shrink:0;background:#fff">
+      <div id="note-delete-row" style="display:none;justify-content:center;margin-bottom:10px">
+        <button onclick="deleteCurrentNote()" style="background:none;border:none;color:#FF3B30;font-size:14px;font-family:var(--mono);cursor:pointer">刪除筆記</button>
+      </div>
       <div style="display:flex;gap:10px">
         <button class="modal-btn modal-btn-cancel" style="flex:1" onclick="closeModal('modal-note-sheet')">取消</button>
         <button class="modal-btn modal-btn-save" style="flex:1" onclick="saveNoteSheet()">儲存</button>
