@@ -491,7 +491,7 @@ function renderHomeTripList() {
     .sort((a, b) => parseStartDate(a) - parseStartDate(b));
 
   if (!trips.length) {
-    el.innerHTML = `<div class="home-empty">點右上角 ＋ 新增行程</div>`;
+    el.innerHTML = `<div class="home-empty">點右上角 ⋯ 新增行程</div>`;
     return;
   }
 
@@ -502,63 +502,71 @@ function renderHomeTripList() {
       ? `background-image:url('${esc(trip.coverImg)}');background-size:cover;background-position:center`
       : `background:#C9A84C`;
     return `
-      <div class="home-trip-swipe-wrap" data-id="${trip.id}">
-        <div class="home-trip-delete-bg"><span>刪除</span></div>
-        <div class="home-trip-row">
-          <div class="home-trip-row-inner" onclick="openTrip('${trip.id}')">
-            <div class="home-trip-cover" style="${coverBg}" onclick="event.stopPropagation();openTripCoverPicker('${trip.id}')"></div>
-            <div class="home-trip-body">
-              <div class="home-trip-date">${esc(dateStr)}</div>
-              <div class="home-trip-name">${esc(trip.name || '未命名行程')}</div>
-            </div>
+      <div class="home-trip-row" data-id="${trip.id}">
+        <div class="home-trip-row-inner" onclick="openTrip('${trip.id}')">
+          <div class="home-trip-cover" style="${coverBg}" onclick="event.stopPropagation();openTripCoverPicker('${trip.id}')"></div>
+          <div class="home-trip-body" style="margin-left:5px">
+            <div class="home-trip-date">${esc(dateStr)}</div>
+            <div class="home-trip-name">${esc(trip.name || '未命名行程')}</div>
           </div>
-          <div class="home-trip-row-bottom-line"></div>
+          ${_tripDeleteMode ? `<button class="home-trip-del-x" onclick="event.stopPropagation();confirmDeleteTrip('${trip.id}')">×</button>` : ''}
         </div>
+        <div class="home-trip-row-bottom-line"></div>
       </div>`;
   }).join('');
 
-  // Bind swipe-to-delete
-  el.querySelectorAll('.home-trip-swipe-wrap').forEach(wrap => {
-    let startX = 0, curX = 0, swiping = false;
-    const row = wrap.querySelector('.home-trip-row');
-    const THRESHOLD = 80;
+  // Year swipe
+  initHomeYearSwipe();
+}
 
-    const onStart = e => {
-      startX = (e.touches ? e.touches[0].clientX : e.clientX);
-      swiping = true; curX = 0;
-      row.style.transition = 'none';
-    };
-    const onMove = e => {
-      if (!swiping) return;
-      const dx = (e.touches ? e.touches[0].clientX : e.clientX) - startX;
-      if (dx > 0) return; // only left swipe
-      curX = dx;
-      row.style.transform = `translateX(${Math.max(dx, -120)}px)`;
-    };
-    const onEnd = () => {
-      if (!swiping) return;
-      swiping = false;
-      row.style.transition = 'transform 0.25s ease';
-      if (curX < -THRESHOLD) {
-        row.style.transform = 'translateX(-100px)';
-        wrap.querySelector('.home-trip-delete-bg').style.opacity = '1';
-        // confirm delete
-        const id = wrap.dataset.id;
-        const trip = meta.trips.find(t => t.id === id);
-        showConfirm('刪除行程', `確定刪除「${trip?.name || '此行程'}」？此操作無法復原。`, () => {
-          deleteTrip(id);
-        }, () => {
-          row.style.transform = 'translateX(0)';
-          wrap.querySelector('.home-trip-delete-bg').style.opacity = '0';
-        });
-      } else {
-        row.style.transform = 'translateX(0)';
-      }
-    };
-    wrap.addEventListener('touchstart', onStart, { passive: true });
-    wrap.addEventListener('touchmove', onMove, { passive: true });
-    wrap.addEventListener('touchend', onEnd);
+function openHomeMoreSheet() {
+  document.getElementById('modal-home-more').classList.add('open');
+}
+
+let _tripDeleteMode = false;
+
+function toggleTripDeleteMode() {
+  _tripDeleteMode = !_tripDeleteMode;
+  renderHomeTripList();
+  // Exit delete mode when tapping outside or after a delete
+}
+
+function confirmDeleteTrip(id) {
+  const trip = meta.trips.find(t => t.id === id);
+  showConfirm('刪除行程', `確定刪除「${trip?.name || '此行程'}」？此操作無法復原。`, () => {
+    deleteTrip(id);
+    if (!meta.trips.some(t => tripYear(t) === _homeYear)) {
+      _tripDeleteMode = false;
+    }
   });
+}
+
+let _homeYearSwipeInited = false;
+function initHomeYearSwipe() {
+  if (_homeYearSwipeInited) return;
+  _homeYearSwipeInited = true;
+  const screen = document.getElementById('screen-home');
+  if (!screen) return;
+  let startX = 0, startY = 0;
+  screen.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  screen.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return;
+    const years = [...new Set((meta.trips || []).map(tripYear))].sort((a,b) => a-b);
+    if (years.length <= 1) return;
+    const idx = years.indexOf(_homeYear);
+    if (dx < 0 && idx < years.length - 1) {
+      _homeYear = years[idx + 1];
+      renderHome();
+    } else if (dx > 0 && idx > 0) {
+      _homeYear = years[idx - 1];
+      renderHome();
+    }
+  }, { passive: true });
 }
 
 function deleteTrip(id) {
@@ -1118,9 +1126,7 @@ function renderBanner() {
     </div>
     <div class="banner-more-wrap">
       <button class="banner-more-btn" onclick="openBannerActionSheet(event)" title="更多選項">
-        <span class="banner-more-dot"></span>
-        <span class="banner-more-dot"></span>
-        <span class="banner-more-dot"></span>
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#1A1A1A"><path d="M240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400Z"/></svg>
       </button>
     </div>
     <div class="day-banner" onclick="openBannerModal(event)">
@@ -1599,7 +1605,7 @@ function handleGridUpload(input) {
     showUploadStatus('上傳中...');
     try {
       const url = await uploadToImgBB(file);
-      data.days[currentDay].banner.photos.push(url);
+      data.days[currentDay].banner.photos = [url];
       save();
       renderPhotoGrid();
     } catch(err) {
