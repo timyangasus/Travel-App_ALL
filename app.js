@@ -2487,7 +2487,7 @@ function noteBodyToHtml(text) {
         html += `<span style="white-space:pre-wrap">${escaped}</span>`;
       }
     } else {
-      html += `<img src="${segments[i]}" style="max-width:100%;border-radius:8px;display:block;margin:8px 0" onclick="event.stopPropagation()">`;
+      html += `<img src="${segments[i]}" style="max-width:100%;border-radius:0;display:block;margin:8px 0" onclick="event.stopPropagation()">`;
     }
   }
   return html;
@@ -2545,7 +2545,7 @@ function renderNotes() {
     // Collapsed view: thumbnail + text side by side
     const collapsedInner = `<div class="note-card-content-row" id="ncollapsed-${n.id}">
         ${thumbHtml}
-        <div class="note-card-text-col">${textOnlyHtml}</div>
+        <div class="note-card-text-col" style="margin-top:-5px">${textOnlyHtml}</div>
       </div>`;
     // Expanded view: full bodyHtml with images inline
     const expandedInner = bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})" style="display:none" id="nexpanded-${n.id}">${bodyHtml}</div>` : '';
