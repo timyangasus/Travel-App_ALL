@@ -1213,7 +1213,7 @@ function renderTimeline() {
       </div>
       <div class="timeline-right">
         <div class="timeline-time-row">
-          <span class="timeline-time">${ev.time}</span>
+          <span class="timeline-time" onclick="editEvent(${ev.id})" style="cursor:pointer">${ev.time}</span>
           <button class="t-del-btn" onclick="deleteEvent(${ev.id})">×</button>
         </div>
         <div class="timeline-title" onclick="editEvent(${ev.id})">${esc(ev.title)}</div>
@@ -2529,48 +2529,69 @@ function renderNotes() {
     const lines = (n.content || '').split('\n');
     const title = lines[0] || '';
     const body = lines.slice(1).join('\n').trim();
-    // merge legacy images into body for [[IMG:]] rendering
+    // merge legacy images into body
     let fullBody = body;
     if (n.images?.length && !fullBody.includes('[[IMG:')) {
       fullBody += n.images.map(u => '\n[[IMG:' + u + ']]').join('');
     }
+    // Extract first image for thumbnail
+    const imgMatch = fullBody.match(/\[\[IMG:([^\]]+)\]\]/);
+    const thumbUrl = imgMatch ? imgMatch[1] : null;
+    // Body without [[IMG:]] for text-only clamp display
+    const textOnly = fullBody.replace(/\n?\[\[IMG:[^\]]+\]\]\n?/g, '').trim();
     const bodyHtml = fullBody ? noteBodyToHtml(fullBody) : '';
+    const textOnlyHtml = textOnly ? `<div class="note-card-body note-card-body-clamp" onclick="openNoteSheet(${n.id})">${esc(textOnly).replace(/(https?:\/\/[^\s]+)/g, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`)}</div>` : '';
+    const thumbHtml = thumbUrl ? `<img class="note-card-thumb" src="${thumbUrl}" onclick="openNoteSheet(${n.id})">` : '';
+    // Collapsed view: thumbnail + text side by side
+    const collapsedInner = `<div class="note-card-content-row">
+        ${thumbHtml}
+        <div class="note-card-text-col">${textOnlyHtml}</div>
+      </div>`;
+    // Expanded view: full bodyHtml with images inline
+    const expandedInner = bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})" style="display:none" id="nexpanded-${n.id}">${bodyHtml}</div>` : '';
     return `<div class="note-card" id="ncard-${n.id}">
       <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:2px 6px">×</button>
-      <div class="note-card-inner" id="ninner-${n.id}">
-        <div class="note-card-title" style="padding-right:28px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
-        ${bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})">${bodyHtml}</div>` : ''}
-        <div class="note-card-fade" id="nfade-${n.id}"></div>
+      <div class="note-card-title" style="padding-right:28px;margin-bottom:8px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
+      <div class="note-card-inner collapsed" id="ninner-${n.id}">
+        ${collapsedInner}
+        ${expandedInner}
       </div>
-      <div class="note-card-toggle" id="ntoggle-${n.id}" onclick="toggleNoteCard(${n.id})" style="display:none">展開 ▾</div>
+      <div class="note-card-toggle" id="ntoggle-${n.id}" onclick="toggleNoteCard(${n.id})" style="display:none">
+        <svg id="ntoggle-icon-${n.id}" xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#AAAAAA"><path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z"/></svg>
+      </div>
     </div>`;
   }).join('');
 
   requestAnimationFrame(() => {
     if (!Array.isArray(data.notes)) return;
     [...data.notes].reverse().forEach(n => {
-      const inner = document.getElementById('ninner-' + n.id);
+      const inner  = document.getElementById('ninner-' + n.id);
       const toggle = document.getElementById('ntoggle-' + n.id);
-      const fade = document.getElementById('nfade-' + n.id);
       if (!inner || !toggle) return;
-      if (inner.scrollHeight > 100) {
-        toggle.style.display = 'block';
-        if (fade) fade.style.display = 'block';
-      } else {
-        if (fade) fade.style.display = 'none';
+      // Show toggle if content overflows 4 lines or has images
+      const hasImg = (n.content || '').includes('[[IMG:') || n.images?.length;
+      if (inner.scrollHeight > inner.clientHeight + 4 || hasImg) {
+        toggle.style.display = 'flex';
       }
     });
   });
 }
 
 function toggleNoteCard(id) {
-  const inner  = document.getElementById('ninner-'  + id);
-  const toggle = document.getElementById('ntoggle-' + id);
-  const fade   = document.getElementById('nfade-'   + id);
-  if (!inner || !toggle) return;
-  const expanded = inner.classList.toggle('expanded');
-  toggle.textContent = expanded ? '收起 ▴' : '展開 ▾';
-  if (fade) fade.style.display = expanded ? 'none' : 'block';
+  const inner    = document.getElementById('ninner-'     + id);
+  const toggle   = document.getElementById('ntoggle-'    + id);
+  const icon     = document.getElementById('ntoggle-icon-' + id);
+  const expanded_el = document.getElementById('nexpanded-'  + id);
+  if (!inner) return;
+  const isExpanded = inner.classList.toggle('expanded');
+  inner.classList.toggle('collapsed', !isExpanded);
+  if (expanded_el) expanded_el.style.display = isExpanded ? 'block' : 'none';
+  // Swap icon: chevron down (collapsed) / chevron up (expanded)
+  if (icon) {
+    icon.innerHTML = isExpanded
+      ? '<path d="M480-616 240-376l-56-56 296-296 296 296-56 56-240-240Z"/>'
+      : '<path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z"/>';
+  }
 }
 
 function confirmDeleteNote(id) {
