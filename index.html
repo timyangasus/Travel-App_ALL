@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="旅遊誌">
@@ -74,6 +74,42 @@
       <div class="timeline" id="timeline-list"></div>
     </div>
   </div>
+
+  <!-- ═══ INFO SUB: MAP ═══ -->
+  <div id="screen-info-map" class="page">
+    <!-- Header -->
+    <div class="screen-header sub-header" id="map-sub-header">
+      <button class="sub-back-btn" onclick="closeInfoSub('map')">
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z"/></svg>
+      </button>
+      <div class="screen-title" style="flex:1;font-family:var(--mono)">Map</div>
+      <!-- 有地圖時顯示 refresh，無地圖時顯示 + -->
+      <button id="map-action-btn" class="sub-header-action" onclick="onMapActionBtn()" style="padding:4px">
+        <!-- icon swapped by JS -->
+        <svg id="map-action-icon-add" xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 -960 960 960" width="30px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+        <svg id="map-action-icon-refresh" xmlns="http://www.w3.org/2000/svg" height="26px" viewBox="0 -960 960 960" width="26px" style="display:none"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 108-114 174t-196 66Z"/></svg>
+      </button>
+    </div>
+
+    <!-- Empty state -->
+    <div id="map-empty-state" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px 32px;text-align:center">
+      <svg xmlns="http://www.w3.org/2000/svg" height="64px" viewBox="0 -960 960 960" width="64px" fill="#D0D0D0"><path d="m600-176-240-84-150 58q-14 5-26-3t-12-23v-468q0-10 4.5-18.5T190-726l170-58 240 84 150-58q14-5 26 1.5t12 20.5v476q0 11-6 19t-16 11l-166 54Zm-14-34v-468l-212-74v468l212 74Zm28 0 146-48v-474l-146 54v468Zm-414-18 146-56v-468l-146 50v474Zm414-450v468-468Zm-268-74v468-468Z"/></svg>
+      <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:#AAAAAA">尚未新增地圖</div>
+      <div style="font-size:13px;color:#CCCCCC;font-family:var(--mono);line-height:1.6">點右上角 ＋ 貼上地圖圖片網址</div>
+    </div>
+
+    <!-- Map Viewer (hidden until map loaded) -->
+    <div id="map-viewer" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;background:#F0F0F0;touch-action:none">
+      <img id="map-img" src="" alt="map"
+        style="position:absolute;top:0;left:0;width:100%;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;display:block"/>
+      <!-- Reset button -->
+      <button id="map-reset-btn" onclick="mapResetView()"
+        style="position:absolute;bottom:20px;right:16px;z-index:10;width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.95);border:1px solid rgba(0,0,0,0.10);box-shadow:0 2px 8px rgba(0,0,0,0.12);cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent">
+        <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px" fill="#555"><path d="M200-120q-33 0-56.5-23.5T120-200v-160h80v160h160v80H200Zm400 0v-80h160v-160h80v160q0 33-23.5 56.5T760-120H600ZM120-600v-160q0-33 23.5-56.5T200-840h160v80H200v160h-80Zm640 0v-160H600v-80h160q33 0 56.5 23.5T840-760v160h-80Z"/></svg>
+      </button>
+    </div>
+  </div>
+
 
   <!-- ═══ EXPENSE ═══ -->
   <div id="screen-expense" class="page">
@@ -459,10 +495,12 @@
             <div class="set-currency-option" onclick="event.stopPropagation();setCurrencyBtn('THB','฿','泰銖')">฿　泰銖</div>
           </div>
         </div>
-        <div class="set-field set-field-select" onclick="openTagSheet()">
-          <span class="set-field-label">標籤</span>
+
+        <!-- 天氣地點 -->
+        <div class="set-field set-field-select" onclick="openWeatherLocationSheet()">
+          <span class="set-field-label">天氣地點</span>
           <div class="set-field-row">
-            <span class="set-field-val" id="set-tags-display">加入標籤</span>
+            <span class="set-field-val" id="set-weather-location-display">現在地</span>
             <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px"><path fill="#1A1A1A" d="M7 10l5 5 5-5z"/></svg>
           </div>
         </div>
@@ -484,6 +522,38 @@
           <span class="set-action-title">清除所有資料</span>
           <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px"><path fill="#1A1A1A" d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></svg>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ WEATHER LOCATION SHEET ═══ -->
+  <div class="modal-overlay" id="modal-weather-location">
+    <div class="modal-sheet">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px">
+        <span class="modal-title" style="padding:0">天氣地點</span>
+        <button onclick="closeModal('modal-weather-location')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
+      </div>
+      <!-- GPS 選項 -->
+      <div class="currency-option-row" onclick="setWeatherGPS()" style="padding:16px 20px">
+        <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px" fill="#888"><path d="M480-80q-83 0-141.5-58.5T280-280q0-48 20.5-90.5T360-446v-394l120 80 120-80v394q39 27 59.5 69.5T680-280q0 83-58.5 141.5T480-80Zm0-80q50 0 85-35t35-85q0-39-22-69.5T520-397v-363l-40 26-40-26v363q-36 18-58 48.5T360-280q0 50 35 85t85 35Zm0-120Z"/></svg>
+        <span style="font-family:var(--mono);font-size:16px;color:#1A1A1A;flex:1">現在地（GPS）</span>
+        <svg id="weather-gps-check" xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#1A1A1A" style="display:none"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>
+      </div>
+      <div style="height:0.5px;background:#F0F0F0;margin:0 20px"></div>
+      <!-- 手動輸入 -->
+      <div style="padding:16px 20px 12px">
+        <div style="font-family:var(--mono);font-size:13px;color:#AAAAAA;margin-bottom:12px">指定地點</div>
+        <div style="display:flex;gap:10px;align-items:stretch;padding-right:0">
+          <input id="weather-city-input" type="text" placeholder="例：Osaka、大阪市"
+            style="flex:1;padding:14px;border:1.5px solid #EBEBEB;border-radius:0;font-size:16px;font-family:var(--mono);outline:none;box-sizing:border-box;height:52px">
+          <button onclick="searchWeatherCity()" style="height:52px;padding:0 18px;background:#1A1A1A;color:#fff;border:none;font-family:var(--mono);font-size:14px;cursor:pointer;white-space:nowrap;flex-shrink:0;box-sizing:border-box">搜尋</button>
+        </div>
+        <!-- 搜尋結果列表 -->
+        <div id="weather-city-results" style="margin-top:8px"></div>
+        <div id="weather-city-status" style="font-family:var(--mono);font-size:13px;color:#AAAAAA;margin-top:4px;min-height:18px"></div>
+      </div>
+      <div style="padding:0 20px 28px">
+        <button onclick="confirmWeatherCity()" id="weather-city-confirm" style="display:none;width:100%;padding:14px;background:#1A1A1A;color:#fff;border:none;font-family:var(--mono);font-size:15px;cursor:pointer;box-sizing:border-box">確認使用此地點</button>
       </div>
     </div>
   </div>
@@ -680,12 +750,21 @@
   <div class="modal-sheet" style="display:flex;flex-direction:column;max-height:92vh;background:#fff">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;flex-shrink:0;background:#fff">
       <span class="modal-title" style="padding:0" id="note-sheet-title">新增筆記</span>
-      <button onclick="closeModal('modal-note-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <!-- 插入圖片 icon -->
+        <button onclick="noteInsertImage()" style="background:none;border:none;cursor:pointer;padding:2px;color:#BBBBBB;display:flex;align-items:center" title="插入圖片">
+          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/></svg>
+        </button>
+        <button onclick="closeModal('modal-note-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
+      </div>
     </div>
     <div style="flex:1;overflow-y:auto;padding:0 20px 16px;background:#fff">
       <textarea id="note-sheet-content" class="note-sheet-textarea" placeholder="第一行為標題…"></textarea>
+      <!-- 縮圖列 -->
+      <div id="note-img-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
     </div>
     <div style="padding:0 20px 20px;flex-shrink:0;background:#fff">
+
       <div style="display:flex;gap:10px">
         <button class="modal-btn modal-btn-cancel" style="flex:1" onclick="closeModal('modal-note-sheet')">取消</button>
         <button class="modal-btn modal-btn-save" style="flex:1" onclick="saveNoteSheet()">儲存</button>
@@ -847,21 +926,17 @@
 </div>
 
 <!-- ═══ TRIP CURRENCY SHEET ═══ -->
-<div class="modal-overlay" id="modal-trip-currency">
-  <div class="modal-sheet">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px">
+<!-- ═══ CURRENCY SHEET (shared) ═══ -->
+<div class="modal-overlay" id="modal-currency-sheet">
+  <div class="modal-sheet" style="max-height:85vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 10px;flex-shrink:0">
       <span class="modal-title" style="padding:0">選擇幣別</span>
-      <button onclick="closeModal('modal-trip-currency')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary)">×</button>
+      <button onclick="closeModal('modal-currency-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
     </div>
-    <div id="trip-currency-list">
-      <div class="set-currency-option" onclick="setTripCurrencySheet('TWD','NT$','新台幣')">NT$　新台幣</div>
-      <div class="set-currency-option" onclick="setTripCurrencySheet('JPY','¥','日圓')">¥　日圓</div>
-      <div class="set-currency-option" onclick="setTripCurrencySheet('USD','$','美金')">$　美金</div>
-      <div class="set-currency-option" onclick="setTripCurrencySheet('EUR','€','歐元')">€　歐元</div>
-      <div class="set-currency-option" onclick="setTripCurrencySheet('HKD','HK$','港幣')">HK$　港幣</div>
-      <div class="set-currency-option" onclick="setTripCurrencySheet('CNY','CN¥','人民幣')">CN¥　人民幣</div>
-      <div class="set-currency-option" onclick="setTripCurrencySheet('THB','฿','泰銖')">฿　泰銖</div>
-    </div>
+    <!-- 幣別清單 -->
+    <div id="currency-sheet-list" style="flex:1;overflow-y:auto;padding:0 0 20px"></div>
+    <!-- context 記錄 -->
+    <input type="hidden" id="currency-sheet-context" value="settings">
   </div>
 </div>
 

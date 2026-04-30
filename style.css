@@ -973,7 +973,7 @@ canvas { display: block; width: 100%; height: 100%; }
 .day-banner {
   position: relative;
   width: calc(100% - 64px);
-  height: 72vw;
+  height: 60vw;
   background: #000000;
   overflow: visible;
   margin: 5px 0 0 0;
@@ -1595,7 +1595,7 @@ canvas { display: block; width: 100%; height: 100%; }
   border: 0.5px solid var(--border);
   border-radius: var(--radius);
   padding: 0;
-  margin-bottom: 12px;
+  margin-bottom: 24px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
   overflow: hidden;
 }
@@ -2676,18 +2676,25 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .banner-lat-block {
   position: absolute;
-  right: -150px;
+  right: -85px;
   top: 0; bottom: 0;
-  width: 220px;
+  width: 200px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: flex-start;
-  padding-top: 12px;
+  padding-top: 16px;
   z-index: 3;
   pointer-events: none;
   gap: 0;
   overflow: visible;
+}
+.banner-weather-icon {
+  width: 144px;
+  height: 144px;
+  margin-top: 4px;
+  overflow: visible;
+  flex-shrink: 0;
 }
 .banner-lat-text {
   font-family: var(--mono);
@@ -2695,7 +2702,7 @@ canvas { display: block; width: 100%; height: 100%; }
   font-weight: 700;
   color: #F5C518;
   line-height: 0.88;
-  text-align: left;
+  text-align: right;
   letter-spacing: -2px;
   display: block;
   white-space: nowrap;
@@ -3158,47 +3165,64 @@ canvas { display: block; width: 100%; height: 100%; }
   background: #fff;
   border: 1.5px solid #EBEBEB;
   border-radius: 0;
-  padding: 16px 20px 14px;
+  padding: 20px 20px 16px;
   cursor: pointer;
   transition: background 0.12s;
   position: relative;
+  min-height: 110px;
 }
 .note-card:active { background: #F8F8F8; }
 .note-card-inner {
-  max-height: 100px;
   overflow: hidden;
   position: relative;
   transition: max-height 0.3s ease;
 }
+.note-card-inner.collapsed {
+  max-height: calc(1.65em * 4 + 8px + 1.3em * 1); /* 4 body lines + title */
+}
 .note-card-inner.expanded {
-  max-height: 2000px;
+  max-height: 4000px;
 }
-.note-card-fade {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 48px;
-  background: linear-gradient(transparent, #fff);
-  pointer-events: none;
-  display: none;
-}
-.note-card-inner.expanded .note-card-fade {
-  display: none;
-}
+/* no fade */
+.note-card-fade { display: none !important; }
 .note-card-toggle {
-  text-align: right;
-  padding: 8px 0 14px;
-  font-size: 12px;
-  color: #AAAAAA;
-  font-family: var(--mono);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 6px 0 0;
   cursor: pointer;
   user-select: none;
+  color: #AAAAAA;
+  -webkit-tap-highlight-color: transparent;
 }
 .note-card-toggle:active { color: #888; }
+/* thumbnail layout */
+.note-card-content-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.note-card-thumb {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+.note-card-text-col {
+  flex: 1;
+  min-width: 0;
+}
+/* body 4-line clamp when collapsed */
+.note-card-inner.collapsed .note-card-body-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .note-card-title {
   font-family: var(--mono);
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 700;
   color: #1A1A1A;
   margin-bottom: 8px;
@@ -3207,8 +3231,8 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .note-card-body {
   font-family: var(--mono);
-  font-size: 13px;
-  color: #666;
+  font-size: 17px;
+  color: #1A1A1A;
   line-height: 1.65;
   word-break: break-word;
   white-space: pre-wrap;
@@ -3260,6 +3284,34 @@ textarea ~ .field-x {
   transform: none;
 }
 
+/* ===================== MAP SUB-SCREEN ===================== */
+#screen-info-map {
+  display: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  -webkit-overflow-scrolling: auto !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: var(--tab-height) !important;
+  z-index: 10;
+}
+#screen-info-map.active {
+  display: block !important;
+}
+#map-sub-header {
+  position: relative;
+  z-index: 2;
+}
+/* Prevent page scroll on map viewer */
+#map-viewer {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+}
+
 /* Home trip delete X button */
 .home-trip-del-x {
   background: none;
@@ -3272,3 +3324,35 @@ textarea ~ .field-x {
   line-height: 1;
 }
 .home-trip-del-x:active { color: #E53935; }
+
+/* ═══ CURRENCY SHEET ═══ */
+.currency-option-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 0.5px solid #F0F0F0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.currency-option-row:active { background: #F8F8F8; }
+.currency-option-code {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1A1A;
+  width: 44px;
+  flex-shrink: 0;
+}
+.currency-option-symbol {
+  font-family: var(--mono);
+  font-size: 15px;
+  color: #888;
+  width: 36px;
+  flex-shrink: 0;
+}
+.currency-option-label {
+  font-family: var(--mono);
+  font-size: 15px;
+  color: #444;
+}

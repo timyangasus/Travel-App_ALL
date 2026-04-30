@@ -129,6 +129,7 @@ function loadTrip(id) {
     if (!data.checklist) data.checklist = [];
     if (!data.shopping)  data.shopping  = [];
     if (!data.notes)     data.notes     = '';
+    if (!data.maps)      data.maps      = [];
     if (!data.settings)  data.settings  = { tripName: '', budget: 0, currency: 'TWD', theme: 'light' };
     data.days.forEach(d => {
       if (!d.banner) d.banner = { date: '', subtitle: '', photos: [] };
@@ -145,6 +146,7 @@ function freshTripData() {
     expenses: [[]],
     flights: [], hotels: [], tickets: [], checklist: [], shopping: [],
     notes: '',
+    maps: [],
     settings: { tripName: '', budget: 0, currency: 'TWD', theme: 'light' }
   };
 }
@@ -574,6 +576,7 @@ function deleteTrip(id) {
   saveMeta();
   try { localStorage.removeItem(TRIP_PREFIX + id); } catch(e) {}
   if (currentTripId === id) { data = null; currentTripId = null; }
+  _tripDeleteMode = false;
   renderHome();
 }
 
@@ -598,6 +601,11 @@ function openTrip(id) {
   renderExpense();
   renderSettings();
   switchTab('itinerary');
+  // Clear cached weather and re-fetch for this trip's location
+  _liveTemp = '';
+  _liveWeatherKey = 'sunny_day';
+  _forecastCache = {};
+  initWeather();
 }
 
 /* ─── Trip Cover Picker ─── */
@@ -637,7 +645,7 @@ function openTripSheet() {
 }
 
 function openTripCurrencySheet() {
-  document.getElementById('modal-trip-currency').classList.add('open');
+  openCurrencySheet('trip');
 }
 
 function setTripCurrencySheet(code, symbol, label) {
@@ -1135,6 +1143,7 @@ function renderBanner() {
       <!-- Right side: weather -->
       <div class="banner-lat-block">
         <span class="banner-lat-text" id="banner-weather-temp"></span>
+        <div class="banner-weather-icon" id="banner-weather-icon"></div>
       </div>
       <!-- Bottom left: date + subtitle -->
       <div class="banner-text-area">
@@ -1192,7 +1201,7 @@ function renderTimeline() {
   const list = document.getElementById('timeline-list');
   const evs  = [...(data.days[currentDay].events || [])].sort((a, b) => a.time.localeCompare(b.time));
   if (!evs.length) {
-    list.innerHTML = `<div class="timeline-empty">點右下角 ＋ 新增行程</div>`;
+    list.innerHTML = `<div class="timeline-empty">點 ＋ 新增行程</div>`;
     return;
   }
   list.innerHTML = evs.map((ev, i) => {
@@ -1211,7 +1220,7 @@ function renderTimeline() {
       </div>
       <div class="timeline-right">
         <div class="timeline-time-row">
-          <span class="timeline-time">${ev.time}</span>
+          <span class="timeline-time" onclick="editEvent(${ev.id})" style="cursor:pointer">${ev.time}</span>
           <button class="t-del-btn" onclick="deleteEvent(${ev.id})">×</button>
         </div>
         <div class="timeline-title" onclick="editEvent(${ev.id})">${esc(ev.title)}</div>
@@ -1822,11 +1831,273 @@ function openInfoSub(name) {
   if (name === 'shopping')  renderShopItems();
   if (name === 'ticket')    renderTicketCards();
   if (name === 'notes')     renderNotes();
+  if (name === 'map')       renderMapSub();
 }
 
 function closeInfoSub(name) {
   document.getElementById('screen-info-' + name).classList.remove('active');
   document.getElementById('screen-info').classList.add('active');
+}
+
+/* ═══════════════════════════════════════
+   MAP MODULE
+═══════════════════════════════════════ */
+
+/* ─── Render / state ─── */
+function renderMapSub() {
+  const maps = data.maps || [];
+  const hasMap = maps.length > 0;
+
+  const emptyEl     = document.getElementById('map-empty-state');
+  const viewerEl    = document.getElementById('map-viewer');
+  const iconAdd     = document.getElementById('map-action-icon-add');
+  const iconRefresh = document.getElementById('map-action-icon-refresh');
+
+  if (hasMap) {
+    emptyEl.style.display     = 'none';
+    viewerEl.style.display    = 'block';
+    iconAdd.style.display     = 'none';
+    iconRefresh.style.display = '';
+    // Position viewer: top = below header, bottom = above tab bar
+    _mapSizeViewer();
+    const m = maps[maps.length - 1];
+    _mapLoadImage(m.url);
+  } else {
+    emptyEl.style.display     = 'flex';
+    viewerEl.style.display    = 'none';
+    iconAdd.style.display     = '';
+    iconRefresh.style.display = 'none';
+  }
+}
+
+function _mapSizeViewer() {
+  const header   = document.getElementById('map-sub-header');
+  const viewerEl = document.getElementById('map-viewer');
+  if (!header || !viewerEl) return;
+  requestAnimationFrame(() => {
+    const topPx = header.getBoundingClientRect().height + 15; // 15px gap below header
+    viewerEl.style.top    = topPx + 'px';
+    viewerEl.style.bottom = '0';
+    viewerEl.style.height = '';
+  });
+}
+
+function onMapActionBtn() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    showUploadStatus('上傳地圖中…');
+    try {
+      const url = await uploadToImgBB(file);
+      if (!data.maps) data.maps = [];
+      data.maps = [{ name: file.name || '地圖', url }];
+      save();
+      showUploadStatus('');
+      renderMapSub();
+    } catch(e) {
+      showUploadStatus('');
+      showToast('上傳失敗，請再試一次');
+    }
+  };
+  input.click();
+}
+
+/* ─── Pan / Zoom Engine (曼谷地圖寫法) ─── */
+let _mapScale = 1, _mapTx = 0, _mapTy = 0;
+let _mapDragging = false;
+let _mapLastX = 0, _mapLastY = 0;
+let _mapPinchDist = null;
+let _mapPinchMidX = 0, _mapPinchMidY = 0;
+let _mapEngineReady = false;
+const MAP_MAX_SCALE = 8;
+
+function _mapGetMinScale() {
+  const viewer = document.getElementById('map-viewer');
+  const img    = document.getElementById('map-img');
+  if (!viewer || !img || !img.naturalWidth) return 1;
+  const vw = viewer.clientWidth;
+  const vh = viewer.clientHeight;
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  // Min scale = fit height exactly — cannot zoom out further
+  return vh / (vw * (ih / iw));
+}
+
+function _mapClamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+
+function _mapConstrain() {
+  const viewer = document.getElementById('map-viewer');
+  const img    = document.getElementById('map-img');
+  if (!viewer || !img) return;
+  const vw = viewer.clientWidth, vh = viewer.clientHeight;
+  const iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
+  const renderedW = vw * _mapScale;
+  const renderedH = vw * (ih / iw) * _mapScale;
+  // Allow free pan when image smaller than viewport
+  if (renderedW <= vw) _mapTx = (vw - renderedW) / 2;
+  else _mapTx = _mapClamp(_mapTx, vw - renderedW, 0);
+  if (renderedH <= vh) _mapTy = (vh - renderedH) / 2;
+  else _mapTy = _mapClamp(_mapTy, vh - renderedH, 0);
+}
+
+function _mapApply(smooth) {
+  const img = document.getElementById('map-img');
+  if (!img) return;
+  img.style.transition = smooth ? 'transform 0.18s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none';
+  img.style.transform  = `translate(${_mapTx}px,${_mapTy}px) scale(${_mapScale})`;
+}
+
+function mapResetView() {
+  const viewer = document.getElementById('map-viewer');
+  const img    = document.getElementById('map-img');
+  if (!viewer || !img) return;
+  _mapSizeViewer();
+  requestAnimationFrame(() => {
+    const vw = viewer.clientWidth;
+    const vh = viewer.clientHeight;
+    const iw = img.naturalWidth  || vw;
+    const ih = img.naturalHeight || vh;
+    _mapScale = vh / (vw * (ih / iw));
+    const renderedW = vw * _mapScale;
+    _mapTx = (vw - renderedW) / 2;
+    _mapTy = 0;
+    _mapApply(true);
+  });
+}
+
+function _mapZoomAt(px, py, factor) {
+  const min = _mapGetMinScale();
+  const newScale = _mapClamp(_mapScale * factor, min, MAP_MAX_SCALE);
+  _mapTx = px - (px - _mapTx) * (newScale / _mapScale);
+  _mapTy = py - (py - _mapTy) * (newScale / _mapScale);
+  _mapScale = newScale;
+  _mapConstrain();
+  _mapApply(false);
+}
+
+function _mapDist(t1, t2) {
+  return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+}
+
+function _mapMid(t1, t2, rect) {
+  return {
+    x: (t1.clientX + t2.clientX) / 2 - rect.left,
+    y: (t1.clientY + t2.clientY) / 2 - rect.top
+  };
+}
+
+function mapInitPanZoom() {
+  const viewer = document.getElementById('map-viewer');
+  const img    = document.getElementById('map-img');
+  if (!viewer || !img || _mapEngineReady) return;
+  _mapEngineReady = true;
+
+  // Touch events
+  viewer.addEventListener('touchstart', e => {
+    img.style.transition = 'none';
+    if (e.touches.length === 1) {
+      _mapDragging = true;
+      _mapLastX = e.touches[0].clientX;
+      _mapLastY = e.touches[0].clientY;
+      _mapPinchDist = null;
+    } else if (e.touches.length === 2) {
+      _mapDragging = false;
+      _mapPinchDist = _mapDist(e.touches[0], e.touches[1]);
+      const rect = viewer.getBoundingClientRect();
+      const mid  = _mapMid(e.touches[0], e.touches[1], rect);
+      _mapPinchMidX = mid.x;
+      _mapPinchMidY = mid.y;
+    }
+  }, { passive: true });
+
+  viewer.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && _mapDragging && _mapPinchDist === null) {
+      _mapTx += e.touches[0].clientX - _mapLastX;
+      _mapTy += e.touches[0].clientY - _mapLastY;
+      _mapLastX = e.touches[0].clientX;
+      _mapLastY = e.touches[0].clientY;
+      _mapConstrain();
+      _mapApply(false);
+    } else if (e.touches.length === 2 && _mapPinchDist !== null) {
+      const newDist = _mapDist(e.touches[0], e.touches[1]);
+      const rect = viewer.getBoundingClientRect();
+      const mid  = _mapMid(e.touches[0], e.touches[1], rect);
+      // pan from mid delta
+      _mapTx += mid.x - _mapPinchMidX;
+      _mapTy += mid.y - _mapPinchMidY;
+      _mapPinchMidX = mid.x;
+      _mapPinchMidY = mid.y;
+      // zoom
+      _mapZoomAt(mid.x, mid.y, newDist / _mapPinchDist);
+      _mapPinchDist = newDist;
+    }
+  }, { passive: false });
+
+  viewer.addEventListener('touchend', e => {
+    if (e.touches.length < 2) _mapPinchDist = null;
+    if (e.touches.length === 0) _mapDragging = false;
+  }, { passive: true });
+
+  // Mouse drag (desktop)
+  viewer.addEventListener('mousedown', e => {
+    _mapDragging = true;
+    _mapLastX = e.clientX;
+    _mapLastY = e.clientY;
+    img.style.transition = 'none';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if (!_mapDragging) return;
+    _mapTx += e.clientX - _mapLastX;
+    _mapTy += e.clientY - _mapLastY;
+    _mapLastX = e.clientX;
+    _mapLastY = e.clientY;
+    _mapConstrain();
+    _mapApply(false);
+  });
+  window.addEventListener('mouseup', () => { _mapDragging = false; });
+
+  // Wheel zoom (desktop)
+  viewer.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = viewer.getBoundingClientRect();
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    _mapZoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
+  }, { passive: false });
+}
+
+function _mapLoadImage(url) {
+  const img    = document.getElementById('map-img');
+  const viewer = document.getElementById('map-viewer');
+  if (!img) return;
+
+  // Reset pan/zoom state and engine flag for new image
+  _mapScale = 1; _mapTx = 0; _mapTy = 0;
+  _mapEngineReady = false;
+  img.style.transform = '';
+
+  img.onload = () => {
+    // rAF ensures viewer has its final dimensions after layout
+    requestAnimationFrame(() => {
+      const vw = viewer.clientWidth, vh = viewer.clientHeight;
+      const iw = img.naturalWidth  || vw;
+      const ih = img.naturalHeight || vh;
+      // Always fit height — image fills viewer top to bottom, no gap
+      _mapScale = vh / (vw * (ih / iw));
+      const renderedW = vw * _mapScale;
+      // Centre horizontally
+      _mapTx = (vw - renderedW) / 2;
+      _mapTy = 0;
+      _mapApply(false);
+      mapInitPanZoom();
+    });
+  };
+  img.onerror = () => showToast('地圖圖片載入失敗');
+  img.src = url;
 }
 
 /* ─── Checklist ─── */
@@ -2151,17 +2422,188 @@ function addTicketFromPhoto(input) {
 
 
 function openTicketLightbox(url) {
+  // Build URL list from current tickets
+  const urls = (data.tickets || [])
+    .filter(t => t.photo)
+    .map(t => resolvePhoto(t.photo));
+  if (!urls.length) return;
+  let idx = urls.indexOf(url);
+  if (idx < 0) idx = 0;
+
   let lb = document.getElementById('ticket-lightbox');
   if (!lb) {
     lb = document.createElement('div');
     lb.id = 'ticket-lightbox';
-    lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
-    lb.innerHTML = '<img id="ticket-lightbox-img" style="max-width:95vw;max-height:92vh;object-fit:contain;border-radius:8px;">';
-    lb.addEventListener('click', () => lb.style.display = 'none');
+    lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;overflow:hidden;touch-action:none;';
+
+    const img = document.createElement('img');
+    img.id = 'ticket-lightbox-img';
+    img.style.cssText = 'position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;max-width:none;';
+    lb.appendChild(img);
+
+    // Counter
+    const counter = document.createElement('div');
+    counter.id = 'ticket-lb-counter';
+    counter.style.cssText = 'position:absolute;top:20px;left:0;right:0;text-align:center;color:rgba(255,255,255,0.7);font-family:var(--mono);font-size:13px;pointer-events:none;z-index:10;';
+    lb.appendChild(counter);
+
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '×';
+    closeBtn.style.cssText = 'position:absolute;top:12px;right:16px;z-index:11;background:rgba(0,0,0,0.5);color:#fff;border:none;font-size:28px;line-height:1;width:44px;height:44px;border-radius:50%;cursor:pointer;';
+    closeBtn.addEventListener('click', () => lb.style.display = 'none');
+    lb.appendChild(closeBtn);
+
     document.body.appendChild(lb);
+    _initLightboxPinch(lb, img);
   }
-  document.getElementById('ticket-lightbox-img').src = url;
-  lb.style.display = 'flex';
+
+  lb._urls = urls;
+  lb._idx = idx;
+  lb.style.display = 'block';
+  _lbShowIdx(lb);
+}
+
+function _lbShowIdx(lb) {
+  const img = document.getElementById('ticket-lightbox-img');
+  const counter = document.getElementById('ticket-lb-counter');
+  const urls = lb._urls;
+  const idx = lb._idx;
+  img.src = urls[idx];
+  img.style.transform = '';
+  if (counter) counter.textContent = urls.length > 1 ? `${idx + 1} / ${urls.length}` : '';
+  img.onload = () => _lbFitImage(lb, img);
+}
+
+function _lbFitImage(lb, img) {
+  const vw = lb.clientWidth, vh = lb.clientHeight;
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const scale = Math.min(vw / iw, vh / ih);
+  const tx = (vw - iw * scale) / 2;
+  const ty = (vh - ih * scale) / 2;
+  img._lbScale = scale;
+  img._lbMinScale = scale;
+  img._lbTx = tx; img._lbTy = ty;
+  img.style.transition = 'none';
+  img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+}
+
+function _initLightboxPinch(lb, img) {
+  let dragging = false, lastX = 0, lastY = 0;
+  let pinchDist = null, pinchMidX = 0, pinchMidY = 0;
+
+  function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+  function dist(t1, t2) { return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY); }
+  function mid(t1, t2) { return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 }; }
+
+  function apply(smooth) {
+    const vw = lb.clientWidth, vh = lb.clientHeight;
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const s = img._lbScale || 1;
+    const rw = iw * s, rh = ih * s;
+    img._lbTx = rw <= vw ? (vw - rw) / 2 : clamp(img._lbTx, vw - rw, 0);
+    img._lbTy = rh <= vh ? (vh - rh) / 2 : clamp(img._lbTy, vh - rh, 0);
+    img.style.transition = smooth ? 'transform 0.18s ease' : 'none';
+    img.style.transform = `translate(${img._lbTx}px,${img._lbTy}px) scale(${s})`;
+  }
+
+  function zoomAt(px, py, factor) {
+    const min = img._lbMinScale || 0.1;
+    const newScale = clamp((img._lbScale || 1) * factor, min, min * 10);
+    img._lbTx = px - (px - (img._lbTx || 0)) * (newScale / (img._lbScale || 1));
+    img._lbTy = py - (py - (img._lbTy || 0)) * (newScale / (img._lbScale || 1));
+    img._lbScale = newScale;
+    apply(false);
+  }
+
+  lb.addEventListener('touchstart', e => {
+    img.style.transition = 'none';
+    if (e.touches.length === 1) {
+      dragging = true; pinchDist = null;
+      lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      dragging = false;
+      pinchDist = dist(e.touches[0], e.touches[1]);
+      const m = mid(e.touches[0], e.touches[1]);
+      pinchMidX = m.x; pinchMidY = m.y;
+    }
+  }, { passive: true });
+
+  lb.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && dragging && pinchDist === null) {
+      img._lbTx = (img._lbTx || 0) + e.touches[0].clientX - lastX;
+      img._lbTy = (img._lbTy || 0) + e.touches[0].clientY - lastY;
+      lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+      apply(false);
+    } else if (e.touches.length === 2 && pinchDist !== null) {
+      const newDist = dist(e.touches[0], e.touches[1]);
+      const m = mid(e.touches[0], e.touches[1]);
+      img._lbTx = (img._lbTx || 0) + m.x - pinchMidX;
+      img._lbTy = (img._lbTy || 0) + m.y - pinchMidY;
+      pinchMidX = m.x; pinchMidY = m.y;
+      zoomAt(m.x, m.y, newDist / pinchDist);
+      pinchDist = newDist;
+    }
+  }, { passive: false });
+
+  lb.addEventListener('touchend', e => {
+    if (e.touches.length < 2) pinchDist = null;
+    if (e.touches.length === 0) {
+      dragging = false;
+      // If back to min scale, re-center
+      if ((img._lbScale || 1) <= (img._lbMinScale || 0.1) * 1.05) {
+        _lbFitImage(lb, img);
+      }
+    }
+  }, { passive: true });
+
+  // Double-tap to zoom + swipe to navigate
+  let lastTap = 0;
+  let swipeStartX = 0, swipeStartY = 0, swipeStartScale = 1;
+  lb.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      swipeStartX = e.touches[0].clientX;
+      swipeStartY = e.touches[0].clientY;
+      swipeStartScale = img._lbScale || 1;
+    }
+  }, { passive: true });
+
+  lb.addEventListener('touchend', e => {
+    if (e.touches.length > 0) return;
+    const now = Date.now();
+    const dx = e.changedTouches[0].clientX - swipeStartX;
+    const dy = e.changedTouches[0].clientY - swipeStartY;
+    const min = img._lbMinScale || 0.1;
+    const atMinScale = (img._lbScale || 1) <= min * 1.05;
+
+    // Swipe navigate when at base scale and fast horizontal swipe
+    if (atMinScale && Math.abs(dx) > 60 && Math.abs(dy) < Math.abs(dx) * 0.6 && (lb._urls?.length > 1)) {
+      const dir = dx < 0 ? 1 : -1;
+      lb._idx = (lb._idx + dir + lb._urls.length) % lb._urls.length;
+      _lbShowIdx(lb);
+      lastTap = 0;
+      return;
+    }
+
+    // Double-tap zoom
+    if (now - lastTap < 300 && Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+      const s = img._lbScale || 1;
+      if (s > min * 1.1) {
+        _lbFitImage(lb, img);
+      } else {
+        const t = e.changedTouches[0];
+        zoomAt(t.clientX, t.clientY, 2.5);
+      }
+    }
+    lastTap = now;
+  }, { passive: true });
+
+  // Wheel zoom (desktop)
+  lb.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+  }, { passive: false });
 }
 
 
@@ -2209,10 +2651,24 @@ function deleteTicketPhoto(id) {
    NOTES — card-based
 ═══════════════════════════════════════ */
 let _noteEditId = null;
+let _noteImages = []; // staging images in sheet
 
 function noteBodyToHtml(text) {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return esc(text).replace(urlRegex, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`);
+  const segments = text.split(/\[\[IMG:([^\]]+)\]\]/);
+  let html = '';
+  for (let i = 0; i < segments.length; i++) {
+    if (i % 2 === 0) {
+      const t = segments[i].trim();
+      if (t) {
+        const escaped = esc(t).replace(/(https?:\/\/[^\s]+)/g,
+          url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`);
+        html += `<span style="white-space:pre-wrap">${escaped}</span>`;
+      }
+    } else {
+      html += `<img src="${segments[i]}" style="max-width:100%;border-radius:0;display:block;margin:8px 0" onclick="event.stopPropagation()">`;
+    }
+  }
+  return html;
 }
 
 function openNoteSheet(id) {
@@ -2221,11 +2677,18 @@ function openNoteSheet(id) {
   document.getElementById('note-sheet-title').textContent = isNew ? '新增筆記' : '編輯筆記';
   const delRow = document.getElementById('note-delete-row');
   if (delRow) delRow.style.display = isNew ? 'none' : 'flex';
-  const content = isNew ? '' : (data.notes.find(n => n.id === id)?.content || '');
+  const note = isNew ? null : data.notes.find(n => n.id === id);
   const ta = document.getElementById('note-sheet-content');
-  ta.value = content;
+  // Migrate legacy images array into [[IMG:]] markers
+  let noteContent = note?.content || '';
+  if (note?.images?.length && !noteContent.includes('[[IMG:')) {
+    noteContent += note.images.map(u => '\n[[IMG:' + u + ']]').join('');
+  }
+  ta.value = noteContent;
+  ta.setSelectionRange(0, 0);
+  _renderNoteImgPreview();
   document.getElementById('modal-note-sheet').classList.add('open');
-  setTimeout(() => ta.focus(), 340);
+  setTimeout(() => { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }, 340);
 }
 
 function renderNotes() {
@@ -2244,41 +2707,72 @@ function renderNotes() {
     const lines = (n.content || '').split('\n');
     const title = lines[0] || '';
     const body = lines.slice(1).join('\n').trim();
-    const bodyHtml = body ? noteBodyToHtml(body) : '';
+    // merge legacy images into body
+    let fullBody = body;
+    if (n.images?.length && !fullBody.includes('[[IMG:')) {
+      fullBody += n.images.map(u => '\n[[IMG:' + u + ']]').join('');
+    }
+    // Extract first image for thumbnail
+    const imgMatch = fullBody.match(/\[\[IMG:([^\]]+)\]\]/);
+    const thumbUrl = imgMatch ? imgMatch[1] : null;
+    // Body without [[IMG:]] for text-only clamp display
+    const textOnly = fullBody.replace(/\n?\[\[IMG:[^\]]+\]\]\n?/g, '').trim();
+    const bodyHtml = fullBody ? noteBodyToHtml(fullBody) : '';
+    const textOnlyHtml = textOnly ? `<div class="note-card-body note-card-body-clamp" onclick="openNoteSheet(${n.id})">${esc(textOnly).replace(/(https?:\/\/[^\s]+)/g, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`)}</div>` : '';
+    const thumbHtml = thumbUrl ? `<img class="note-card-thumb" src="${thumbUrl}" onclick="openNoteSheet(${n.id})">` : '';
+    // Collapsed view: thumbnail + text side by side
+    const collapsedInner = `<div class="note-card-content-row" id="ncollapsed-${n.id}">
+        ${thumbHtml}
+        <div class="note-card-text-col" style="margin-top:-5px">${textOnlyHtml}</div>
+      </div>`;
+    // Expanded view: full bodyHtml with images inline
+    const expandedInner = bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})" style="display:none" id="nexpanded-${n.id}">${bodyHtml}</div>` : '';
     return `<div class="note-card" id="ncard-${n.id}">
       <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:2px 6px">×</button>
-      <div class="note-card-inner" id="ninner-${n.id}">
-        <div class="note-card-title" style="padding-right:28px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
-        ${bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})">${bodyHtml}</div>` : ''}
-        <div class="note-card-fade" id="nfade-${n.id}"></div>
+      <div class="note-card-title" style="padding-right:28px;margin-bottom:8px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
+      <div class="note-card-inner collapsed" id="ninner-${n.id}">
+        ${collapsedInner}
+        ${expandedInner}
       </div>
-      <div class="note-card-toggle" id="ntoggle-${n.id}" onclick="toggleNoteCard(${n.id})" style="display:none">展開 ▾</div>
+      <div class="note-card-toggle" id="ntoggle-${n.id}" onclick="toggleNoteCard(${n.id})" style="display:none">
+        <svg id="ntoggle-icon-${n.id}" xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#AAAAAA"><path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z"/></svg>
+      </div>
     </div>`;
   }).join('');
 
   requestAnimationFrame(() => {
     if (!Array.isArray(data.notes)) return;
     [...data.notes].reverse().forEach(n => {
-      const inner = document.getElementById('ninner-' + n.id);
+      const inner  = document.getElementById('ninner-' + n.id);
       const toggle = document.getElementById('ntoggle-' + n.id);
-      const fade = document.getElementById('nfade-' + n.id);
       if (!inner || !toggle) return;
-      if (inner.scrollHeight > 100) {
-        toggle.style.display = 'block';
-        if (fade) fade.style.display = 'block';
-      } else {
-        if (fade) fade.style.display = 'none';
+      // Show toggle if content overflows 4 lines or has images
+      const hasImg = (n.content || '').includes('[[IMG:') || n.images?.length;
+      if (inner.scrollHeight > inner.clientHeight + 4 || hasImg) {
+        toggle.style.display = 'flex';
       }
     });
   });
 }
 
 function toggleNoteCard(id) {
-  const inner = document.getElementById('ninner-' + id);
-  const toggle = document.getElementById('ntoggle-' + id);
-  if (!inner || !toggle) return;
-  const expanded = inner.classList.toggle('expanded');
-  toggle.textContent = expanded ? '收起 ▴' : '展開 ▾';
+  const inner       = document.getElementById('ninner-'       + id);
+  const toggle      = document.getElementById('ntoggle-'      + id);
+  const icon        = document.getElementById('ntoggle-icon-' + id);
+  const expandedEl  = document.getElementById('nexpanded-'    + id);
+  const collapsedEl = document.getElementById('ncollapsed-'   + id);
+  if (!inner) return;
+  const isExpanded = inner.classList.toggle('expanded');
+  inner.classList.toggle('collapsed', !isExpanded);
+  // Show/hide views
+  if (collapsedEl) collapsedEl.style.display = isExpanded ? 'none' : 'flex';
+  if (expandedEl)  expandedEl.style.display  = isExpanded ? 'block' : 'none';
+  // Swap chevron icon
+  if (icon) {
+    icon.innerHTML = isExpanded
+      ? '<path d="M480-616 240-376l-56-56 296-296 296 296-56 56-240-240Z"/>'
+      : '<path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z"/>';
+  }
 }
 
 function confirmDeleteNote(id) {
@@ -2302,6 +2796,54 @@ function saveNoteSheet() {
   save();
   closeModal('modal-note-sheet');
   renderNotes();
+}
+
+function noteInsertImage() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    showUploadStatus('上傳圖片中…');
+    try {
+      const url = await uploadToImgBB(file);
+      showUploadStatus('');
+      const ta = document.getElementById('note-sheet-content');
+      const start = ta.selectionStart;
+      const marker = '\n[[IMG:' + url + ']]\n';
+      ta.value = ta.value.slice(0, start) + marker + ta.value.slice(ta.selectionEnd);
+      ta.setSelectionRange(start + marker.length, start + marker.length);
+      ta.focus();
+      _renderNoteImgPreview();
+    } catch(e) {
+      showUploadStatus('');
+      showToast('上傳失敗，請再試一次');
+    }
+  };
+  input.click();
+}
+
+function _renderNoteImgPreview() {
+  const wrap = document.getElementById('note-img-preview');
+  if (!wrap) return;
+  const ta = document.getElementById('note-sheet-content');
+  const matches = ta ? [...ta.value.matchAll(/\[\[IMG:([^\]]+)\]\]/g)] : [];
+  if (!matches.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = matches.map((m, i) =>
+    `<div style="position:relative;display:inline-block">
+      <img src="${m[1]}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;display:block">
+      <button onclick="_removeNoteImg(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#1A1A1A;border:none;color:#fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">×</button>
+    </div>`
+  ).join('');
+}
+
+function _removeNoteImg(idx) {
+  const ta = document.getElementById('note-sheet-content');
+  if (!ta) return;
+  let count = 0;
+  ta.value = ta.value.replace(/\n?\[\[IMG:[^\]]+\]\]\n?/g, m => count++ === idx ? '' : m);
+  _renderNoteImgPreview();
 }
 
 function deleteCurrentNote() {
@@ -2676,13 +3218,40 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
    SETTINGS
 ═══════════════════════════════════════ */
 const CURRENCIES = [
-  { code: 'TWD', symbol: 'NT$',  label: '新台幣' },
-  { code: 'JPY', symbol: '¥',    label: '日圓'   },
-  { code: 'CNY', symbol: 'CN¥',  label: '人民幣' },
-  { code: 'HKD', symbol: 'HK$',  label: '港幣'   },
-  { code: 'USD', symbol: '$',    label: '美金'   },
-  { code: 'EUR', symbol: '€',    label: '歐元'   },
-  { code: 'THB', symbol: '฿',    label: '泰銖'   },
+  { code: 'TWD', symbol: 'NT$',  label: '新台幣'       },
+  { code: 'JPY', symbol: '¥',    label: '日圓'         },
+  { code: 'KRW', symbol: '₩',    label: '韓元'         },
+  { code: 'HKD', symbol: 'HK$',  label: '港幣'         },
+  { code: 'CNY', symbol: 'CN¥',  label: '人民幣'       },
+  { code: 'MOP', symbol: 'MOP$', label: '澳門幣'       },
+  { code: 'THB', symbol: '฿',    label: '泰銖'         },
+  { code: 'SGD', symbol: 'S$',   label: '新加坡幣'     },
+  { code: 'MYR', symbol: 'RM',   label: '馬來西亞令吉' },
+  { code: 'VND', symbol: '₫',    label: '越南盾'       },
+  { code: 'IDR', symbol: 'Rp',   label: '印尼盾'       },
+  { code: 'PHP', symbol: '₱',    label: '菲律賓披索'   },
+  { code: 'INR', symbol: '₹',    label: '印度盧比'     },
+  { code: 'NPR', symbol: 'Rs',   label: '尼泊爾盧比'   },
+  { code: 'LKR', symbol: 'Rs',   label: '斯里蘭卡盧比' },
+  { code: 'USD', symbol: '$',    label: '美金'         },
+  { code: 'EUR', symbol: '€',    label: '歐元'         },
+  { code: 'GBP', symbol: '£',    label: '英鎊'         },
+  { code: 'CHF', symbol: 'Fr',   label: '瑞士法郎'     },
+  { code: 'SEK', symbol: 'kr',   label: '瑞典克朗'     },
+  { code: 'NOK', symbol: 'kr',   label: '挪威克朗'     },
+  { code: 'DKK', symbol: 'kr',   label: '丹麥克朗'     },
+  { code: 'CZK', symbol: 'Kč',   label: '捷克克朗'     },
+  { code: 'HUF', symbol: 'Ft',   label: '匈牙利福林'   },
+  { code: 'PLN', symbol: 'zł',   label: '波蘭茲羅提'   },
+  { code: 'TRY', symbol: '₺',    label: '土耳其里拉'   },
+  { code: 'AED', symbol: 'AED',  label: '阿聯酋迪拉姆' },
+  { code: 'CAD', symbol: 'CA$',  label: '加拿大幣'     },
+  { code: 'AUD', symbol: 'A$',   label: '澳幣'         },
+  { code: 'NZD', symbol: 'NZ$',  label: '紐西蘭幣'     },
+  { code: 'MXN', symbol: 'MX$',  label: '墨西哥披索'   },
+  { code: 'BRL', symbol: 'R$',   label: '巴西里拉'     },
+  { code: 'ZAR', symbol: 'R',    label: '南非蘭特'     },
+  { code: 'EGP', symbol: 'E£',   label: '埃及鎊'       },
 ];
 
 function renderSettings() {
@@ -2704,7 +3273,15 @@ function renderSettings() {
   const sel = document.getElementById('set-currency');
   if (sel) sel.value = s.currency || 'TWD';
   // Tags
-  renderSettingsTags();
+  // Weather location display
+  const wLocEl = document.getElementById('set-weather-location-display');
+  if (wLocEl) {
+    if (s.weatherMode === 'manual' && s.weatherCity) {
+      wLocEl.textContent = s.weatherCity;
+    } else {
+      wLocEl.textContent = '現在地';
+    }
+  }
   applyTheme(s.theme);
 }
 
@@ -2717,9 +3294,93 @@ function saveGeoText() {
   renderBanner();
 }
 
-function toggleCurrencyDropdown() {
-  const dd = document.getElementById('set-currency-dropdown');
-  if (dd) dd.classList.toggle('open');
+function toggleCurrencyDropdown() { openCurrencySheet('settings'); }
+
+/* ─── Weather Location Sheet ─── */
+let _pendingWeatherCity = null; // { name, lat, lon }
+
+function openWeatherLocationSheet() {
+  const s = data.settings;
+  const isGPS = s.weatherMode !== 'manual';
+  document.getElementById('weather-gps-check').style.display = isGPS ? '' : 'none';
+  document.getElementById('weather-city-input').value = s.weatherCity || '';
+  document.getElementById('weather-city-status').textContent = '';
+  document.getElementById('weather-city-results').innerHTML = '';
+  document.getElementById('weather-city-confirm').style.display = 'none';
+  _pendingWeatherCity = null;
+  window._weatherResults = [];
+  document.getElementById('modal-weather-location').classList.add('open');
+}
+
+function setWeatherGPS() {
+  data.settings.weatherMode = 'gps';
+  data.settings.weatherCity = '';
+  data.settings.weatherLat = null;
+  data.settings.weatherLon = null;
+  save();
+  closeModal('modal-weather-location');
+  renderSettings();
+  initWeather();
+}
+
+async function searchWeatherCity() {
+  const q = document.getElementById('weather-city-input').value.trim();
+  if (!q) return;
+  const statusEl  = document.getElementById('weather-city-status');
+  const resultsEl = document.getElementById('weather-city-results');
+  const confirmEl = document.getElementById('weather-city-confirm');
+  statusEl.textContent = '搜尋中…';
+  resultsEl.innerHTML = '';
+  confirmEl.style.display = 'none';
+  _pendingWeatherCity = null;
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=zh&format=json&fuzzy=true`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if (!json.results?.length) {
+      statusEl.textContent = '找不到此地點，試試其他拼法';
+      return;
+    }
+    statusEl.textContent = '';
+    // 顯示最多5個結果讓用戶選
+    resultsEl.innerHTML = json.results.map((r, i) => {
+      const label = [r.name, r.admin1, r.country].filter(Boolean).join('，');
+      return `<div onclick="selectWeatherResult(${i})" data-idx="${i}"
+        style="padding:12px 14px;border:1.5px solid #EBEBEB;margin-bottom:6px;cursor:pointer;font-family:var(--mono);font-size:14px;color:#1A1A1A;-webkit-tap-highlight-color:transparent"
+        id="weather-result-${i}">${label}</div>`;
+    }).join('');
+    // 存結果供選擇
+    window._weatherResults = json.results;
+  } catch(e) {
+    statusEl.textContent = '搜尋失敗，請確認網路連線';
+  }
+}
+
+function selectWeatherResult(idx) {
+  const r = window._weatherResults?.[idx];
+  if (!r) return;
+  _pendingWeatherCity = { name: r.name, lat: r.latitude, lon: r.longitude };
+  // 高亮選中
+  document.querySelectorAll('[id^="weather-result-"]').forEach(el => {
+    el.style.borderColor = '#EBEBEB';
+    el.style.background = '';
+  });
+  const el = document.getElementById('weather-result-' + idx);
+  if (el) { el.style.borderColor = '#F5C518'; el.style.background = '#FFFBEA'; }
+  document.getElementById('weather-city-confirm').style.display = 'block';
+}
+
+function confirmWeatherCity() {
+  if (!_pendingWeatherCity) return;
+  data.settings.weatherMode = 'manual';
+  data.settings.weatherCity = _pendingWeatherCity.name;
+  data.settings.weatherLat  = _pendingWeatherCity.lat;
+  data.settings.weatherLon  = _pendingWeatherCity.lon;
+  save();
+  closeModal('modal-weather-location');
+  renderSettings();
+  fetchWeather(_pendingWeatherCity.lat, _pendingWeatherCity.lon);
+  _pendingWeatherCity = null;
 }
 
 function setCurrencyBtn(code, symbol, label) {
@@ -2741,6 +3402,37 @@ function setCurrencyFromSelect() {
   if (disp && c) disp.textContent = c.symbol + ' ' + c.label;
   document.getElementById('set-currency-dropdown')?.classList.remove('open');
   renderExpenseList();
+}
+
+function openCurrencySheet(context) {
+  document.getElementById('currency-sheet-context').value = context;
+  const list = document.getElementById('currency-sheet-list');
+  list.innerHTML = CURRENCIES.map(c =>
+    `<div class="currency-option-row" onclick="selectCurrencyFromSheet('${c.code}','${c.symbol}','${c.label}')">
+      <span class="currency-option-code">${c.code}</span>
+      <span class="currency-option-symbol">${c.symbol}</span>
+      <span class="currency-option-label">${c.label}</span>
+    </div>`
+  ).join('');
+  document.getElementById('modal-currency-sheet').classList.add('open');
+}
+
+function selectCurrencyFromSheet(code, symbol, label) {
+  const context = document.getElementById('currency-sheet-context').value;
+  closeModal('modal-currency-sheet');
+  if (context === 'trip') {
+    // new trip sheet
+    _tfCurrencyCode = code;
+    const disp = document.getElementById('tf-currency-display');
+    if (disp) disp.textContent = symbol + ' ' + label;
+  } else {
+    // settings page
+    data.settings.currency = code;
+    save();
+    const disp = document.getElementById('set-currency-display');
+    if (disp) disp.textContent = symbol + ' ' + label;
+    renderExpenseList();
+  }
 }
 
 function renderSettingsTags() {
@@ -3064,7 +3756,7 @@ function clearAllData() {
 
 /* ─── Info Sub-Screen Swipe Gesture ─── */
 (function() {
-  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes'];
+  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes']; // map excluded from swipe
   let _currentInfoSub = null;
   let _startX = 0, _startY = 0;
   const THRESHOLD = 50;
@@ -3078,14 +3770,12 @@ function clearAllData() {
   };
 
   function swipeInfoSub(dir) {
-    if (!_currentInfoSub) return;
+    if (!_currentInfoSub || _currentInfoSub === 'map') return; // map: no swipe
     const idx = INFO_SUBS.indexOf(_currentInfoSub);
     if (idx === -1) return;
-    const nextIdx = (idx + dir + INFO_SUBS.length) % INFO_SUBS.length;
+    const nextIdx = (idx + dir + INFO_SUBS.length) % INFO_SUBS.length; // wrapping, map excluded
     const nextName = INFO_SUBS[nextIdx];
-    // 關掉目前的
     document.getElementById('screen-info-' + _currentInfoSub)?.classList.remove('active');
-    // 開啟下一個
     _currentInfoSub = nextName;
     _origOpenInfoSub(nextName);
   }
@@ -3135,6 +3825,8 @@ let _liveTemp = '';  // 即時溫度快取
 
   // 把溫度顯示到 DOM
 function applyWeatherToDOM() {
+  const iconEl = document.getElementById('banner-weather-icon');
+  if (iconEl) iconEl.innerHTML = getWeatherSvg(_liveWeatherKey);
   const tempEl = document.getElementById('banner-weather-temp');
   if (!tempEl) return;
 
@@ -3184,7 +3876,38 @@ function _todayDayIndex() {
     return -1;
   }
 
-let _forecastCache = {}; // { 'YYYY-MM-DD': '24°' } 預報暫存，不寫 localStorage
+const WEATHER_PATHS = {
+  sunny_day: 'M440-760v-160h80v160h-80Zm266 110-55-55 112-115 56 57-113 113Zm54 210v-80h160v80H760ZM440-40v-160h80v160h-80ZM254-652 140-763l57-56 113 113-56 54Zm508 512L651-255l54-54 114 110-57 59ZM40-440v-80h160v80H40Zm157 300-56-57 112-112 29 27 29 28-114 114Zm113-170q-70-70-70-170t70-170q70-70 170-70t170 70q70 70 70 170t-70 170q-70 70-170 70t-170-70Zm283-57q47-47 47-113t-47-113q-47-47-113-47t-113 47q-47 47-47 113t47 113q47 47 113 47t113-47ZM480-480Z',
+  sunny_night: 'M484-80q-84 0-157.5-32t-128-86.5Q144-253 112-326.5T80-484q0-146 93-257.5T410-880q-18 99 11 193.5T521-521q71 71 165.5 100T880-410q-26 144-138 237T484-80Zm0-80q88 0 163-44t118-121q-86-8-163-43.5T464-465q-61-61-97-138t-43-163q-77 43-120.5 118.5T160-484q0 135 94.5 229.5T484-160Zm-20-305Z',
+  cloudy_day: 'M440-760v-160h80v160h-80Zm266 110-56-56 113-114 56 57-113 113Zm54 210v-80h160v80H760Zm3 299L650-254l56-56 114 112-57 57ZM254-650 141-763l57-57 112 114-56 56Zm-14 450h180q25 0 42.5-17.5T480-260q0-25-17-42.5T421-320h-51l-20-48q-14-33-44-52.5T240-440q-50 0-85 35t-35 85q0 50 35 85t85 35Zm0 80q-83 0-141.5-58.5T40-320q0-83 58.5-141.5T240-520q60 0 109.5 32.5T423-400q58 0 97.5 43T560-254q-2 57-42.5 95.5T420-120H240Zm320-134q-5-20-10-39t-10-39q45-19 72.5-59t27.5-89q0-66-47-113t-113-47q-60 0-105 39t-53 99q-20-5-41-9t-41-9q14-88 82.5-144T480-720q100 0 170 70t70 170q0 77-44 138.5T560-254Zm-79-226Z',
+  cloudy_night: 'M504-465Zm20 385H420l20-12.5q20-12.5 43.5-28t43.5-28l20-12.5q81-6 149.5-49T805-325q-86-8-163-43.5T504-465q-61-61-97-138t-43-163q-77 43-120.5 118.5T200-484v12l-12 5.5q-12 5.5-26.5 11.5T135-443.5l-12 5.5q-2-11-2.5-23t-.5-23q0-146 93-257.5T450-880q-18 99 11 193.5T561-521q71 71 165.5 100T920-410q-26 144-138 237T524-80Zm-284-80h180q25 0 42.5-17.5T480-220q0-25-17-42.5T422-280h-52l-20-48q-14-33-44-52.5T240-400q-50 0-85 34.5T120-280q0 50 35 85t85 35Zm0 80q-83 0-141.5-58.5T40-280q0-83 58.5-141.5T240-480q60 0 109.5 32.5T423-360q57 2 97 42.5t40 97.5q0 58-41 99t-99 41H240Z',
+  drizzle: 'M558-84q-15 8-30.5 2.5T504-102l-60-120q-8-15-2.5-30.5T462-276q15-8 30.5-2.5T516-258l60 120q8 15 2.5 30.5T558-84Zm240 0q-15 8-30.5 2.5T744-102l-60-120q-8-15-2.5-30.5T702-276q15-8 30.5-2.5T756-258l60 120q8 15 2.5 30.5T798-84Zm-480 0q-15 8-30.5 2.5T264-102l-60-120q-8-15-2.5-30.5T222-276q15-8 30.5-2.5T276-258l60 120q8 15 2.5 30.5T318-84Zm-18-236q-91 0-155.5-64.5T80-540q0-83 55-145t136-73q32-57 87.5-89.5T480-880q90 0 156.5 57.5T717-679q69 6 116 57t47 122q0 75-52.5 127.5T700-320H300Zm0-80h400q42 0 71-29t29-71q0-42-29-71t-71-29h-60v-40q0-66-47-113t-113-47q-48 0-87.5 26T333-704l-10 24h-25q-57 2-97.5 42.5T160-540q0 58 41 99t99 41Zm180-200Z',
+  heavy_rain: 'M338-204q-15 8-30.5 2.5T284-222L44-702q-8-15-2.5-30.5T62-756q15-8 30.5-2.5T116-738l240 480q8 15 2.5 30.5T338-204Zm187 0q-15 8-30.5 2.5T471-222L231-702q-8-15-2.5-30.5T249-756q15-8 30-2.5t23 20.5l241 480q8 15 2.5 30.5T525-204Zm187-1q-15 8-30.5 3T658-222L418-702q-8-15-2.5-30.5T436-756q15-8 30-2.5t23 20.5l241 480q8 15 2.5 30T712-205Zm155.5 3.5Q852-207 844-222L604-702q-8-15-2.5-30.5T622-756q15-8 30.5-2.5T676-738l240 480q8 15 2.5 30.5T898-204q-15 8-30.5 2.5Z',
+  showers: 'M198-484q-15 8-30.5 2.5T144-502L44-702q-8-15-2.5-30.5T62-756q15-8 30.5-2.5T116-738l100 200q8 15 2.5 30.5T198-484Zm140 280q-15 8-30.5 2.5T284-222l-80-160q-8-15-2.5-30.5T222-436q15-8 30.5-2.5T276-418l80 160q8 15 2.5 30.5T338-204Zm82-200q-15 8-30.5 2.5T366-422L226-702q-8-15-2.5-30.5T244-756q15-8 30.5-2.5T298-738l140 280q8 15 2.5 30.5T420-404Zm86-200q-15 8-30.5 2.5T452-622l-39-80q-8-15-2.5-30.5T431-756q15-8 30-2.5t23 20.5l40 80q8 15 2.5 30.5T506-604Zm-6.5 402q-15.5-5-23.5-20l-40-80q-8-15-2.5-30.5T454-356q15-8 30.5-2.5T508-338l40 80q8 15 2.5 30T530-205q-15 8-30.5 3Zm216.5-3q-15 8-30.5 3T662-222L522-502q-8-15-2.5-30.5T540-556q15-8 30.5-2.5T594-538l140 280q8 15 2.5 30T716-205Zm62-239q-15 8-30.5 2.5T724-462L604-702q-8-15-2.5-30.5T622-756q15-8 30.5-2.5T676-738l120 240q8 15 2.5 30.5T778-444Zm120 240q-15 8-30.5 2.5T844-222l-60-120q-8-15-2.5-30.5T802-396q15-8 30.5-2.5T856-378l60 120q8 15 2.5 30.5T898-204Z',
+  snow: 'M440-80v-166L310-118l-56-56 186-186v-80h-80L174-254l-56-56 128-130H80v-80h166L118-650l56-56 186 186h80v-80L254-786l56-56 130 128v-166h80v166l130-128 56 56-186 186v80h80l186-186 56 56-128 130h166v80H714l128 130-56 56-186-186h-80v80l186 186-56 56-130-128v166h-80Z',
+  thunderstorm: 'm300-40 36-100h-76l50-140h100l-43 100h83L340-40h-40Zm270-40 28-80h-78l43-120h100l-35 80h82L610-80h-40ZM300-320q-91 0-155.5-64.5T80-540q0-83 55-145t136-73q32-57 87.5-89.5T480-880q90 0 156.5 57.5T717-679q69 6 116 57t47 122q0 75-52.5 127.5T700-320H300Zm0-80h400q42 0 71-29t29-71q0-42-29-71t-71-29h-60v-40q0-66-47-113t-113-47q-48 0-87.5 26T333-704l-10 24h-25q-57 2-97.5 42.5T160-540q0 58 41 99t99 41Zm180-200Z',
+  windy: 'M460-160q-50 0-85-35t-35-85h80q0 17 11.5 28.5T460-240q17 0 28.5-11.5T500-280q0-17-11.5-28.5T460-320H80v-80h380q50 0 85 35t35 85q0 50-35 85t-85 35ZM80-560v-80h540q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43h-80q0-59 40.5-99.5T620-840q59 0 99.5 40.5T760-700q0 59-40.5 99.5T620-560H80Zm660 320v-80q26 0 43-17t17-43q0-26-17-43t-43-17H80v-80h660q59 0 99.5 40.5T880-380q0 59-40.5 99.5T740-240Z',
+};
+
+function getWeatherSvg(key) {
+  const d = WEATHER_PATHS[key] || WEATHER_PATHS.sunny_day;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="#F5C518" style="width:100%;height:100%"><path d="${d}"/></svg>`;
+}
+
+function getWeatherIconKey(code, wind, isDay) {
+  if (wind >= 40) return 'windy';
+  if (code === 0)                       return isDay ? 'sunny_day' : 'sunny_night';
+  if (code <= 3)                        return isDay ? 'cloudy_day' : 'cloudy_night';
+  if (code <= 49)                       return isDay ? 'cloudy_day' : 'cloudy_night';
+  if (code <= 67)                       return code <= 57 ? 'drizzle' : 'heavy_rain';
+  if (code <= 77)                       return 'snow';
+  if (code <= 82)                       return 'showers';
+  if (code >= 95)                       return 'thunderstorm';
+  return isDay ? 'sunny_day' : 'sunny_night';
+}
+
+let _forecastCache = {};
+let _liveWeatherKey = 'sunny_day'; // default
 
 function _dateKey(dateObj) {
   const y = dateObj.getFullYear();
@@ -3196,13 +3919,19 @@ function _dateKey(dateObj) {
 async function fetchWeather(lat, lon) {
     try {
       // 一次抓：即時 + 未來7天日最高溫
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m&daily=temperature_2m_max&temperature_unit=celsius&timezone=auto&forecast_days=7`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m&daily=temperature_2m_max,weathercode&temperature_unit=celsius&timezone=auto&forecast_days=7`;
       const res = await fetch(url);
       const json = await res.json();
 
       // 即時溫度
       const temp = Math.round(json.current.temperature_2m);
       _liveTemp = temp + '°';
+      // Weather icon
+      const wcode = json.current.weathercode || 0;
+      const wind  = json.current.windspeed_10m || 0;
+      const hour  = new Date().getHours();
+      const isDay = hour >= 7 && hour < 19;
+      _liveWeatherKey = getWeatherIconKey(wcode, wind, isDay);
 
       // 存進今天對應的行程天（永久），非行程日期就只存 _liveTemp 不寫 data
       const todayIdx = _todayDayIndex();
@@ -3228,13 +3957,20 @@ async function fetchWeather(lat, lon) {
   }
 
 function initWeather() {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
-      () => {},
-      { timeout: 8000 }
-    );
+  const s = data?.settings || {};
+  if (s.weatherMode === 'manual' && s.weatherLat && s.weatherLon) {
+    // Use saved manual location
+    fetchWeather(s.weatherLat, s.weatherLon);
+    return;
   }
+  // Fall back to GPS
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+    () => {},
+    { timeout: 8000 }
+  );
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     initWeather();
