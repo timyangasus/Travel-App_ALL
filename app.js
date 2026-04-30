@@ -576,6 +576,7 @@ function deleteTrip(id) {
   saveMeta();
   try { localStorage.removeItem(TRIP_PREFIX + id); } catch(e) {}
   if (currentTripId === id) { data = null; currentTripId = null; }
+  _tripDeleteMode = false;
   renderHome();
 }
 
