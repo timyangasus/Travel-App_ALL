@@ -3759,7 +3759,7 @@ async function fetchWeather(lat, lon) {
       const wcode = json.current.weathercode || 0;
       const wind  = json.current.windspeed_10m || 0;
       const hour  = new Date().getHours();
-      const isDay = hour >= 6 && hour < 20;
+      const isDay = hour >= 7 && hour < 19;
       _liveWeatherKey = getWeatherIconKey(wcode, wind, isDay);
 
       // 存進今天對應的行程天（永久），非行程日期就只存 _liveTemp 不寫 data
