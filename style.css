@@ -973,7 +973,7 @@ canvas { display: block; width: 100%; height: 100%; }
 .day-banner {
   position: relative;
   width: calc(100% - 64px);
-  height: 50vw;
+  height: 66vw;
   background: #000000;
   overflow: visible;
   margin: 5px 0 0 0;
