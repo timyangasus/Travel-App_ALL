@@ -495,13 +495,7 @@
             <div class="set-currency-option" onclick="event.stopPropagation();setCurrencyBtn('THB','฿','泰銖')">฿　泰銖</div>
           </div>
         </div>
-        <div class="set-field set-field-select" onclick="openTagSheet()">
-          <span class="set-field-label">標籤</span>
-          <div class="set-field-row">
-            <span class="set-field-val" id="set-tags-display">加入標籤</span>
-            <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px"><path fill="#1A1A1A" d="M7 10l5 5 5-5z"/></svg>
-          </div>
-        </div>
+
         <!-- 天氣地點 -->
         <div class="set-field set-field-select" onclick="openWeatherLocationSheet()">
           <span class="set-field-label">天氣地點</span>
@@ -547,17 +541,19 @@
       </div>
       <div style="height:0.5px;background:#F0F0F0;margin:0 20px"></div>
       <!-- 手動輸入 -->
-      <div style="padding:16px 20px 8px">
-        <div style="font-family:var(--mono);font-size:13px;color:#AAAAAA;margin-bottom:8px">指定地點</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="weather-city-input" type="text" placeholder="輸入城市名稱，例：大阪"
-            style="flex:1;padding:10px 14px;border:1.5px solid #EBEBEB;border-radius:0;font-size:15px;font-family:var(--mono);outline:none;box-sizing:border-box">
-          <button onclick="searchWeatherCity()" style="padding:10px 16px;background:#1A1A1A;color:#fff;border:none;font-family:var(--mono);font-size:14px;cursor:pointer;white-space:nowrap">搜尋</button>
+      <div style="padding:16px 20px 12px">
+        <div style="font-family:var(--mono);font-size:13px;color:#AAAAAA;margin-bottom:12px">指定地點</div>
+        <div style="display:flex;gap:10px;align-items:stretch;padding-right:0">
+          <input id="weather-city-input" type="text" placeholder="例：Osaka、大阪、Bangkok"
+            style="flex:1;padding:14px 14px;border:1.5px solid #EBEBEB;border-radius:0;font-size:15px;font-family:var(--mono);outline:none;box-sizing:border-box;min-height:50px">
+          <button onclick="searchWeatherCity()" style="padding:14px 18px;background:#1A1A1A;color:#fff;border:none;font-family:var(--mono);font-size:14px;cursor:pointer;white-space:nowrap;flex-shrink:0">搜尋</button>
         </div>
-        <div id="weather-city-status" style="font-family:var(--mono);font-size:13px;color:#AAAAAA;margin-top:8px;min-height:20px"></div>
+        <!-- 搜尋結果列表 -->
+        <div id="weather-city-results" style="margin-top:8px"></div>
+        <div id="weather-city-status" style="font-family:var(--mono);font-size:13px;color:#AAAAAA;margin-top:4px;min-height:18px"></div>
       </div>
-      <div style="padding:0 20px 24px">
-        <button onclick="confirmWeatherCity()" id="weather-city-confirm" style="display:none;width:100%;padding:14px;background:#1A1A1A;color:#fff;border:none;font-family:var(--mono);font-size:15px;cursor:pointer">確認使用此地點</button>
+      <div style="padding:0 20px 28px">
+        <button onclick="confirmWeatherCity()" id="weather-city-confirm" style="display:none;width:100%;padding:14px;background:#1A1A1A;color:#fff;border:none;font-family:var(--mono);font-size:15px;cursor:pointer;box-sizing:border-box">確認使用此地點</button>
       </div>
     </div>
   </div>

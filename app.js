@@ -3096,7 +3096,6 @@ function renderSettings() {
   const sel = document.getElementById('set-currency');
   if (sel) sel.value = s.currency || 'TWD';
   // Tags
-  renderSettingsTags();
   // Weather location display
   const wLocEl = document.getElementById('set-weather-location-display');
   if (wLocEl) {
@@ -3148,26 +3147,48 @@ function setWeatherGPS() {
 async function searchWeatherCity() {
   const q = document.getElementById('weather-city-input').value.trim();
   if (!q) return;
-  const statusEl = document.getElementById('weather-city-status');
+  const statusEl  = document.getElementById('weather-city-status');
+  const resultsEl = document.getElementById('weather-city-results');
   const confirmEl = document.getElementById('weather-city-confirm');
   statusEl.textContent = '搜尋中…';
+  resultsEl.innerHTML = '';
   confirmEl.style.display = 'none';
   _pendingWeatherCity = null;
   try {
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=zh&format=json`;
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=zh&format=json&fuzzy=true`;
     const res = await fetch(url);
     const json = await res.json();
     if (!json.results?.length) {
-      statusEl.textContent = '找不到此地點，請換個關鍵字';
+      statusEl.textContent = '找不到此地點，試試其他拼法';
       return;
     }
-    const r = json.results[0];
-    _pendingWeatherCity = { name: r.name, lat: r.latitude, lon: r.longitude };
-    statusEl.textContent = `找到：${r.name}，${r.country || ''}`;
-    confirmEl.style.display = 'block';
+    statusEl.textContent = '';
+    // 顯示最多5個結果讓用戶選
+    resultsEl.innerHTML = json.results.map((r, i) => {
+      const label = [r.name, r.admin1, r.country].filter(Boolean).join('，');
+      return `<div onclick="selectWeatherResult(${i})" data-idx="${i}"
+        style="padding:12px 14px;border:1.5px solid #EBEBEB;margin-bottom:6px;cursor:pointer;font-family:var(--mono);font-size:14px;color:#1A1A1A;-webkit-tap-highlight-color:transparent"
+        id="weather-result-${i}">${label}</div>`;
+    }).join('');
+    // 存結果供選擇
+    window._weatherResults = json.results;
   } catch(e) {
     statusEl.textContent = '搜尋失敗，請確認網路連線';
   }
+}
+
+function selectWeatherResult(idx) {
+  const r = window._weatherResults?.[idx];
+  if (!r) return;
+  _pendingWeatherCity = { name: r.name, lat: r.latitude, lon: r.longitude };
+  // 高亮選中
+  document.querySelectorAll('[id^="weather-result-"]').forEach(el => {
+    el.style.borderColor = '#EBEBEB';
+    el.style.background = '';
+  });
+  const el = document.getElementById('weather-result-' + idx);
+  if (el) { el.style.borderColor = '#F5C518'; el.style.background = '#FFFBEA'; }
+  document.getElementById('weather-city-confirm').style.display = 'block';
 }
 
 function confirmWeatherCity() {
