@@ -600,6 +600,11 @@ function openTrip(id) {
   renderExpense();
   renderSettings();
   switchTab('itinerary');
+  // Clear cached weather and re-fetch for this trip's location
+  _liveTemp = '';
+  _liveWeatherKey = 'sunny_day';
+  _forecastCache = {};
+  initWeather();
 }
 
 /* ─── Trip Cover Picker ─── */
