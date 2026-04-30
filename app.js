@@ -3128,8 +3128,10 @@ function openWeatherLocationSheet() {
   document.getElementById('weather-gps-check').style.display = isGPS ? '' : 'none';
   document.getElementById('weather-city-input').value = s.weatherCity || '';
   document.getElementById('weather-city-status').textContent = '';
+  document.getElementById('weather-city-results').innerHTML = '';
   document.getElementById('weather-city-confirm').style.display = 'none';
   _pendingWeatherCity = null;
+  window._weatherResults = [];
   document.getElementById('modal-weather-location').classList.add('open');
 }
 
