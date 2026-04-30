@@ -3132,31 +3132,16 @@ function setCurrencyFromSelect() {
 }
 
 function openCurrencySheet(context) {
-  // context: 'trip' or 'settings'
   document.getElementById('currency-sheet-context').value = context;
-  document.getElementById('currency-search').value = '';
-  renderCurrencyList('');
-  document.getElementById('modal-currency-sheet').classList.add('open');
-  setTimeout(() => document.getElementById('currency-search').focus(), 340);
-}
-
-function renderCurrencyList(q) {
   const list = document.getElementById('currency-sheet-list');
-  const filtered = q
-    ? CURRENCIES.filter(c =>
-        c.code.toLowerCase().includes(q.toLowerCase()) ||
-        c.label.includes(q) ||
-        c.symbol.includes(q))
-    : CURRENCIES;
-  list.innerHTML = filtered.length
-    ? filtered.map(c =>
-        `<div class="currency-option-row" onclick="selectCurrencyFromSheet('${c.code}','${c.symbol}','${c.label}')">
-          <span class="currency-option-code">${c.code}</span>
-          <span class="currency-option-symbol">${c.symbol}</span>
-          <span class="currency-option-label">${c.label}</span>
-        </div>`
-      ).join('')
-    : '<div style="color:#CCCCCC;font-family:var(--mono);font-size:14px;text-align:center;padding:32px 0">找不到幣別</div>';
+  list.innerHTML = CURRENCIES.map(c =>
+    `<div class="currency-option-row" onclick="selectCurrencyFromSheet('${c.code}','${c.symbol}','${c.label}')">
+      <span class="currency-option-code">${c.code}</span>
+      <span class="currency-option-symbol">${c.symbol}</span>
+      <span class="currency-option-label">${c.label}</span>
+    </div>`
+  ).join('');
+  document.getElementById('modal-currency-sheet').classList.add('open');
 }
 
 function selectCurrencyFromSheet(code, symbol, label) {
