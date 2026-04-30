@@ -3826,7 +3826,8 @@ let _liveTemp = '';  // 即時溫度快取
   // 把溫度顯示到 DOM
 function applyWeatherToDOM() {
   const iconEl = document.getElementById('banner-weather-icon');
-  if (iconEl) iconEl.innerHTML = getWeatherSvg(_liveWeatherKey);
+  const storedKey = data.days[currentDay]?.weatherKey;
+  if (iconEl) iconEl.innerHTML = getWeatherSvg(storedKey || _liveWeatherKey);
   const tempEl = document.getElementById('banner-weather-temp');
   if (!tempEl) return;
 
@@ -3938,6 +3939,7 @@ async function fetchWeather(lat, lon) {
       if (todayIdx !== -1) {
         if (!data.days[todayIdx].weather) {
           data.days[todayIdx].weather = _liveTemp;
+          data.days[todayIdx].weatherKey = _liveWeatherKey;
           save();
         }
       }
