@@ -2543,7 +2543,7 @@ function renderNotes() {
     const textOnlyHtml = textOnly ? `<div class="note-card-body note-card-body-clamp" onclick="openNoteSheet(${n.id})">${esc(textOnly).replace(/(https?:\/\/[^\s]+)/g, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`)}</div>` : '';
     const thumbHtml = thumbUrl ? `<img class="note-card-thumb" src="${thumbUrl}" onclick="openNoteSheet(${n.id})">` : '';
     // Collapsed view: thumbnail + text side by side
-    const collapsedInner = `<div class="note-card-content-row">
+    const collapsedInner = `<div class="note-card-content-row" id="ncollapsed-${n.id}">
         ${thumbHtml}
         <div class="note-card-text-col">${textOnlyHtml}</div>
       </div>`;
@@ -2578,15 +2578,18 @@ function renderNotes() {
 }
 
 function toggleNoteCard(id) {
-  const inner    = document.getElementById('ninner-'     + id);
-  const toggle   = document.getElementById('ntoggle-'    + id);
-  const icon     = document.getElementById('ntoggle-icon-' + id);
-  const expanded_el = document.getElementById('nexpanded-'  + id);
+  const inner       = document.getElementById('ninner-'       + id);
+  const toggle      = document.getElementById('ntoggle-'      + id);
+  const icon        = document.getElementById('ntoggle-icon-' + id);
+  const expandedEl  = document.getElementById('nexpanded-'    + id);
+  const collapsedEl = document.getElementById('ncollapsed-'   + id);
   if (!inner) return;
   const isExpanded = inner.classList.toggle('expanded');
   inner.classList.toggle('collapsed', !isExpanded);
-  if (expanded_el) expanded_el.style.display = isExpanded ? 'block' : 'none';
-  // Swap icon: chevron down (collapsed) / chevron up (expanded)
+  // Show/hide views
+  if (collapsedEl) collapsedEl.style.display = isExpanded ? 'none' : 'flex';
+  if (expandedEl)  expandedEl.style.display  = isExpanded ? 'block' : 'none';
+  // Swap chevron icon
   if (icon) {
     icon.innerHTML = isExpanded
       ? '<path d="M480-616 240-376l-56-56 296-296 296 296-56 56-240-240Z"/>'
