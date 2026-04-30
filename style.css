@@ -2683,7 +2683,7 @@ canvas { display: block; width: 100%; height: 100%; }
   flex-direction: column;
   align-items: flex-end;
   justify-content: flex-start;
-  padding-top: 27px;
+  padding-top: 21px;
   z-index: 3;
   pointer-events: none;
   gap: 0;
