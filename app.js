@@ -639,7 +639,7 @@ function openTripSheet() {
 }
 
 function openTripCurrencySheet() {
-  document.getElementById('modal-trip-currency').classList.add('open');
+  openCurrencySheet('trip');
 }
 
 function setTripCurrencySheet(code, symbol, label) {
@@ -1194,7 +1194,7 @@ function renderTimeline() {
   const list = document.getElementById('timeline-list');
   const evs  = [...(data.days[currentDay].events || [])].sort((a, b) => a.time.localeCompare(b.time));
   if (!evs.length) {
-    list.innerHTML = `<div class="timeline-empty">點右下角 ＋ 新增行程</div>`;
+    list.innerHTML = `<div class="timeline-empty">點 ＋ 新增行程</div>`;
     return;
   }
   list.innerHTML = evs.map((ev, i) => {
@@ -3040,13 +3040,40 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
    SETTINGS
 ═══════════════════════════════════════ */
 const CURRENCIES = [
-  { code: 'TWD', symbol: 'NT$',  label: '新台幣' },
-  { code: 'JPY', symbol: '¥',    label: '日圓'   },
-  { code: 'CNY', symbol: 'CN¥',  label: '人民幣' },
-  { code: 'HKD', symbol: 'HK$',  label: '港幣'   },
-  { code: 'USD', symbol: '$',    label: '美金'   },
-  { code: 'EUR', symbol: '€',    label: '歐元'   },
-  { code: 'THB', symbol: '฿',    label: '泰銖'   },
+  { code: 'TWD', symbol: 'NT$',  label: '新台幣'       },
+  { code: 'JPY', symbol: '¥',    label: '日圓'         },
+  { code: 'KRW', symbol: '₩',    label: '韓元'         },
+  { code: 'HKD', symbol: 'HK$',  label: '港幣'         },
+  { code: 'CNY', symbol: 'CN¥',  label: '人民幣'       },
+  { code: 'MOP', symbol: 'MOP$', label: '澳門幣'       },
+  { code: 'THB', symbol: '฿',    label: '泰銖'         },
+  { code: 'SGD', symbol: 'S$',   label: '新加坡幣'     },
+  { code: 'MYR', symbol: 'RM',   label: '馬來西亞令吉' },
+  { code: 'VND', symbol: '₫',    label: '越南盾'       },
+  { code: 'IDR', symbol: 'Rp',   label: '印尼盾'       },
+  { code: 'PHP', symbol: '₱',    label: '菲律賓披索'   },
+  { code: 'INR', symbol: '₹',    label: '印度盧比'     },
+  { code: 'NPR', symbol: 'Rs',   label: '尼泊爾盧比'   },
+  { code: 'LKR', symbol: 'Rs',   label: '斯里蘭卡盧比' },
+  { code: 'USD', symbol: '$',    label: '美金'         },
+  { code: 'EUR', symbol: '€',    label: '歐元'         },
+  { code: 'GBP', symbol: '£',    label: '英鎊'         },
+  { code: 'CHF', symbol: 'Fr',   label: '瑞士法郎'     },
+  { code: 'SEK', symbol: 'kr',   label: '瑞典克朗'     },
+  { code: 'NOK', symbol: 'kr',   label: '挪威克朗'     },
+  { code: 'DKK', symbol: 'kr',   label: '丹麥克朗'     },
+  { code: 'CZK', symbol: 'Kč',   label: '捷克克朗'     },
+  { code: 'HUF', symbol: 'Ft',   label: '匈牙利福林'   },
+  { code: 'PLN', symbol: 'zł',   label: '波蘭茲羅提'   },
+  { code: 'TRY', symbol: '₺',    label: '土耳其里拉'   },
+  { code: 'AED', symbol: 'AED',  label: '阿聯酋迪拉姆' },
+  { code: 'CAD', symbol: 'CA$',  label: '加拿大幣'     },
+  { code: 'AUD', symbol: 'A$',   label: '澳幣'         },
+  { code: 'NZD', symbol: 'NZ$',  label: '紐西蘭幣'     },
+  { code: 'MXN', symbol: 'MX$',  label: '墨西哥披索'   },
+  { code: 'BRL', symbol: 'R$',   label: '巴西里拉'     },
+  { code: 'ZAR', symbol: 'R',    label: '南非蘭特'     },
+  { code: 'EGP', symbol: 'E£',   label: '埃及鎊'       },
 ];
 
 function renderSettings() {
@@ -3081,10 +3108,7 @@ function saveGeoText() {
   renderBanner();
 }
 
-function toggleCurrencyDropdown() {
-  const dd = document.getElementById('set-currency-dropdown');
-  if (dd) dd.classList.toggle('open');
-}
+function toggleCurrencyDropdown() { openCurrencySheet('settings'); }
 
 function setCurrencyBtn(code, symbol, label) {
   data.settings.currency = code;
@@ -3105,6 +3129,52 @@ function setCurrencyFromSelect() {
   if (disp && c) disp.textContent = c.symbol + ' ' + c.label;
   document.getElementById('set-currency-dropdown')?.classList.remove('open');
   renderExpenseList();
+}
+
+function openCurrencySheet(context) {
+  // context: 'trip' or 'settings'
+  document.getElementById('currency-sheet-context').value = context;
+  document.getElementById('currency-search').value = '';
+  renderCurrencyList('');
+  document.getElementById('modal-currency-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('currency-search').focus(), 340);
+}
+
+function renderCurrencyList(q) {
+  const list = document.getElementById('currency-sheet-list');
+  const filtered = q
+    ? CURRENCIES.filter(c =>
+        c.code.toLowerCase().includes(q.toLowerCase()) ||
+        c.label.includes(q) ||
+        c.symbol.includes(q))
+    : CURRENCIES;
+  list.innerHTML = filtered.length
+    ? filtered.map(c =>
+        `<div class="currency-option-row" onclick="selectCurrencyFromSheet('${c.code}','${c.symbol}','${c.label}')">
+          <span class="currency-option-code">${c.code}</span>
+          <span class="currency-option-symbol">${c.symbol}</span>
+          <span class="currency-option-label">${c.label}</span>
+        </div>`
+      ).join('')
+    : '<div style="color:#CCCCCC;font-family:var(--mono);font-size:14px;text-align:center;padding:32px 0">找不到幣別</div>';
+}
+
+function selectCurrencyFromSheet(code, symbol, label) {
+  const context = document.getElementById('currency-sheet-context').value;
+  closeModal('modal-currency-sheet');
+  if (context === 'trip') {
+    // new trip sheet
+    _tfCurrencyCode = code;
+    const disp = document.getElementById('tf-currency-display');
+    if (disp) disp.textContent = symbol + ' ' + label;
+  } else {
+    // settings page
+    data.settings.currency = code;
+    save();
+    const disp = document.getElementById('set-currency-display');
+    if (disp) disp.textContent = symbol + ' ' + label;
+    renderExpenseList();
+  }
 }
 
 function renderSettingsTags() {
