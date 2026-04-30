@@ -3097,6 +3097,15 @@ function renderSettings() {
   if (sel) sel.value = s.currency || 'TWD';
   // Tags
   renderSettingsTags();
+  // Weather location display
+  const wLocEl = document.getElementById('set-weather-location-display');
+  if (wLocEl) {
+    if (s.weatherMode === 'manual' && s.weatherCity) {
+      wLocEl.textContent = s.weatherCity;
+    } else {
+      wLocEl.textContent = '現在地';
+    }
+  }
   applyTheme(s.theme);
 }
 
@@ -3110,6 +3119,69 @@ function saveGeoText() {
 }
 
 function toggleCurrencyDropdown() { openCurrencySheet('settings'); }
+
+/* ─── Weather Location Sheet ─── */
+let _pendingWeatherCity = null; // { name, lat, lon }
+
+function openWeatherLocationSheet() {
+  const s = data.settings;
+  const isGPS = s.weatherMode !== 'manual';
+  document.getElementById('weather-gps-check').style.display = isGPS ? '' : 'none';
+  document.getElementById('weather-city-input').value = s.weatherCity || '';
+  document.getElementById('weather-city-status').textContent = '';
+  document.getElementById('weather-city-confirm').style.display = 'none';
+  _pendingWeatherCity = null;
+  document.getElementById('modal-weather-location').classList.add('open');
+}
+
+function setWeatherGPS() {
+  data.settings.weatherMode = 'gps';
+  data.settings.weatherCity = '';
+  data.settings.weatherLat = null;
+  data.settings.weatherLon = null;
+  save();
+  closeModal('modal-weather-location');
+  renderSettings();
+  initWeather();
+}
+
+async function searchWeatherCity() {
+  const q = document.getElementById('weather-city-input').value.trim();
+  if (!q) return;
+  const statusEl = document.getElementById('weather-city-status');
+  const confirmEl = document.getElementById('weather-city-confirm');
+  statusEl.textContent = '搜尋中…';
+  confirmEl.style.display = 'none';
+  _pendingWeatherCity = null;
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=zh&format=json`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if (!json.results?.length) {
+      statusEl.textContent = '找不到此地點，請換個關鍵字';
+      return;
+    }
+    const r = json.results[0];
+    _pendingWeatherCity = { name: r.name, lat: r.latitude, lon: r.longitude };
+    statusEl.textContent = `找到：${r.name}，${r.country || ''}`;
+    confirmEl.style.display = 'block';
+  } catch(e) {
+    statusEl.textContent = '搜尋失敗，請確認網路連線';
+  }
+}
+
+function confirmWeatherCity() {
+  if (!_pendingWeatherCity) return;
+  data.settings.weatherMode = 'manual';
+  data.settings.weatherCity = _pendingWeatherCity.name;
+  data.settings.weatherLat  = _pendingWeatherCity.lat;
+  data.settings.weatherLon  = _pendingWeatherCity.lon;
+  save();
+  closeModal('modal-weather-location');
+  renderSettings();
+  fetchWeather(_pendingWeatherCity.lat, _pendingWeatherCity.lon);
+  _pendingWeatherCity = null;
+}
 
 function setCurrencyBtn(code, symbol, label) {
   data.settings.currency = code;
@@ -3685,13 +3757,20 @@ async function fetchWeather(lat, lon) {
   }
 
 function initWeather() {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
-      () => {},
-      { timeout: 8000 }
-    );
+  const s = data?.settings || {};
+  if (s.weatherMode === 'manual' && s.weatherLat && s.weatherLon) {
+    // Use saved manual location
+    fetchWeather(s.weatherLat, s.weatherLon);
+    return;
   }
+  // Fall back to GPS
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+    () => {},
+    { timeout: 8000 }
+  );
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     initWeather();
