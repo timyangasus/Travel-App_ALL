@@ -3311,7 +3311,7 @@ const TRANSIT_COLORS = {
   // Bangkok BTS
   '深綠': '#1D7340', '淺綠': '#7DC242', 'sukhumvit': '#7DC242', 'silom': '#1D7340',
   // Bangkok MRT
-  '藍線': '#1A3F8F', '紫線': '#8B1A8B', 'blue': '#1A3F8F', 'purple': '#8B1A8B',
+  '藍線': '#1A3F8F', '紫線': '#8B1A8B',
   // Taipei MRT
   '板南': '#0070BD', '淡水信義': '#E3002C', '中和新蘆': '#F8A501', '松山新店': '#008659', '環狀': '#FAEC00',
   // Tokyo
@@ -3319,7 +3319,9 @@ const TRANSIT_COLORS = {
   // Osaka
   '御堂筋': '#E5171F', '四つ橋': '#0066B3', '中央': '#1CB47A', '千日前': '#E5634C',
   // General
-  'red': '#E60012', 'green': '#1D7340', 'blue': '#1A3F8F', 'yellow': '#F8A501', 'orange': '#F2952E', 'purple': '#8B1A8B', 'brown': '#964B00', 'pink': '#F194B4', 'grey': '#888888', 'gray': '#888888',
+  'red': '#E60012', 'green': '#1D7340', 'blue': '#1A3F8F', 'yellow': '#F8A501',
+  'orange': '#F2952E', 'purple': '#8B1A8B', 'brown': '#964B00',
+  'pink': '#F194B4', 'grey': '#888888', 'gray': '#888888',
 };
 
 function getTransitColor(lineStr) {
