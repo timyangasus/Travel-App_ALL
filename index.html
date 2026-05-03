@@ -786,7 +786,7 @@
         <div class="ff-label">日期</div>
         <input class="ff-input" id="tf-dates" placeholder="YYYY/MM/DD–MM/DD" inputmode="numeric" oninput="fmtTripSheetDates(this)">
       </div>
-      <div style="padding:12px 0 16px" onclick="openTripCurrencySheet()" style="cursor:pointer">
+      <div style="padding:12px 0 16px">
         <div class="ff-label">幣別</div>
         <div style="display:flex;align-items:center;gap:4px;padding:8px 0;border-bottom:1.5px solid #E0E0E0;cursor:pointer" onclick="openTripCurrencySheet()">
           <span id="tf-currency-display" style="font-family:var(--mono);font-size:16px;font-weight:700;flex:1;color:#1A1A1A">NT$ 新台幣</span>
@@ -795,10 +795,17 @@
       </div>
       <!-- 一鍵匯入 -->
       <div style="padding:0 0 8px">
-        <div class="ff-label">一鍵匯入（選填）</div>
-        <div onclick="openSmartImport('new')" style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1.5px solid #E0E0E0;cursor:pointer">
-          <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#AAAAAA"><path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
-          <span style="font-family:var(--mono);font-size:15px;color:#AAAAAA">貼入行程文字，自動建立行程</span>
+        <div class="ff-label" style="display:flex;align-items:center;justify-content:space-between">
+          <span>一鍵匯入（選填）</span>
+          <button onclick="toggleTripSmartInput()" style="background:none;border:none;font-size:12px;font-family:var(--mono);color:#AAAAAA;cursor:pointer;padding:0" id="trip-smart-toggle">展開 ▾</button>
+        </div>
+        <div id="trip-smart-input-wrap" style="display:none;margin-top:8px">
+          <textarea id="trip-smart-text"
+            placeholder="貼入行程文字…&#10;&#10;例：&#10;Day 1｜2026/11/05（三）&#10;09:00 - 11:00 抵達機場"
+            style="width:100%;box-sizing:border-box;min-height:160px;padding:12px;border:1.5px solid #EBEBEB;font-size:16px;font-family:var(--mono);outline:none;resize:vertical;line-height:1.6"></textarea>
+          <div style="text-align:right;margin-top:4px">
+            <span id="trip-smart-count" style="font-family:var(--mono);font-size:12px;color:#AAAAAA">0 / 3000</span>
+          </div>
         </div>
       </div>
       <div style="padding:0 0 16px">

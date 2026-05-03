@@ -761,11 +761,13 @@ function saveTripSheet() {
   const start = startDate ? new Date(startDate.replace(/\//g, '-')) : null;
   for (let i = 0; i < days; i++) {
     let dateStr = '';
-    if (start) {
+    if (start && !isNaN(start.getTime())) {
       const d = new Date(start);
       d.setDate(d.getDate() + i);
-      const wd = ['日','一','二','三','四','五','六'][d.getDay()];
-      dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}（${wd}）`;
+      if (!isNaN(d.getTime())) {
+        const wd = ['日','一','二','三','四','五','六'][d.getDay()];
+        dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}（${wd}）`;
+      }
     }
     tripData.days.push({ banner: { date: dateStr, subtitle: '', photos: [] }, events: [] });
     tripData.expenses.push([]);
@@ -773,8 +775,35 @@ function saveTripSheet() {
 
   localStorage.setItem(TRIP_PREFIX + id, JSON.stringify(tripData));
   closeModal('modal-trip-sheet');
-  openTrip(id);
-  showToast(`行程已建立，共 ${days} 天`);
+
+  // Check if inline smart import text was entered
+  const smartText = document.getElementById('trip-smart-text')?.value?.trim();
+  document.getElementById('trip-smart-text') && (document.getElementById('trip-smart-text').value = '');
+  document.getElementById('trip-smart-input-wrap') && (document.getElementById('trip-smart-input-wrap').style.display = 'none');
+  document.getElementById('trip-smart-toggle') && (document.getElementById('trip-smart-toggle').textContent = '展開 ▾');
+
+  if (smartText && smartText.length > 0) {
+    // Open trip then run smart import with this trip's data loaded
+    openTrip(id);
+    showToast(`行程已建立，共 ${days} 天，正在解析行程文字…`);
+    // Give UI time to render then run import
+    setTimeout(() => {
+      _smartImportContext = 'settings'; // use settings mode (trip already created)
+      _smartImportResult = null;
+      // Temporarily set the smart-import-text for runSmartImport to read
+      const ta = document.getElementById('smart-import-text');
+      if (ta) ta.value = smartText;
+      // Show loading overlay
+      document.getElementById('smart-import-loading').style.display = 'flex';
+      document.getElementById('smart-import-actions').style.display = 'none';
+      document.getElementById('smart-import-report').style.display = 'none';
+      document.getElementById('modal-smart-import').classList.add('open');
+      runSmartImport();
+    }, 600);
+  } else {
+    openTrip(id);
+    showToast(`行程已建立，共 ${days} 天`);
+  }
 }
 
 /* ═══════════════════════════════════════
@@ -3333,6 +3362,27 @@ function getTransitColor(lineStr) {
   return '#999999';
 }
 
+function toggleTripSmartInput() {
+  const wrap = document.getElementById('trip-smart-input-wrap');
+  const btn  = document.getElementById('trip-smart-toggle');
+  const ta   = document.getElementById('trip-smart-text');
+  if (!wrap) return;
+  const isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  if (btn) btn.textContent = isOpen ? '展開 ▾' : '收起 ▴';
+  if (!isOpen && ta) {
+    // Set up char count
+    ta.oninput = () => {
+      const el = document.getElementById('trip-smart-count');
+      if (el) {
+        el.textContent = `${ta.value.length} / 3000`;
+        el.style.color = ta.value.length > 3000 ? '#FF3B30' : '#AAAAAA';
+      }
+    };
+    setTimeout(() => ta.focus(), 100);
+  }
+}
+
 function openSmartImport(context) {
   _smartImportContext = context;
   _smartImportResult  = null;
@@ -3464,11 +3514,13 @@ function _applySmartImport() {
     const start = startDate ? new Date(startDate.replace(/\//g, '-')) : null;
     for (let i = 0; i < actualDays; i++) {
       let dateStr = '';
-      if (start) {
+      if (start && !isNaN(start.getTime())) {
         const d = new Date(start);
         d.setDate(d.getDate() + i);
-        const wd = ['日','一','二','三','四','五','六'][d.getDay()];
-        dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}（${wd}）`;
+        if (!isNaN(d.getTime())) {
+          const wd = ['日','一','二','三','四','五','六'][d.getDay()];
+          dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}（${wd}）`;
+        }
       }
       tripData.days.push({ banner: { date: dateStr, subtitle: '', photos: [] }, events: [] });
       tripData.expenses.push([]);
