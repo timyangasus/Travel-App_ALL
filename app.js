@@ -3542,12 +3542,16 @@ function _applySmartImport(result) {
   if (result._noDayDetected && result.events.length > 0) {
     document.getElementById('smart-import-loading').style.display = 'none';
     const listEl = document.getElementById('smart-import-report-list');
-    const dayBtns = data.days.map((_, i) =>
-      `<button onclick="_importToDay(${i})"
-        style="padding:10px 18px;background:#1A1A1A;color:#fff;border:none;font-family:var(--mono);font-size:14px;cursor:pointer;border-radius:0;-webkit-tap-highlight-color:transparent">
-        Day ${i+1}
-      </button>`
-    ).join('');
+    const dayBtns = data.days.map((d, i) => {
+      const dateStr = d.banner?.date || '';
+      // Extract MM/DD（週X） from dateStr like 2026/05/07（四）
+      const dateShort = dateStr.replace(/^\d{4}\//, '').replace(/（[^）]+）/, m => m) || '';
+      return `<button onclick="_importToDay(${i})"
+        style="padding:10px 14px;background:#1A1A1A;color:#fff;border:none;font-family:var(--mono);cursor:pointer;border-radius:0;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px">
+        <span style="font-size:14px;font-weight:700">Day ${i+1}</span>
+        ${dateShort ? `<span style="font-size:11px;opacity:0.7">${dateShort}</span>` : ''}
+      </button>`;
+    }).join('');
     listEl.innerHTML = `
       <div style="font-family:var(--mono);font-size:14px;color:#1A1A1A;padding:8px 12px;background:#FFF8E1;border-left:3px solid #F5C518">
         ⚠️ 未偵測到日期或天數，請選擇要匯入至哪一天
