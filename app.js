@@ -278,9 +278,8 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
   document.getElementById('screen-' + tab).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
-  // Hide tab bar on Home, show on all other screens
   const tabBar = document.querySelector('.tab-bar');
-  if (tabBar) tabBar.style.display = tab === 'home' ? 'none' : '';
+  if (tabBar) tabBar.style.display = tab === 'home' ? 'none' : 'flex';
   if (tab === 'home')     renderHome();
   if (tab === 'expense')  renderExpense();
   if (tab === 'info')     renderInfo();
@@ -774,35 +773,31 @@ function saveTripSheet() {
   }
 
   localStorage.setItem(TRIP_PREFIX + id, JSON.stringify(tripData));
+
+  // Get inline smart import text before closing modal
+  const smartText = document.getElementById('trip-smart-text')?.value?.trim() || '';
+  // Reset inline textarea
+  const stWrap = document.getElementById('trip-smart-input-wrap');
+  const stTa   = document.getElementById('trip-smart-text');
+  const stBtn  = document.getElementById('trip-smart-toggle');
+  if (stWrap) stWrap.style.display = 'none';
+  if (stTa)   stTa.value = '';
+  if (stBtn)  stBtn.textContent = '展開 ▾';
+
   closeModal('modal-trip-sheet');
+  openTrip(id);
+  showToast(`行程已建立，共 ${days} 天`);
 
-  // Check if inline smart import text was entered
-  const smartText = document.getElementById('trip-smart-text')?.value?.trim();
-  document.getElementById('trip-smart-text') && (document.getElementById('trip-smart-text').value = '');
-  document.getElementById('trip-smart-input-wrap') && (document.getElementById('trip-smart-input-wrap').style.display = 'none');
-  document.getElementById('trip-smart-toggle') && (document.getElementById('trip-smart-toggle').textContent = '展開 ▾');
-
-  if (smartText && smartText.length > 0) {
-    // Open trip then run smart import with this trip's data loaded
-    openTrip(id);
-    showToast(`行程已建立，共 ${days} 天，正在解析行程文字…`);
-    // Give UI time to render then run import
+  // If smart import text provided, open import modal after trip loads
+  if (smartText) {
     setTimeout(() => {
-      _smartImportContext = 'settings'; // use settings mode (trip already created)
-      _smartImportResult = null;
-      // Temporarily set the smart-import-text for runSmartImport to read
+      openSmartImport('settings');
       const ta = document.getElementById('smart-import-text');
-      if (ta) ta.value = smartText;
-      // Show loading overlay
-      document.getElementById('smart-import-loading').style.display = 'flex';
-      document.getElementById('smart-import-actions').style.display = 'none';
-      document.getElementById('smart-import-report').style.display = 'none';
-      document.getElementById('modal-smart-import').classList.add('open');
-      runSmartImport();
-    }, 600);
-  } else {
-    openTrip(id);
-    showToast(`行程已建立，共 ${days} 天`);
+      if (ta) {
+        ta.value = smartText;
+        ta.dispatchEvent(new Event('input'));
+      }
+    }, 400);
   }
 }
 
