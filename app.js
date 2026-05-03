@@ -1205,7 +1205,7 @@ function renderTimeline() {
     return;
   }
   list.innerHTML = evs.map((ev, i) => {
-    const noteHtml = ev.note ? `<div class="timeline-note">${noteToHtml(ev.note)}</div>` : '';
+    const noteHtml = ev.note ? `<div class="timeline-note" onclick="editEvent(${ev.id})" style="cursor:pointer">${noteToHtml(ev.note)}</div>` : '';
     const addrHtml = ev.addr ? `<div class="timeline-addr" onclick="openAddr('${esc(ev.addr)}')">${esc(ev.addr)}</div>` : '';
     const stationHtml = (ev.station || ev.line) ? `
       <div class="timeline-station-row">
