@@ -3350,9 +3350,6 @@ async function runSmartImport() {
   if (!text) { showToast('請先貼入行程文字'); return; }
   if (text.length > 3000) { showToast('文字超過 3000 字，請精簡後再試'); return; }
 
-  // Backup first
-  exportJSON();
-
   // Show loading
   document.getElementById('smart-import-actions').style.display = 'none';
   document.getElementById('smart-import-loading').style.display = 'flex';
