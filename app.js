@@ -3522,8 +3522,9 @@ function _parseItineraryText(text) {
   }
 
   pushCurrentEvent();
+  const noDayDetected = daysCount === 0;
   if (daysCount === 0 && events.length > 0) daysCount = 1;
-  return { days_count: daysCount, events, issues };
+  return { days_count: daysCount, events, issues, _noDayDetected: noDayDetected };
 }
 
 
@@ -3534,6 +3535,30 @@ function _applySmartImport(result) {
     document.getElementById('smart-import-loading').style.display = 'none';
     document.getElementById('smart-import-actions').style.display = 'flex';
     showToast('無法識別行程格式，請確認文字包含日期、時間或天數資訊');
+    return;
+  }
+
+  // No day detected — show day picker in report area
+  if (result._noDayDetected && result.events.length > 0) {
+    document.getElementById('smart-import-loading').style.display = 'none';
+    const listEl = document.getElementById('smart-import-report-list');
+    const dayBtns = data.days.map((_, i) =>
+      `<button onclick="_importToDay(${i})"
+        style="padding:10px 18px;background:#1A1A1A;color:#fff;border:none;font-family:var(--mono);font-size:14px;cursor:pointer;border-radius:0;-webkit-tap-highlight-color:transparent">
+        Day ${i+1}
+      </button>`
+    ).join('');
+    listEl.innerHTML = `
+      <div style="font-family:var(--mono);font-size:14px;color:#1A1A1A;padding:8px 12px;background:#FFF8E1;border-left:3px solid #F5C518">
+        ⚠️ 未偵測到日期或天數，請選擇要匯入至哪一天
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">${dayBtns}</div>`;
+    document.getElementById('smart-import-report').style.display = 'block';
+    document.getElementById('smart-import-confirm-actions') && (document.getElementById('smart-import-confirm-actions').style.display = 'none');
+    document.getElementById('smart-import-done-actions').style.display = 'none';
+    document.getElementById('smart-import-actions').style.display = 'none';
+    // store result for later use
+    window._pendingSmartResult = result;
     return;
   }
 
@@ -3571,7 +3596,16 @@ function _applySmartImport(result) {
     written++;
   });
 
+  // Count by day
+  const dayCount = {};
+  result.events.forEach(ev => {
+    if (!ev._skipped) dayCount[ev.day] = (dayCount[ev.day] || 0) + 1;
+  });
+  const dayReports = Object.keys(dayCount).sort((a,b)=>a-b)
+    .map(d => `✓ Day ${d} 匯入 ${dayCount[d]} 筆行程`);
+  reports.unshift(...dayReports);
   reports.unshift(`✓ 共匯入 ${written} 筆行程`);
+  if (result._noDayDetected) reports.push('⚠️ 未偵測到日期或天數，所有行程已放入 Day 1，請自行移至正確天數');
   if (skipped > 0) reports.push(`✓ ${skipped} 筆重複行程已略過`);
   if (result.issues?.length) result.issues.forEach(i => reports.push(i));
 
@@ -3591,6 +3625,40 @@ function _applySmartImport(result) {
 function closeSmartImportDone() {
   closeModal('modal-smart-import');
   switchTab('itinerary');
+}
+
+function _importToDay(dayIdx) {
+  const result = window._pendingSmartResult;
+  if (!result) return;
+  const reports = [];
+  let written = 0, skipped = 0;
+  result.events.forEach(ev => {
+    const dayEvents = data.days[dayIdx].events;
+    if (dayEvents.some(e => e.time === ev.time && e.title === ev.title)) {
+      skipped++; return;
+    }
+    dayEvents.push({
+      id: Date.now() + Math.random(),
+      time:      ev.time     || '',
+      title:     ev.title    || '',
+      note:      ev.note     || '',
+      addr:      ev.addr     || '',
+      station:   ev.station  || '',
+      line:      ev.line     || '',
+      lineColor: (ev.station || ev.line) ? getTransitColor(ev.line || '') : ''
+    });
+    written++;
+  });
+  reports.push(`✓ 共匯入 ${written} 筆行程至 Day ${dayIdx+1}`);
+  if (skipped > 0) reports.push(`✓ ${skipped} 筆重複行程已略過`);
+  window._pendingSmartResult = null;
+  save();
+  renderItinerary();
+  const listEl = document.getElementById('smart-import-report-list');
+  listEl.innerHTML = reports.map(r =>
+    `<div style="font-family:var(--mono);font-size:14px;color:#1A1A1A;padding:8px 12px;background:#F8F8F8;border-left:3px solid #1A1A1A">${r}</div>`
+  ).join('');
+  document.getElementById('smart-import-done-actions').style.display = 'block';
 }
 
 function openWeatherLocationSheet() {
