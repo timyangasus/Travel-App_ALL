@@ -3357,64 +3357,124 @@ function openSmartImport() {
   document.getElementById('modal-smart-import').classList.add('open');
 }
 
-async function runSmartImport() {
+function runSmartImport() {
   const ta = document.getElementById('smart-import-text');
   const text = ta?.value?.trim() || '';
   if (!text) { showToast('請先貼入行程文字'); return; }
   if (text.length > 3000) { showToast('文字超過 3000 字，請精簡後再試'); return; }
 
-  // Show loading
+  // Show loading briefly then parse
   document.getElementById('smart-import-actions').style.display = 'none';
   document.getElementById('smart-import-loading').style.display = 'flex';
 
-  const dateRange = data?.settings?.tripDates || '';
-
-  const prompt = `你是旅遊行程解析助手。將以下行程文字解析成 JSON。
-
-行程日期區間：${dateRange || '請從文字中推斷'}
-
-規則：
-1. 每條：day(第幾天,從1起)、time(HH:MM)、title、note、addr、station、line
-2. 時間區間如12:30-15:30：time填12:30，note填「12:30-15:30 標題」
-3. 地址判斷不出就放note，addr填空字串
-4. 金額放note
-5. 「最近站：站名｜路線」→ station和line
-6. 標題說明維持原文
-7. 同天同時間同標題只保留一筆
-8. 跨夜行程在issues說明
-
-只回傳JSON，格式：
-{"days_count":N,"events":[{"day":1,"time":"09:00","title":"...","note":"...","addr":"...","station":"...","line":"..."}],"issues":["⚠️ 說明"]}
-
-行程文字：
-${text}`;
-
-  try {
-    const apiKey = getApiKey();
-    if (!apiKey) {
+  setTimeout(() => {
+    try {
+      const result = _parseItineraryText(text);
+      _applySmartImport(result);
+    } catch(e) {
       document.getElementById('smart-import-loading').style.display = 'none';
       document.getElementById('smart-import-actions').style.display = 'flex';
-      showToast('請先在設定頁填入 Claude API Key');
-      return;
+      showToast('解析失敗，請確認文字格式');
     }
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const json = await res.json();
-    const raw = (json.content?.[0]?.text || '').replace(/```json|```/g, '').trim();
-    const result = JSON.parse(raw);
-    _applySmartImport(result);
-  } catch(e) {
-    document.getElementById('smart-import-loading').style.display = 'none';
-    document.getElementById('smart-import-actions').style.display = 'flex';
-    showToast('匯入失敗，請確認網路連線，你的資料未受影響');
+  }, 300);
+}
+
+
+function _parseItineraryText(text) {
+  const lines = text.split('\n');
+  const events = [];
+  const issues = [];
+  let currentDay = 0;
+  let currentEvent = null;
+  let noteLines = [];
+  let daysCount = 0;
+
+  function padTime(t) {
+    const parts = t.split(':');
+    return parts[0].padStart(2,'0') + ':' + parts[1];
   }
+
+  function pushCurrentEvent() {
+    if (!currentEvent) return;
+    if (noteLines.length > 0) {
+      const extra = noteLines.join(' ').trim();
+      if (extra) currentEvent.note = (currentEvent.note ? currentEvent.note + ' ' : '') + extra;
+    }
+    events.push(currentEvent);
+    currentEvent = null;
+    noteLines = [];
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const line = raw.trim();
+    if (!line || line === '\u2015' || line === '---' || line === '\u2014') continue;
+
+    // Day header
+    const dayMatch = line.match(/[Dd]ay\s*(\d+)|\u7b2c(\d+)\u5929/);
+    if (dayMatch) {
+      pushCurrentEvent();
+      currentDay = parseInt(dayMatch[1] || dayMatch[2]);
+      if (currentDay > daysCount) daysCount = currentDay;
+      continue;
+    }
+
+    // Time range: 09:00 - 11:00 Title
+    const timeRangeMatch = line.match(/^(\d{1,2}:\d{2})\s*[-\u2013\u2014]\s*(\d{1,2}:\d{2})\s*[|\uff5c]?\s*(.+)$/);
+    if (timeRangeMatch) {
+      pushCurrentEvent();
+      const time = padTime(timeRangeMatch[1]);
+      const endTime = padTime(timeRangeMatch[2]);
+      const title = timeRangeMatch[3].trim();
+      const sh = parseInt(timeRangeMatch[1].split(':')[0]);
+      const eh = parseInt(timeRangeMatch[2].split(':')[0]);
+      if (eh < sh && eh < 6) {
+        issues.push('\u26a0\ufe0f Day ' + (currentDay||1) + ' \u5075\u6e2c\u5230\u8de8\u591c\u884c\u7a0b\uff08' + time + '\u2013' + endTime + '\uff09\uff0c\u5df2\u653e\u5165 Day ' + (currentDay||1) + '\uff0c\u8acb\u81ea\u884c\u78ba\u8a8d');
+      }
+      currentEvent = { day: currentDay||1, time, title, note: time + '\u2013' + endTime + ' ' + title, addr: '', station: '', line: '' };
+      noteLines = [];
+      continue;
+    }
+
+    // Single time: 09:00 | Title or 09:00 Title
+    const timeSingleMatch = line.match(/^(\d{1,2}:\d{2})\s*[|\uff5c\u3000\s]\s*(.+)$/);
+    if (timeSingleMatch) {
+      pushCurrentEvent();
+      const time = padTime(timeSingleMatch[1]);
+      const title = timeSingleMatch[2].trim();
+      currentEvent = { day: currentDay||1, time, title, note: '', addr: '', station: '', line: '' };
+      noteLines = [];
+      continue;
+    }
+
+    // Labels
+    if (/^\u8aac\u660e[:\uff1a]/.test(line)) {
+      const val = line.replace(/^\u8aac\u660e[:\uff1a]/, '').trim();
+      if (currentEvent) currentEvent.note = (currentEvent.note ? currentEvent.note + ' ' : '') + val;
+      continue;
+    }
+    if (/^\u5730\u5740[:\uff1a]/.test(line)) {
+      if (currentEvent) currentEvent.addr = line.replace(/^\u5730\u5740[:\uff1a]/, '').trim();
+      continue;
+    }
+    if (/^\u6700\u8fd1\u7ad9[:\uff1a]/.test(line)) {
+      const val = line.replace(/^\u6700\u8fd1\u7ad9[:\uff1a]/, '').trim();
+      const parts = val.split(/[\uff5c|]/);
+      if (currentEvent) { currentEvent.station = (parts[0]||'').trim(); currentEvent.line = (parts[1]||'').trim().replace(/（[^）]*）/g,'').replace(/\([^)]*\)/g,'').trim(); }
+      continue;
+    }
+    if (/^\u4e3b\u984c[:\uff1a]/.test(line)) {
+      const val = line.replace(/^\u4e3b\u984c[:\uff1a]/, '').trim();
+      if (currentEvent) currentEvent.note = (currentEvent.note ? currentEvent.note + ' ' : '') + '\u4e3b\u984c\uff1a' + val;
+      continue;
+    }
+
+    if (currentEvent) noteLines.push(line);
+  }
+
+  pushCurrentEvent();
+  if (daysCount === 0 && events.length > 0) daysCount = 1;
+  return { days_count: daysCount, events, issues };
 }
 
 function _applySmartImport(result) {
