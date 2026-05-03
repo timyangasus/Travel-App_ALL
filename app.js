@@ -3273,6 +3273,9 @@ function renderSettings() {
   const sel = document.getElementById('set-currency');
   if (sel) sel.value = s.currency || 'TWD';
   // Tags
+  // API Key
+  const apiKeyEl = document.getElementById('set-api-key');
+  if (apiKeyEl) apiKeyEl.value = getApiKey();
   // Weather location display
   const wLocEl = document.getElementById('set-weather-location-display');
   if (wLocEl) {
@@ -3321,6 +3324,16 @@ function getTransitColor(lineStr) {
     if (s.includes(key.toLowerCase())) return val;
   }
   return '#999999';
+}
+
+function saveApiKey() {
+  const key = document.getElementById('set-api-key')?.value?.trim() || '';
+  try { localStorage.setItem('claude_api_key', key); } catch(e) {}
+  if (key) showToast('API Key 已儲存');
+}
+
+function getApiKey() {
+  try { return localStorage.getItem('claude_api_key') || ''; } catch(e) { return ''; }
 }
 
 function openSmartImport() {
@@ -3377,9 +3390,16 @@ async function runSmartImport() {
 ${text}`;
 
   try {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      document.getElementById('smart-import-loading').style.display = 'none';
+      document.getElementById('smart-import-actions').style.display = 'flex';
+      showToast('請先在設定頁填入 Claude API Key');
+      return;
+    }
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,

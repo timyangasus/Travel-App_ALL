@@ -514,7 +514,19 @@
         </div>
       </div>
 
-      <!-- 第二區塊 -->
+      <!-- 功能區塊 -->
+      <div class="set-section-label">設定</div>
+      <div class="set-section">
+        <div class="set-field">
+          <span class="set-field-label">Claude API Key</span>
+          <input class="set-field-val" id="set-api-key" type="password"
+            placeholder="sk-ant-..." 
+            onblur="saveApiKey()"
+            style="font-family:var(--mono);font-size:13px;letter-spacing:0.5px">
+        </div>
+      </div>
+
+      <!-- 第三區塊 -->
       <div class="set-section-label">設定</div>
       <div class="set-section">
         <div class="set-action" onclick="document.getElementById('import-json-input').click()">
