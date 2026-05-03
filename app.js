@@ -1449,9 +1449,14 @@ function setEvColor(hex) { pickColor(hex); }
 function toggleEvColorPicker() { openColorSheet(); }
 
 function noteToHtml(text) {
-  // Convert URLs to clickable links
   const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return esc(text).replace(urlRegex, url => `<a href="${url}" target="_blank" style="color:#2980B9;text-decoration:underline">${url}</a>`);
+  // Split by * bullets and render each on its own line
+  const lines = esc(text).split(/\s*\*\s+/);
+  const result = lines.map((line, i) => {
+    const linked = line.replace(urlRegex, url => `<a href="${url}" target="_blank" style="color:#2980B9;text-decoration:underline">${url}</a>`);
+    return i === 0 ? linked : '• ' + linked;
+  }).filter(l => l.trim()).join('<br>');
+  return result;
 }
 
 function openEventModal(id) {
