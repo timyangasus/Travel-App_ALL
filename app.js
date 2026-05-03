@@ -278,8 +278,9 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
   document.getElementById('screen-' + tab).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
+  // Hide tab bar on Home, show on all other screens
   const tabBar = document.querySelector('.tab-bar');
-  if (tabBar) tabBar.style.display = tab === 'home' ? 'none' : 'flex';
+  if (tabBar) tabBar.style.display = tab === 'home' ? 'none' : '';
   if (tab === 'home')     renderHome();
   if (tab === 'expense')  renderExpense();
   if (tab === 'info')     renderInfo();
@@ -760,45 +761,20 @@ function saveTripSheet() {
   const start = startDate ? new Date(startDate.replace(/\//g, '-')) : null;
   for (let i = 0; i < days; i++) {
     let dateStr = '';
-    if (start && !isNaN(start.getTime())) {
+    if (start) {
       const d = new Date(start);
       d.setDate(d.getDate() + i);
-      if (!isNaN(d.getTime())) {
-        const wd = ['日','一','二','三','四','五','六'][d.getDay()];
-        dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}（${wd}）`;
-      }
+      const wd = ['日','一','二','三','四','五','六'][d.getDay()];
+      dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}（${wd}）`;
     }
     tripData.days.push({ banner: { date: dateStr, subtitle: '', photos: [] }, events: [] });
     tripData.expenses.push([]);
   }
 
   localStorage.setItem(TRIP_PREFIX + id, JSON.stringify(tripData));
-
-  // Get inline smart import text before closing modal
-  const smartText = document.getElementById('trip-smart-text')?.value?.trim() || '';
-  // Reset inline textarea
-  const stWrap = document.getElementById('trip-smart-input-wrap');
-  const stTa   = document.getElementById('trip-smart-text');
-  const stBtn  = document.getElementById('trip-smart-toggle');
-  if (stWrap) stWrap.style.display = 'none';
-  if (stTa)   stTa.value = '';
-  if (stBtn)  stBtn.textContent = '展開 ▾';
-
   closeModal('modal-trip-sheet');
   openTrip(id);
   showToast(`行程已建立，共 ${days} 天`);
-
-  // If smart import text provided, open import modal after trip loads
-  if (smartText) {
-    setTimeout(() => {
-      openSmartImport('settings');
-      const ta = document.getElementById('smart-import-text');
-      if (ta) {
-        ta.value = smartText;
-        ta.dispatchEvent(new Event('input'));
-      }
-    }, 400);
-  }
 }
 
 /* ═══════════════════════════════════════
@@ -3327,22 +3303,12 @@ let _pendingWeatherCity = null; // { name, lat, lon }
    一鍵匯入
 ═══════════════════════════════════════ */
 
-let _smartImportContext = 'new'; // 'new' or 'settings'
-let _smartImportResult  = null;  // parsed result from Claude
-
-// 曼谷/台北/日本等常見捷運顏色對應
 const TRANSIT_COLORS = {
-  // Bangkok BTS
   '深綠': '#1D7340', '淺綠': '#7DC242', 'sukhumvit': '#7DC242', 'silom': '#1D7340',
-  // Bangkok MRT
   '藍線': '#1A3F8F', '紫線': '#8B1A8B',
-  // Taipei MRT
   '板南': '#0070BD', '淡水信義': '#E3002C', '中和新蘆': '#F8A501', '松山新店': '#008659', '環狀': '#FAEC00',
-  // Tokyo
   '山手': '#80C241', 'JR': '#F15A22', '丸之內': '#E60012', '日比谷': '#B5B5AC', '銀座': '#F2952E',
-  // Osaka
   '御堂筋': '#E5171F', '四つ橋': '#0066B3', '中央': '#1CB47A', '千日前': '#E5634C',
-  // General
   'red': '#E60012', 'green': '#1D7340', 'blue': '#1A3F8F', 'yellow': '#F8A501',
   'orange': '#F2952E', 'purple': '#8B1A8B', 'brown': '#964B00',
   'pink': '#F194B4', 'grey': '#888888', 'gray': '#888888',
@@ -3357,98 +3323,58 @@ function getTransitColor(lineStr) {
   return '#999999';
 }
 
-function toggleTripSmartInput() {
-  const wrap = document.getElementById('trip-smart-input-wrap');
-  const btn  = document.getElementById('trip-smart-toggle');
-  const ta   = document.getElementById('trip-smart-text');
-  if (!wrap) return;
-  const isOpen = wrap.style.display !== 'none';
-  wrap.style.display = isOpen ? 'none' : 'block';
-  if (btn) btn.textContent = isOpen ? '展開 ▾' : '收起 ▴';
-  if (!isOpen && ta) {
-    // Set up char count
+function openSmartImport() {
+  const ta = document.getElementById('smart-import-text');
+  const countEl = document.getElementById('smart-import-count');
+  if (ta) {
+    ta.value = '';
     ta.oninput = () => {
-      const el = document.getElementById('trip-smart-count');
-      if (el) {
-        el.textContent = `${ta.value.length} / 3000`;
-        el.style.color = ta.value.length > 3000 ? '#FF3B30' : '#AAAAAA';
+      const len = ta.value.length;
+      if (countEl) {
+        countEl.textContent = `${len} / 3000`;
+        countEl.style.color = len > 3000 ? '#FF3B30' : '#AAAAAA';
       }
     };
-    setTimeout(() => ta.focus(), 100);
   }
-}
-
-function openSmartImport(context) {
-  _smartImportContext = context;
-  _smartImportResult  = null;
-  // Reset UI
-  document.getElementById('smart-import-text').value = '';
-  document.getElementById('smart-import-count').textContent = '0 / 3000';
-  document.getElementById('smart-import-count').style.color = '#AAAAAA';
+  if (countEl) { countEl.textContent = '0 / 3000'; countEl.style.color = '#AAAAAA'; }
   document.getElementById('smart-import-loading').style.display = 'none';
   document.getElementById('smart-import-report').style.display = 'none';
   document.getElementById('smart-import-actions').style.display = 'flex';
-  document.getElementById('smart-import-confirm-actions').style.display = 'none';
-  document.getElementById('smart-import-btn').textContent = '確認匯入';
-  document.getElementById('smart-import-btn').disabled = false;
+  document.getElementById('smart-import-done-actions').style.display = 'none';
   document.getElementById('modal-smart-import').classList.add('open');
-  // Character count listener
-  const ta = document.getElementById('smart-import-text');
-  ta.oninput = () => {
-    const len = ta.value.length;
-    const el = document.getElementById('smart-import-count');
-    el.textContent = `${len} / 3000`;
-    el.style.color = len > 3000 ? '#FF3B30' : '#AAAAAA';
-  };
 }
 
 async function runSmartImport() {
-  const text = document.getElementById('smart-import-text').value.trim();
+  const ta = document.getElementById('smart-import-text');
+  const text = ta?.value?.trim() || '';
   if (!text) { showToast('請先貼入行程文字'); return; }
   if (text.length > 3000) { showToast('文字超過 3000 字，請精簡後再試'); return; }
 
-  // Auto export JSON backup first
+  // Backup first
   exportJSON();
 
   // Show loading
   document.getElementById('smart-import-actions').style.display = 'none';
   document.getElementById('smart-import-loading').style.display = 'flex';
 
-  // Get date range from context
-  let dateRange = '';
-  if (_smartImportContext === 'new') {
-    dateRange = document.getElementById('tf-dates')?.value?.trim() || '';
-  } else {
-    dateRange = data?.settings?.tripDates || '';
-  }
+  const dateRange = data?.settings?.tripDates || '';
 
-  const prompt = `你是旅遊行程解析助手。請將以下行程文字解析成 JSON 格式。
+  const prompt = `你是旅遊行程解析助手。將以下行程文字解析成 JSON。
 
-行程日期區間：${dateRange || '未提供，請從文字中推斷'}
+行程日期區間：${dateRange || '請從文字中推斷'}
 
-解析規則：
-1. 每個行程條目包含：day（第幾天，從1開始）、time（開始時間，格式HH:MM）、title（標題）、note（說明）、addr（地址）、station（捷運站名）、line（路線名稱）
-2. 時間區間（如 12:30-15:30）：time 填開始時間，note 填「12:30-15:30 標題內容」
-3. 地址若無法判斷，放入 note，addr 填空字串
-4. 金額預算放入 note，不單獨處理
-5. 最近站格式「站名｜路線」，解析為 station 和 line 兩個欄位
-6. 標題說明維持原文不翻譯
-7. 同一天重複的時間+標題只保留一筆
-8. 跨夜行程（如 23:00-01:00）在 issues 中說明
+規則：
+1. 每條：day(第幾天,從1起)、time(HH:MM)、title、note、addr、station、line
+2. 時間區間如12:30-15:30：time填12:30，note填「12:30-15:30 標題」
+3. 地址判斷不出就放note，addr填空字串
+4. 金額放note
+5. 「最近站：站名｜路線」→ station和line
+6. 標題說明維持原文
+7. 同天同時間同標題只保留一筆
+8. 跨夜行程在issues說明
 
-請回傳純 JSON，格式如下：
-{
-  "days_count": 總天數,
-  "events": [
-    {"day":1,"time":"09:00","title":"...","note":"...","addr":"...","station":"...","line":"..."},
-    ...
-  ],
-  "issues": [
-    "⚠️ 偵測到跨夜行程（Day 2 23:00–01:00），已放入 Day 2，請自行確認",
-    "⚠️ 3 筆地址無法判斷，已放入說明欄"
-  ]
-}
-只回傳 JSON，不要任何其他文字。
+只回傳JSON，格式：
+{"days_count":N,"events":[{"day":1,"time":"09:00","title":"...","note":"...","addr":"...","station":"...","line":"..."}],"issues":["⚠️ 說明"]}
 
 行程文字：
 ${text}`;
@@ -3464,10 +3390,9 @@ ${text}`;
       })
     });
     const json = await res.json();
-    const raw = json.content?.[0]?.text || '';
-    const clean = raw.replace(/```json|```/g, '').trim();
-    _smartImportResult = JSON.parse(clean);
-    _applySmartImport();
+    const raw = (json.content?.[0]?.text || '').replace(/```json|```/g, '').trim();
+    const result = JSON.parse(raw);
+    _applySmartImport(result);
   } catch(e) {
     document.getElementById('smart-import-loading').style.display = 'none';
     document.getElementById('smart-import-actions').style.display = 'flex';
@@ -3475,135 +3400,70 @@ ${text}`;
   }
 }
 
-function _applySmartImport() {
-  const result = _smartImportResult;
-  if (!result || !result.events) {
+function _applySmartImport(result) {
+  const reports = [];
+
+  if (!result || !Array.isArray(result.events) || result.events.length === 0) {
     document.getElementById('smart-import-loading').style.display = 'none';
     document.getElementById('smart-import-actions').style.display = 'flex';
-    showToast('無法識別行程格式，請確認文字內容是否包含日期、時間或天數資訊');
+    showToast('無法識別行程格式，請確認文字包含日期、時間或天數資訊');
     return;
   }
 
-  const reports = [];
+  // Extend days if needed
   const daysNeeded = result.days_count || 1;
-
-  if (_smartImportContext === 'new') {
-    // 新增行程：先建立行程再匯入
-    const name = document.getElementById('tf-name')?.value?.trim() || '新行程';
-    const datesRaw = document.getElementById('tf-dates')?.value?.trim() || '';
-    const { startDate, endDate, days } = _parseTripSheetDates(datesRaw);
-    const actualDays = Math.max(days, daysNeeded);
-
-    const id = genId();
-    const newTrip = { id, name, startDate, endDate, currency: _tfCurrencyCode, coverImg: '' };
-    meta.trips.push(newTrip);
-    saveMeta();
-
-    const tripData = freshTripData();
-    tripData.settings.tripName  = name;
-    tripData.settings.currency  = _tfCurrencyCode;
-    tripData.settings.tripDates = datesRaw;
-    tripData.days = [];
-    tripData.expenses = [];
-
-    const start = startDate ? new Date(startDate.replace(/\//g, '-')) : null;
-    for (let i = 0; i < actualDays; i++) {
-      let dateStr = '';
-      if (start && !isNaN(start.getTime())) {
-        const d = new Date(start);
-        d.setDate(d.getDate() + i);
-        if (!isNaN(d.getTime())) {
-          const wd = ['日','一','二','三','四','五','六'][d.getDay()];
-          dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}（${wd}）`;
-        }
-      }
-      tripData.days.push({ banner: { date: dateStr, subtitle: '', photos: [] }, events: [] });
-      tripData.expenses.push([]);
+  if (daysNeeded > data.days.length) {
+    const extra = daysNeeded - data.days.length;
+    for (let i = 0; i < extra; i++) {
+      data.days.push({ banner: { date: '', subtitle: '', photos: [] }, events: [] });
+      data.expenses.push([]);
     }
-    if (actualDays > days) reports.push(`✓ 新增至第 ${actualDays} 天，區間已延長`);
-
-    // Write events
-    const written = _writeEvents(result.events, tripData, reports);
-    reports.unshift(`✓ 共匯入 ${written} 筆行程，共 ${actualDays} 天`);
-
-    localStorage.setItem(TRIP_PREFIX + id, JSON.stringify(tripData));
-    closeModal('modal-trip-sheet');
-
-    // Switch to new trip
-    loadTrip(id);
-    switchTab('itinerary');
-
-  } else {
-    // 設定頁：合併到現有行程
-    const daysNeededExtra = daysNeeded - data.days.length;
-    if (daysNeededExtra > 0) {
-      const lastDay = data.days[data.days.length - 1];
-      for (let i = 0; i < daysNeededExtra; i++) {
-        data.days.push({ banner: { date: '', subtitle: '', photos: [] }, events: [] });
-        data.expenses.push([]);
-      }
-      reports.push(`✓ 新增 ${daysNeededExtra} 天，請至設定頁更新行程區間`);
-    }
-
-    const written = _writeEvents(result.events, data, reports);
-    reports.unshift(`✓ 共匯入 ${written} 筆行程`);
-    save();
-    renderItinerary();
+    reports.push(`✓ 新增 ${extra} 天，請至設定頁更新行程區間`);
   }
 
-  // Add issues from Claude
-  if (result.issues?.length) {
-    result.issues.forEach(i => reports.push(i));
-  }
-
-  // Show report or done
-  document.getElementById('smart-import-loading').style.display = 'none';
-
-  if (reports.length > 1) {
-    const listEl = document.getElementById('smart-import-report-list');
-    listEl.innerHTML = reports.map(r =>
-      `<div style="font-family:var(--mono);font-size:14px;color:#1A1A1A;padding:8px 12px;background:#F8F8F8;border-left:3px solid #1A1A1A">${r}</div>`
-    ).join('');
-    document.getElementById('smart-import-report').style.display = 'block';
-    document.getElementById('smart-import-confirm-actions').style.display = 'block';
-  } else {
-    closeModal('modal-smart-import');
-  }
-}
-
-function _writeEvents(events, tripData, reports) {
+  // Write events
   let written = 0, skipped = 0;
-  events.forEach(ev => {
+  result.events.forEach(ev => {
     const dayIdx = (ev.day || 1) - 1;
-    if (dayIdx < 0 || dayIdx >= tripData.days.length) return;
-    const dayEvents = tripData.days[dayIdx].events;
+    if (dayIdx < 0 || dayIdx >= data.days.length) return;
+    const dayEvents = data.days[dayIdx].events;
     // Duplicate check
-    const isDup = dayEvents.some(e =>
-      e.time === ev.time && e.title === ev.title
-    );
-    if (isDup) { skipped++; return; }
-    const lineColor = getTransitColor(ev.line || '');
+    if (dayEvents.some(e => e.time === ev.time && e.title === ev.title)) {
+      skipped++; return;
+    }
     dayEvents.push({
       id: Date.now() + Math.random(),
-      time:  ev.time  || '',
-      title: ev.title || '',
-      note:  ev.note  || '',
-      addr:  ev.addr  || '',
-      station: ev.station || '',
-      line:    ev.line    || '',
-      lineColor: (ev.station || ev.line) ? lineColor : ''
+      time:      ev.time     || '',
+      title:     ev.title    || '',
+      note:      ev.note     || '',
+      addr:      ev.addr     || '',
+      station:   ev.station  || '',
+      line:      ev.line     || '',
+      lineColor: (ev.station || ev.line) ? getTransitColor(ev.line || '') : ''
     });
     written++;
   });
+
+  reports.unshift(`✓ 共匯入 ${written} 筆行程`);
   if (skipped > 0) reports.push(`✓ ${skipped} 筆重複行程已略過`);
-  return written;
+  if (result.issues?.length) result.issues.forEach(i => reports.push(i));
+
+  save();
+  renderItinerary();
+
+  // Show report
+  document.getElementById('smart-import-loading').style.display = 'none';
+  const listEl = document.getElementById('smart-import-report-list');
+  listEl.innerHTML = reports.map(r =>
+    `<div style="font-family:var(--mono);font-size:14px;color:#1A1A1A;padding:8px 12px;background:#F8F8F8;border-left:3px solid #1A1A1A">${r}</div>`
+  ).join('');
+  document.getElementById('smart-import-report').style.display = 'block';
+  document.getElementById('smart-import-done-actions').style.display = 'block';
 }
 
 function closeSmartImportDone() {
   closeModal('modal-smart-import');
-  if (_smartImportContext === 'settings') {
-    switchTab('itinerary');
-  }
+  switchTab('itinerary');
 }
 
 function openWeatherLocationSheet() {
@@ -3742,9 +3602,44 @@ function selectCurrencyFromSheet(code, symbol, label) {
   }
 }
 
+function renderSettingsTags() {
+  const cloud = document.getElementById('set-tags-cloud');
+  if (!cloud) return;
+  const tags = data.settings.tags || [];
+  cloud.innerHTML = tags.map((t, i) =>
+    `<span class="set-tag-chip ${t.active?'active':''}" onclick="toggleSettingsTag(${i})">${esc(t.text)}</span>`
+  ).join('');
+  const disp = document.getElementById('set-tags-display');
+  if (disp) {
+    const active = tags.filter(t => t.active).map(t => t.text);
+    disp.textContent = active.length ? active.join('，') : '加入標籤';
+  }
+}
 
+function openTagSheet() {
+  if (!data.settings.tags) data.settings.tags = [];
+  renderSettingsTags();
+  document.getElementById('modal-tag-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('set-tag-input')?.focus(), 340);
+}
 
+function addSettingsTag() {
+  const inp = document.getElementById('set-tag-input');
+  const text = inp?.value.trim();
+  if (!text) return;
+  if (!data.settings.tags) data.settings.tags = [];
+  data.settings.tags.push({ text, active: true });
+  save();
+  inp.value = '';
+  renderSettingsTags();
+}
 
+function toggleSettingsTag(idx) {
+  if (!data.settings.tags) return;
+  data.settings.tags[idx].active = !data.settings.tags[idx].active;
+  save();
+  renderSettingsTags();
+}
 
 // Close currency dropdown on outside click
 document.addEventListener('click', (e) => {
