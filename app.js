@@ -1373,25 +1373,33 @@ function addDay() {
 function fmtEventTime(el) {
   const raw = el.value;
   const digits = raw.replace(/\D/g, '').slice(0, 4);
+
+  // If user is deleting (raw ends with nothing after removing colon), don't auto-insert
+  const isDeleting = raw.length < (el._lastLen || 0);
+  el._lastLen = raw.length;
+
   let out = digits;
 
   if (digits.length === 1) {
-    // If first digit > 2, auto-pad: 8 → 08:
-    if (parseInt(digits) > 2) {
+    if (!isDeleting && parseInt(digits) > 2) {
       out = '0' + digits + ':';
       el.value = out;
+      el._lastLen = out.length;
       return;
     }
   } else if (digits.length === 2) {
-    // Auto-insert colon after HH
-    out = digits + ':';
-    el.value = out;
-    return;
+    if (!isDeleting) {
+      out = digits + ':';
+      el.value = out;
+      el._lastLen = out.length;
+      return;
+    }
   } else if (digits.length >= 3) {
     out = digits.slice(0,2) + ':' + digits.slice(2,4);
   }
 
   el.value = out;
+  el._lastLen = out.length;
 }
 
 function openEventModal(id) {
