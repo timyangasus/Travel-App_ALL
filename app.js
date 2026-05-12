@@ -1799,7 +1799,7 @@ function renderExpenseList() {
       ? `<div class="exp-row-subitems">${item.subitems.map(s =>
           `<div class="exp-row-subitem">
             <span>${esc(s.name)}</span>
-            <span>${sym}&nbsp;${parseFloat(s.amount).toLocaleString()}</span>
+            <span>${s.amount > 0 ? sym + '&nbsp;' + parseFloat(s.amount).toLocaleString() : '⚠ 待填'}</span>
           </div>`).join('')}</div>`
       : '';
     return `
@@ -3762,19 +3762,33 @@ function _parseAmount(str) {
 }
 
 function _parseSubitemsFromLine(line) {
-  // Split by 頓號 to get individual items, then parse each
-  // Handles: 品A (¥100)、品B(白) (¥200)、品C x2 (¥300)
+  line = line.replace(/[。.]+$/, '').trim();
   const subitems = [];
-  const parts = line.split(/[、，]/);
+  const rawParts = line.split(/[、，]/);
+  const parts = [];
+  for (let i = 0; i < rawParts.length; i++) {
+    let p = rawParts[i];
+    // Merge if next part starts with amount bracket (continuation after split)
+    while (i + 1 < rawParts.length) {
+      const next = rawParts[i + 1].trim();
+      if (next.match(/^[（(]¥\s*[\d,，]+[）)]/)) {
+        p = p + next; i++;
+        continue;
+      }
+      break;
+    }
+    parts.push(p);
+  }
   parts.forEach(part => {
-    part = part.trim().replace(/^[：:,\s]+/, '').trim();
+    part = part.trim().replace(/^[：:,\s]+/, '').trim().replace(/[。.]+$/, '').trim();
     if (!part) return;
-    // Find the LAST (¥xxx) or（¥xxx）bracket — that's the price
     const amtMatch = part.match(/\(¥\s*([\d,，]+)\)\s*$/) || part.match(/（¥\s*([\d,，]+)）\s*$/);
     if (amtMatch) {
       const amount = parseInt(amtMatch[1].replace(/[,，]/g, ''));
       const name = part.slice(0, part.lastIndexOf(amtMatch[0])).trim();
       if (name && amount > 0) subitems.push({ name, amount });
+    } else if (part.length > 1) {
+      subitems.push({ name: part, amount: 0, _raw: true });
     }
   });
   return subitems;
@@ -3803,6 +3817,12 @@ function _parseExpenseText(text) {
 
   function pushEntry() {
     if (!currentEntry) return;
+    // Flush any remaining continuation buffer
+    if (currentEntry._contBuf) {
+      const subs = _parseSubitemsFromLine(currentEntry._contBuf);
+      subs.forEach(s => { if (!currentEntry.subitems.some(e => e.name === s.name)) currentEntry.subitems.push(s); });
+      currentEntry._contBuf = '';
+    }
     // Recalculate total from subitems if no direct amount
     if (currentEntry.subitems.length > 0 && !currentEntry._hasDirectAmount) {
       currentEntry.amount = currentEntry.subitems.reduce((s, i) => s + i.amount, 0);
@@ -3907,36 +3927,35 @@ function _parseExpenseText(text) {
         continue;
       }
 
-      // Line with amount only or continuation: （含披薩、可樂）（¥1,600）
-      // Check if last subitem is pending (no amount yet)
+      // Check pending subitem needing amount from next line
       const lastSub = currentEntry.subitems.length > 0 ? currentEntry.subitems[currentEntry.subitems.length - 1] : null;
       if (lastSub && lastSub._pending) {
-        // Try to extract amount from this continuation line
-        const amtMatch = line.match(/[（(][¥￥]?\s*([\d,，]+)\s*[）)]\s*$/);
+        const amtMatch = line.match(/\(¥\s*([\d,，]+)\)\s*$/) || line.match(/（¥\s*([\d,，]+)）\s*$/);
         if (amtMatch) {
           lastSub.amount = parseInt(amtMatch[1].replace(/[,，]/g, ''));
           lastSub._pending = false;
-          currentEntry.amount = lastSub.amount;
-          currentEntry._hasDirectAmount = true;
+          if (!currentEntry._hasDirectAmount) currentEntry.amount = (currentEntry.subitems.reduce((s,i)=>s+i.amount,0));
           continue;
         }
       }
 
-      // Try to parse as 頓號-separated subitems
-      const subs = _parseSubitemsFromLine(line);
-      if (subs.length > 0) {
-        currentEntry.subitems.push(...subs);
-        continue;
-      }
+      // Accumulate continuation — append to buffer and parse combined
+      if (!currentEntry._contBuf) currentEntry._contBuf = '';
+      currentEntry._contBuf += (currentEntry._contBuf ? '' : '') + line;
 
-      // Single item with amount: 品項（¥560）
-      const subAmtM = line.match(/\(¥\s*([\d,，]+)\)\s*$/) || line.match(/（¥\s*([\d,，]+)）\s*$/);
-      if (subAmtM) {
-        const subAmt = parseInt(subAmtM[1].replace(/[,，]/g, ''));
-        const subName = line.slice(0, line.lastIndexOf(subAmtM[0])).trim();
-        currentEntry.subitems.push({ name: subName, amount: subAmt });
-        continue;
+      // Try to parse accumulated buffer
+      const combined = currentEntry._contBuf;
+      const subs = _parseSubitemsFromLine(combined);
+      if (subs.length > 0) {
+        // Only flush if we have complete items (last item has amount)
+        const lastS = subs[subs.length - 1];
+        if (!lastS._raw || combined.trim().endsWith('。') || combined.trim().endsWith('.')) {
+          subs.forEach(s => { if (!currentEntry.subitems.some(e => e.name === s.name)) currentEntry.subitems.push(s); });
+          if (!currentEntry._hasDirectAmount) currentEntry.amount = currentEntry.subitems.reduce((s,i)=>s+i.amount,0);
+          currentEntry._contBuf = '';
+        }
       }
+      continue;
     }
   }
 
