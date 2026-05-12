@@ -3215,7 +3215,15 @@ function renderHotelCards() {
     el.innerHTML = `<div class="list-empty">點右上角 ＋ 新增住宿</div>`;
     return;
   }
-  el.innerHTML = data.hotels.map(h => {
+  // Sort by checkin date ascending
+  const sorted = [...data.hotels].sort((a, b) => {
+    const pa = (a.checkin || a.dates || '').replace(/[^\d]/g, '');
+    const pb = (b.checkin || b.dates || '').replace(/[^\d]/g, '');
+    if (!pa) return 1;
+    if (!pb) return -1;
+    return pa.localeCompare(pb);
+  });
+  el.innerHTML = sorted.map(h => {
     const nights = h.nights || 0;
     const priceDisplay = h.price ? `${sym} ${parseInt(h.price).toLocaleString()}` : '';
     return `
