@@ -1763,6 +1763,9 @@ function switchExpDay(i) {
   expenseDay = ((i % total) + total) % total; // circular
   renderExpenseDayTabs();
   renderExpenseList();
+  // Reset scroll to top when switching days
+  const screen = document.getElementById('screen-expense');
+  if (screen) screen.scrollTop = 0;
 }
 
 function renderExpenseList() {
@@ -1826,12 +1829,13 @@ function addExpense() {
   const time   = document.getElementById('exp-time')?.value?.trim() || '';
   const cat    = _selectedCat || '其他';
   if (!amount) return;
+  const subitems = _getExpSubitems();
   if (window._expEditId) {
     const idx = data.expenses[expenseDay].findIndex(i => i.id === window._expEditId);
-    if (idx !== -1) data.expenses[expenseDay][idx] = { id: window._expEditId, name, amount: parseFloat(amount), cat, time, subitems: data.expenses[expenseDay][idx].subitems || [] };
+    if (idx !== -1) data.expenses[expenseDay][idx] = { id: window._expEditId, name, amount: parseFloat(amount), cat, time, subitems };
     window._expEditId = null;
   } else {
-    data.expenses[expenseDay].push({ id: Date.now(), name, amount: parseFloat(amount), cat, time, subitems: [] });
+    data.expenses[expenseDay].push({ id: Date.now(), name, amount: parseFloat(amount), cat, time, subitems });
   }
   save();
   closeModal('modal-expense-sheet');
@@ -2655,21 +2659,7 @@ function openExpenseSheetForEdit(id) {
   const subWrap = document.getElementById('exp-subitems-wrap');
   const subList = document.getElementById('exp-subitems-list');
   if (subWrap && subList) {
-    const subs = item.subitems || [];
-    if (subs.length > 0) {
-      const sym = getCurrencySymbol();
-      subList.innerHTML = subs.map((s,i) => `
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <input value="${esc(s.name)}" onchange="_updateSubitem(${item.id},${i},'name',this.value)"
-            style="flex:1;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:4px 0;outline:none;background:transparent">
-          <input value="${s.amount > 0 ? s.amount : ''}" placeholder="金額" type="text" inputmode="decimal"
-            onchange="_updateSubitem(${item.id},${i},'amount',this.value)"
-            style="width:80px;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:4px 0;outline:none;text-align:right;background:transparent">
-        </div>`).join('');
-      subWrap.style.display = 'block';
-    } else {
-      subWrap.style.display = 'none';
-    }
+    _renderExpSubitemsForEdit(item.subitems || []);
   }
   document.getElementById('modal-expense-sheet').classList.add('open');
   setTimeout(() => document.getElementById('exp-amount')?.focus(), 340);
@@ -4088,6 +4078,70 @@ function closeSmartExpenseDone() {
 }
 
 
+
+function addExpSubitemRow() {
+  const list = document.getElementById('exp-subitems-list');
+  if (!list) return;
+  const idx = list.children.length;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px';
+  row.innerHTML = `
+    <input placeholder="品項名稱" type="text"
+      style="flex:1;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:6px 0;outline:none;background:transparent"
+      oninput="_recalcExpTotal()">
+    <input placeholder="金額" type="text" inputmode="decimal"
+      style="width:80px;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:6px 0;outline:none;text-align:right;background:transparent"
+      oninput="_recalcExpTotal()">
+    <button onclick="this.parentElement.remove();_recalcExpTotal()"
+      style="background:none;border:none;color:#CCCCCC;font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0">×</button>`;
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}
+
+function _recalcExpTotal() {
+  const list = document.getElementById('exp-subitems-list');
+  const amtEl = document.getElementById('exp-amount');
+  if (!list || !amtEl) return;
+  let total = 0;
+  [...list.children].forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const amt = parseFloat(inputs[1]?.value || 0);
+    if (amt > 0) total += amt;
+  });
+  if (total > 0) amtEl.value = total;
+}
+
+function _getExpSubitems() {
+  const list = document.getElementById('exp-subitems-list');
+  if (!list) return [];
+  return [...list.children].map(row => {
+    const inputs = row.querySelectorAll('input');
+    return {
+      name: inputs[0]?.value?.trim() || '',
+      amount: parseFloat(inputs[1]?.value || 0)
+    };
+  }).filter(s => s.name || s.amount > 0);
+}
+
+function _renderExpSubitemsForEdit(subitems) {
+  const list = document.getElementById('exp-subitems-list');
+  if (!list) return;
+  list.innerHTML = '';
+  (subitems || []).forEach(s => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px';
+    row.innerHTML = `
+      <input value="${esc(s.name)}" placeholder="品項名稱" type="text"
+        style="flex:1;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:6px 0;outline:none;background:transparent"
+        oninput="_recalcExpTotal()">
+      <input value="${s.amount > 0 ? s.amount : ''}" placeholder="金額" type="text" inputmode="decimal"
+        style="width:80px;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:6px 0;outline:none;text-align:right;background:transparent"
+        oninput="_recalcExpTotal()">
+      <button onclick="this.parentElement.remove();_recalcExpTotal()"
+        style="background:none;border:none;color:#CCCCCC;font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0">×</button>`;
+    list.appendChild(row);
+  });
+}
 
 function _updateSubitem(expId, subIdx, field, value) {
   const item = (data.expenses[expenseDay] || []).find(i => i.id === expId);
