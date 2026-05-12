@@ -1798,8 +1798,9 @@ function renderExpenseList() {
     const iconSvg = catObj ? catObj.svg.replace(/height="[0-9]+px"/, 'height="22px"').replace(/width="[0-9]+px"/, 'width="22px"') : '';
     const label   = item.name || item.cat || '其他';
 
-    const subitemsHtml = (item.subitems && item.subitems.length > 0)
-      ? `<div class="exp-row-subitems">${item.subitems.map(s =>
+    const validSubs = (item.subitems || []).filter(s => s.name || s.amount > 0);
+    const subitemsHtml = validSubs.length > 0
+      ? `<div class="exp-row-subitems">${validSubs.map(s =>
           `<div class="exp-row-subitem">
             <span>${esc(s.name)}</span>
             <span>${s.amount > 0 ? sym + '&nbsp;' + parseFloat(s.amount).toLocaleString() : '⚠ 待填'}</span>
@@ -1829,7 +1830,7 @@ function addExpense() {
   const time   = document.getElementById('exp-time')?.value?.trim() || '';
   const cat    = _selectedCat || '其他';
   if (!amount) return;
-  const subitems = _getExpSubitems();
+  const subitems = _getExpSubitems().filter(s => s.name || s.amount > 0);
   if (window._expEditId) {
     const idx = data.expenses[expenseDay].findIndex(i => i.id === window._expEditId);
     if (idx !== -1) data.expenses[expenseDay][idx] = { id: window._expEditId, name, amount: parseFloat(amount), cat, time, subitems };
@@ -2655,12 +2656,8 @@ function openExpenseSheetForEdit(id) {
   if (amtEl)  amtEl.value  = item.amount || '';
   const timeEl = document.getElementById('exp-time');
   if (timeEl) timeEl.value = item.time || '';
-  // Show subitems
-  const subWrap = document.getElementById('exp-subitems-wrap');
-  const subList = document.getElementById('exp-subitems-list');
-  if (subWrap && subList) {
-    _renderExpSubitemsForEdit(item.subitems || []);
-  }
+  // Render subitems into the shared list
+  _renderExpSubitemsForEdit(item.subitems || []);
   document.getElementById('modal-expense-sheet').classList.add('open');
   setTimeout(() => document.getElementById('exp-amount')?.focus(), 340);
 }
