@@ -1773,7 +1773,10 @@ function renderExpenseList() {
   const items = data.expenses[expenseDay] || [];
   const sym   = getCurrencySymbol();
   const total = items.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
-  document.getElementById('expense-total').textContent = `${sym} ${total.toLocaleString()}`;
+  const totalAbs = Math.abs(total);
+  document.getElementById('expense-total').textContent = `${total < 0 ? '-' : ''}${sym} ${totalAbs.toLocaleString()}`;
+  const totalEl = document.getElementById('expense-total');
+  if (totalEl) totalEl.style.color = total < 0 ? '#E53E3E' : '#D4AF37';
   document.getElementById('expense-count').textContent = `${items.length} 筆記錄`;
 
   const allTotal = data.expenses.reduce((s, day) =>
@@ -1815,7 +1818,7 @@ function renderExpenseList() {
         <div class="exp-row-body">
           <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
             <div class="exp-row-label">${esc(label)}</div>
-            <div class="exp-row-amt">${sym}&nbsp;${parseFloat(item.amount).toLocaleString()}</div>
+            <div class="exp-row-amt" style="${parseFloat(item.amount) < 0 ? 'color:#E53E3E' : ''}">${parseFloat(item.amount) < 0 ? '-' : ''}${sym}&nbsp;${Math.abs(parseFloat(item.amount)).toLocaleString()}</div>
           </div>
           ${subitemsHtml}
         </div>
@@ -3764,8 +3767,10 @@ function runSmartExpense() {
 }
 
 function _parseAmount(str) {
-  const m = str.match(/[\(（]?[¥￥$]?\s*([\d,，]+)[\)）]?/);
-  return m ? parseInt(m[1].replace(/[,，]/g, '')) : 0;
+  const neg = str.includes('-');
+  const m = str.match(/[\(（]?-?[¥￥$]?\s*([\d,，]+)[\)）]?/);
+  const v = m ? parseInt(m[1].replace(/[,，]/g, '')) : 0;
+  return neg ? -v : v;
 }
 
 function _parseSubitemsFromLine(line) {
