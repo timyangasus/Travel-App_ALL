@@ -2657,6 +2657,12 @@ function openExpenseSheetForEdit(id) {
   const amtEl  = document.getElementById('exp-amount');
   if (nameEl) nameEl.value = item.name || '';
   if (amtEl)  amtEl.value  = item.amount || '';
+  const negBtn2 = document.getElementById('exp-neg-btn');
+  if (negBtn2) {
+    const isNeg = parseFloat(item.amount || 0) < 0;
+    negBtn2.style.color = isNeg ? '#E53E3E' : '#AAAAAA';
+    negBtn2.style.borderColor = isNeg ? '#E53E3E' : '#E0E0E0';
+  }
   const timeEl = document.getElementById('exp-time');
   if (timeEl) timeEl.value = item.time || '';
   // Render subitems into the shared list
@@ -4167,6 +4173,20 @@ function _renderExpSubitemsForEdit(subitems) {
         style="background:none;border:none;color:#CCCCCC;font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;align-self:flex-start;margin-top:4px">×</button>`;
     list.appendChild(row);
   });
+}
+
+function toggleExpNegative() {
+  const el = document.getElementById('exp-amount');
+  const btn = document.getElementById('exp-neg-btn');
+  if (!el) return;
+  const val = el.value.trim();
+  if (val.startsWith('-')) {
+    el.value = val.slice(1);
+    if (btn) { btn.style.color = '#AAAAAA'; btn.style.borderColor = '#E0E0E0'; }
+  } else if (val) {
+    el.value = '-' + val;
+    if (btn) { btn.style.color = '#E53E3E'; btn.style.borderColor = '#E53E3E'; }
+  }
 }
 
 function _updateSubitem(expId, subIdx, field, value) {
