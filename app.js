@@ -3762,16 +3762,21 @@ function _parseAmount(str) {
 }
 
 function _parseSubitemsFromLine(line) {
-  // Parse: 品項A（¥1,668）、品項B（¥1,125）或 品項A (¥1,668)、品項B (¥1,125)
+  // Split by 頓號 to get individual items, then parse each
+  // Handles: 品A (¥100)、品B(白) (¥200)、品C x2 (¥300)
   const subitems = [];
-  // Match pattern: 任意文字 + 金額括號
-  const pattern = /([^（(¥、，,]+?)\s*[（(][¥￥]?\s*([\d,，]+)\s*[）)]/g;
-  let m;
-  while ((m = pattern.exec(line)) !== null) {
-    const name = m[1].trim().replace(/^[：:、，,\s]+/, '').trim();
-    const amount = parseInt(m[2].replace(/[,，]/g, ''));
-    if (name && amount > 0) subitems.push({ name, amount });
-  }
+  const parts = line.split(/[、，]/);
+  parts.forEach(part => {
+    part = part.trim().replace(/^[：:,\s]+/, '').trim();
+    if (!part) return;
+    // Find the LAST (¥xxx) or（¥xxx）bracket — that's the price
+    const amtMatch = part.match(/\(¥\s*([\d,，]+)\)\s*$/) || part.match(/（¥\s*([\d,，]+)）\s*$/);
+    if (amtMatch) {
+      const amount = parseInt(amtMatch[1].replace(/[,，]/g, ''));
+      const name = part.slice(0, part.lastIndexOf(amtMatch[0])).trim();
+      if (name && amount > 0) subitems.push({ name, amount });
+    }
+  });
   return subitems;
 }
 
@@ -3855,10 +3860,11 @@ function _parseExpenseText(text) {
 
       if (itemsPart) {
         // Check if single item with amount: 品項名（¥1,560）
-        const singleMatch = itemsPart.match(/^([^（(¥]+?)\s*[（(][¥￥]?\s*([\d,，]+)\s*[）)]\s*$/);
-        if (singleMatch) {
-          directAmount = parseInt(singleMatch[2].replace(/[,，]/g, ''));
-          subitems = [{ name: singleMatch[1].trim(), amount: directAmount }];
+        const amtM = itemsPart.match(/\(¥\s*([\d,，]+)\)\s*$/) || itemsPart.match(/（¥\s*([\d,，]+)）\s*$/);
+        if (amtM) {
+          directAmount = parseInt(amtM[1].replace(/[,，]/g, ''));
+          const itemName = itemsPart.slice(0, itemsPart.lastIndexOf(amtM[0])).trim();
+          subitems = [{ name: itemName, amount: directAmount }];
           hasDirectAmount = true;
         } else {
           // Try 頓號-separated subitems on same line
@@ -3924,12 +3930,11 @@ function _parseExpenseText(text) {
       }
 
       // Single item with amount: 品項（¥560）
-      const singleSub = line.match(/^([^（(¥\n]+?)\s*[（(][¥￥]?\s*([\d,，]+)\s*[）)]/);
-      if (singleSub) {
-        currentEntry.subitems.push({
-          name: singleSub[1].trim(),
-          amount: parseInt(singleSub[2].replace(/[,，]/g, ''))
-        });
+      const subAmtM = line.match(/\(¥\s*([\d,，]+)\)\s*$/) || line.match(/（¥\s*([\d,，]+)）\s*$/);
+      if (subAmtM) {
+        const subAmt = parseInt(subAmtM[1].replace(/[,，]/g, ''));
+        const subName = line.slice(0, line.lastIndexOf(subAmtM[0])).trim();
+        currentEntry.subitems.push({ name: subName, amount: subAmt });
         continue;
       }
     }
