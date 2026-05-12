@@ -3889,20 +3889,24 @@ function _parseExpenseText(text) {
       let hasDirectAmount = false;
 
       if (itemsPart) {
-        // Check if single item with amount: 品項名（¥1,560）
-        const amtM = itemsPart.match(/\(¥\s*([\d,，]+)\)\s*$/) || itemsPart.match(/（¥\s*([\d,，]+)）\s*$/);
-        if (amtM) {
-          directAmount = parseInt(amtM[1].replace(/[,，]/g, ''));
-          const itemName = itemsPart.slice(0, itemsPart.lastIndexOf(amtM[0])).trim();
-          subitems = [{ name: itemName, amount: directAmount }];
-          hasDirectAmount = true;
-        } else {
-          // Try 頓號-separated subitems on same line
+        // First try 頓號-separated subitems (multiple items)
+        if (/[、，]/.test(itemsPart)) {
           const parsed = _parseSubitemsFromLine(itemsPart);
           if (parsed.length > 0) {
             subitems = parsed;
+            directAmount = parsed.reduce((s,i) => s + i.amount, 0);
+            hasDirectAmount = true;
+          }
+        }
+        if (subitems.length === 0) {
+          // Single item with amount: 品項名（¥1,560）
+          const amtM = itemsPart.match(/\(¥\s*([\d,，]+)\)\s*$/) || itemsPart.match(/（¥\s*([\d,，]+)）\s*$/);
+          if (amtM) {
+            directAmount = parseInt(amtM[1].replace(/[,，]/g, ''));
+            const itemName = itemsPart.slice(0, itemsPart.lastIndexOf(amtM[0])).trim();
+            subitems = [{ name: itemName, amount: directAmount }];
+            hasDirectAmount = true;
           } else if (itemsPart.trim()) {
-            // No amount found yet — store as pending subitem, amount on next line
             subitems = [{ name: itemsPart.trim(), amount: 0, _pending: true }];
           }
         }
