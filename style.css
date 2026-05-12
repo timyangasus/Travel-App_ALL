@@ -1374,7 +1374,7 @@ canvas { display: block; width: 100%; height: 100%; }
 .exp-row-subitem {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
   font-size: 15px;
   font-family: var(--mono);
   color: #2A2A2A;

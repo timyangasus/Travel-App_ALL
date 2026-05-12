@@ -3863,7 +3863,7 @@ function _parseExpenseText(text) {
 
     // Main expense line: HH:MM 類別 — 店名： or HH：MM 購物 — 店名：
     // Support both : and ： for time
-    const mainMatch = line.match(/^(\d{1,2}[：:]\d{2})\s+(.+)/);
+    const mainMatch = line.match(/^[•·\-\*\s]*?(\d{1,2}[：:]\d{2})\s+(.+)/);
     if (mainMatch) {
       pushEntry();
       const timeRaw = mainMatch[1].replace('：', ':');
