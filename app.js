@@ -3862,7 +3862,13 @@ function _parseExpenseText(text) {
           hasDirectAmount = true;
         } else {
           // Try 頓號-separated subitems on same line
-          subitems = _parseSubitemsFromLine(itemsPart);
+          const parsed = _parseSubitemsFromLine(itemsPart);
+          if (parsed.length > 0) {
+            subitems = parsed;
+          } else if (itemsPart.trim()) {
+            // No amount found yet — store as pending subitem, amount on next line
+            subitems = [{ name: itemsPart.trim(), amount: 0, _pending: true }];
+          }
         }
       }
 
@@ -3893,6 +3899,21 @@ function _parseExpenseText(text) {
         currentEntry.amount = parseInt(totalMatch[1].replace(/[,，]/g, ''));
         currentEntry._hasDirectAmount = true;
         continue;
+      }
+
+      // Line with amount only or continuation: （含披薩、可樂）（¥1,600）
+      // Check if last subitem is pending (no amount yet)
+      const lastSub = currentEntry.subitems.length > 0 ? currentEntry.subitems[currentEntry.subitems.length - 1] : null;
+      if (lastSub && lastSub._pending) {
+        // Try to extract amount from this continuation line
+        const amtMatch = line.match(/[（(][¥￥]?\s*([\d,，]+)\s*[）)]\s*$/);
+        if (amtMatch) {
+          lastSub.amount = parseInt(amtMatch[1].replace(/[,，]/g, ''));
+          lastSub._pending = false;
+          currentEntry.amount = lastSub.amount;
+          currentEntry._hasDirectAmount = true;
+          continue;
+        }
       }
 
       // Try to parse as 頓號-separated subitems
