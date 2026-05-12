@@ -3877,7 +3877,7 @@ function _parseExpenseText(text) {
       const remainder = dashSplit.slice(1).join(' — ').trim();
 
       // Store name: before ：, items after
-      const colonIdx = remainder.indexOf('：');
+      const colonIdx = remainder.search(/[：:]/);
       const storeName = colonIdx >= 0 ? remainder.slice(0, colonIdx).trim() : remainder.trim();
       const itemsPart = colonIdx >= 0 ? remainder.slice(colonIdx+1).trim() : '';
 
