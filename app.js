@@ -3803,6 +3803,8 @@ function _parseSubitemsFromLine(line) {
 }
 
 function _parseExpenseText(text) {
+  // Pre-process: split bullet points into separate lines
+  text = text.replace(/\s*[•·]\s*/g, '\n');
   const lines = text.split('\n');
   const entries = [];
   const issues = [];
