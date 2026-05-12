@@ -1332,7 +1332,7 @@ canvas { display: block; width: 100%; height: 100%; }
 /* New expense row */
 .exp-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 14px 28px;
   border-bottom: 0.5px solid var(--border-thin);
@@ -1341,20 +1341,39 @@ canvas { display: block; width: 100%; height: 100%; }
   width: 28px; height: 28px;
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
+  margin-top: 2px;
+}
+.exp-row-body {
+  flex: 1;
+  min-width: 0;
 }
 .exp-row-label {
-  flex: 1;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   font-family: var(--mono);
-  color: var(--text-primary);
+  color: #1A1A1A;
+}
+.exp-row-subitems {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.exp-row-subitem {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  font-family: var(--mono);
+  color: #888;
 }
 .exp-row-amt {
   font-size: 17px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: #1A1A1A;
   font-family: var(--mono);
   letter-spacing: -0.3px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .exp-row-del {
   background: none;

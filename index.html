@@ -512,6 +512,14 @@
             <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px"><path fill="#1A1A1A" d="M7 10l5 5 5-5z"/></svg>
           </div>
         </div>
+        <!-- AI記帳 -->
+        <div class="set-field set-field-select" onclick="openSmartExpense()">
+          <span class="set-field-label">AI 記帳</span>
+          <div class="set-field-row">
+            <span class="set-field-val">貼入支出</span>
+            <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px"><path fill="#1A1A1A" d="M7 10l5 5 5-5z"/></svg>
+          </div>
+        </div>
       </div>
 
 
@@ -567,6 +575,39 @@
       </div>
       <div style="padding:0 20px 24px;flex-shrink:0;display:none" id="smart-import-done-actions">
         <button class="modal-btn modal-btn-save" style="width:100%" onclick="closeSmartImportDone()">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ AI 記帳 SHEET ═══ -->
+  <div class="modal-overlay" id="modal-smart-expense">
+    <div class="modal-sheet" style="max-height:92vh;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;flex-shrink:0">
+        <span class="modal-title" style="padding:0">AI 記帳</span>
+        <button onclick="closeModal('modal-smart-expense')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:0 20px">
+        <textarea id="smart-expense-text"
+          placeholder="貼入支出記錄…&#10;&#10;例：&#10;2026年5月7日 (週四)&#10;11:02 車票 — 南海電鐵：關西機場至新今宮 (¥1,560)&#10;13:34 餐飲 — 風神雷神：&#10;拉麵 (¥1,050)&#10;炸雞 (¥560)"
+          style="width:100%;box-sizing:border-box;min-height:220px;resize:vertical;padding:14px;border:1.5px solid #EBEBEB;border-radius:0;font-size:16px;font-family:var(--mono);outline:none;line-height:1.6"></textarea>
+        <div style="text-align:right;margin-top:6px;margin-bottom:8px">
+          <span id="smart-expense-count" style="font-family:var(--mono);font-size:12px;color:#AAAAAA">0 / 3000</span>
+        </div>
+      </div>
+      <div id="smart-expense-loading" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:16px">
+        <div class="smart-import-spinner"></div>
+        <span style="font-family:var(--mono);font-size:14px;color:#AAAAAA">解析中…</span>
+      </div>
+      <div id="smart-expense-report" style="display:none;padding:0 20px 8px">
+        <div style="font-family:var(--mono);font-size:13px;color:#AAAAAA;margin-bottom:10px">AI 已完成以下處理：</div>
+        <div id="smart-expense-report-list" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+      <div style="padding:12px 20px 24px;flex-shrink:0;display:flex;gap:10px" id="smart-expense-actions">
+        <button class="modal-btn modal-btn-cancel" style="flex:1" onclick="closeModal('modal-smart-expense')">取消</button>
+        <button class="modal-btn modal-btn-save" style="flex:1" onclick="runSmartExpense()">加入</button>
+      </div>
+      <div style="padding:0 20px 24px;flex-shrink:0;display:none" id="smart-expense-done-actions">
+        <button class="modal-btn modal-btn-save" style="width:100%" onclick="closeSmartExpenseDone()">確定</button>
       </div>
     </div>
   </div>

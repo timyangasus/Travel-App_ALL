@@ -619,12 +619,6 @@ function openTripCoverPicker(id) {
       const url = await uploadToImgBB(file);
       const trip = meta.trips.find(t => t.id === id);
       if (trip) { trip.coverImg = url; saveMeta(); }
-      // also update trip data day 0 photos if this is current trip
-      if (currentTripId === id && data) {
-        if (!data.days[0].banner.photos) data.days[0].banner.photos = [];
-        if (!data.days[0].banner.photos.includes(url)) data.days[0].banner.photos.unshift(url);
-        save();
-      }
       renderHome();
     } catch(err) { alert('上傳失敗：' + err.message); }
     finally { showUploadStatus(''); }
@@ -1790,15 +1784,26 @@ function renderExpenseList() {
   }
   list.innerHTML = [...items].reverse().map((item, ri) => {
     const catObj = (typeof EXPENSE_CATS !== 'undefined') ? EXPENSE_CATS.find(c => c.label === item.cat) : null;
-    const color  = catObj ? catObj.color : '#D1D5DB';
     const iconSvg = catObj ? catObj.svg.replace(/height="\d+px"/, 'height="22px"').replace(/width="\d+px"/, 'width="22px"') : '';
-    const label  = item.name || item.cat || '其他';
+    const label   = item.name || item.cat || '其他';
+    const subitemsHtml = (item.subitems && item.subitems.length > 0)
+      ? `<div class="exp-row-subitems">${item.subitems.map(s =>
+          `<div class="exp-row-subitem">
+            <span>${esc(s.name)}</span>
+            <span>${sym}&nbsp;${parseFloat(s.amount).toLocaleString()}</span>
+          </div>`).join('')}</div>`
+      : '';
     return `
       <div class="exp-row" onclick="openExpenseSheetForEdit(${item.id})">
         <div class="exp-row-icon">${iconSvg}</div>
-        <div class="exp-row-label">${esc(label)}</div>
-        <div class="exp-row-amt">${sym}&nbsp;${parseFloat(item.amount).toLocaleString()}</div>
-        <button class="exp-row-del" onclick="event.stopPropagation();deleteExpense(${item.id})">×</button>
+        <div class="exp-row-body">
+          <div class="exp-row-label">${esc(label)}</div>
+          ${subitemsHtml}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+          <div class="exp-row-amt">${sym}&nbsp;${parseFloat(item.amount).toLocaleString()}</div>
+          <button class="exp-row-del" onclick="event.stopPropagation();deleteExpense(${item.id})">×</button>
+        </div>
       </div>`;
   }).join('');
 }
@@ -3672,6 +3677,272 @@ function _importToDay(dayIdx) {
   ).join('');
   document.getElementById('smart-import-done-actions').style.display = 'block';
 }
+
+/* ═══════════════════════════════════════
+   AI 記帳
+═══════════════════════════════════════ */
+
+// Category keyword mapping
+const EXPENSE_CAT_MAP = {
+  '餐飲': ['餐飲','拉麵','壽司','咖啡','食','飲','餐','cafe','coffee','ramen','lunch','dinner','breakfast'],
+  '購物': ['購物','店','shop','store','買','商場','market','百貨'],
+  '交通': ['車票','交通','電車','地鐵','計程車','巴士','捷運','JR','MRT','BTS','taxi','bus','train'],
+  '住宿': ['飯店','旅館','住宿','hotel','hostel','inn'],
+  '門票': ['門票','入場','ticket','pass','樂園'],
+  '其他': [],
+};
+
+function _guessExpenseCat(text) {
+  const t = text.toLowerCase();
+  for (const [cat, keywords] of Object.entries(EXPENSE_CAT_MAP)) {
+    if (cat === '其他') continue;
+    if (keywords.some(k => t.includes(k.toLowerCase()))) return cat;
+  }
+  return '其他';
+}
+
+function openSmartExpense() {
+  const ta = document.getElementById('smart-expense-text');
+  const countEl = document.getElementById('smart-expense-count');
+  if (ta) {
+    ta.value = '';
+    ta.oninput = () => {
+      const len = ta.value.length;
+      if (countEl) {
+        countEl.textContent = `${len} / 3000`;
+        countEl.style.color = len > 3000 ? '#FF3B30' : '#AAAAAA';
+      }
+    };
+  }
+  if (countEl) { countEl.textContent = '0 / 3000'; countEl.style.color = '#AAAAAA'; }
+  document.getElementById('smart-expense-loading').style.display = 'none';
+  document.getElementById('smart-expense-report').style.display = 'none';
+  document.getElementById('smart-expense-actions').style.display = 'flex';
+  document.getElementById('smart-expense-done-actions').style.display = 'none';
+  document.getElementById('modal-smart-expense').classList.add('open');
+}
+
+function runSmartExpense() {
+  const ta = document.getElementById('smart-expense-text');
+  const text = ta?.value?.trim() || '';
+  if (!text) { showToast('請先貼入支出記錄'); return; }
+  if (text.length > 3000) { showToast('文字超過 3000 字，請精簡後再試'); return; }
+
+  document.getElementById('smart-expense-actions').style.display = 'none';
+  document.getElementById('smart-expense-loading').style.display = 'flex';
+
+  setTimeout(() => {
+    try {
+      const result = _parseExpenseText(text);
+      _applySmartExpense(result);
+    } catch(e) {
+      document.getElementById('smart-expense-loading').style.display = 'none';
+      document.getElementById('smart-expense-actions').style.display = 'flex';
+      showToast('解析失敗，請確認格式');
+    }
+  }, 300);
+}
+
+function _parseExpenseText(text) {
+  const lines = text.split('\n');
+  const entries = [];
+  const issues = [];
+  let currentDay = 0;
+  let currentEntry = null;
+
+  // Get trip start date
+  const tripDates = data?.settings?.tripDates || '';
+  const dateMatch = tripDates.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+  const tripStart = dateMatch
+    ? new Date(parseInt(dateMatch[1]), parseInt(dateMatch[2])-1, parseInt(dateMatch[3]))
+    : null;
+
+  function dateToDayNum(year, month, day) {
+    if (!tripStart) return 0;
+    const y = year || tripStart.getFullYear();
+    const d = new Date(y, month-1, day);
+    const diff = Math.round((d - tripStart) / 86400000);
+    return diff >= 0 ? diff + 1 : 0;
+  }
+
+  function pushEntry() {
+    if (!currentEntry) return;
+    // Calculate total from subitems if present
+    if (currentEntry.subitems && currentEntry.subitems.length > 0 && !currentEntry._hasDirectAmount) {
+      currentEntry.amount = currentEntry.subitems.reduce((s, i) => s + i.amount, 0);
+    }
+    if (currentEntry.amount > 0) entries.push(currentEntry);
+    currentEntry = null;
+  }
+
+  function parseAmount(str) {
+    // Extract number from ¥1,560 or (¥1,560) or 1560
+    const m = str.match(/[\(（]?[¥￥$]?\s*([\d,，]+)[\)）]?/);
+    return m ? parseInt(m[1].replace(/[,，]/g, '')) : 0;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Date header: 2026年5月7日 or 5/7 or 2026/05/07
+    const dateFullMatch = line.match(/(\d{4})[年\/](\d{1,2})[月\/](\d{1,2})[日]?/);
+    const dateShortMatch = !dateFullMatch && line.match(/^(\d{1,2})\/(\d{1,2})/);
+    if (dateFullMatch) {
+      pushEntry();
+      const dayNum = dateToDayNum(parseInt(dateFullMatch[1]), parseInt(dateFullMatch[2]), parseInt(dateFullMatch[3]));
+      currentDay = dayNum || 1;
+      continue;
+    }
+    if (dateShortMatch) {
+      const hasWeekday = /[週一二三四五六日]/.test(line);
+      if (hasWeekday) {
+        pushEntry();
+        const dayNum = tripStart ? dateToDayNum(0, parseInt(dateShortMatch[1]), parseInt(dateShortMatch[2])) : 0;
+        currentDay = dayNum || (currentDay + 1) || 1;
+        continue;
+      }
+    }
+
+    // Main expense line: 11:02 車票 — 南海電鐵：xxx (¥1,560)
+    // Format: HH:MM 類別 — 店名：品項 (¥金額)  or  HH:MM 類別 — 店名：(no amount, subitems follow)
+    const mainMatch = line.match(/^(\d{1,2}:\d{2})\s+(.+)/);
+    if (mainMatch) {
+      pushEntry();
+      const rest = mainMatch[2];
+      // Try to split: cat — storeName: itemDesc (¥amt)
+      const dashSplit = rest.split(/\s*[—\-–]\s*/);
+      const catPart   = dashSplit[0]?.trim() || '';
+      const remainder = dashSplit.slice(1).join(' — ').trim();
+      const colonIdx  = remainder.lastIndexOf('：');
+      const storeName = colonIdx >= 0 ? remainder.slice(0, colonIdx).trim() : remainder.trim();
+      const itemDesc  = colonIdx >= 0 ? remainder.slice(colonIdx+1).trim() : '';
+
+      // Extract amount from itemDesc
+      const amtMatch = itemDesc.match(/\(([¥￥][\d,，]+)\)\s*$/);
+      const amount   = amtMatch ? parseAmount(amtMatch[1]) : 0;
+      const itemName = amtMatch ? itemDesc.slice(0, itemDesc.lastIndexOf('(')).trim() : itemDesc.trim();
+
+      const name = storeName || catPart;
+      const cat  = _guessExpenseCat(catPart + ' ' + storeName);
+
+      currentEntry = {
+        day: currentDay || 1,
+        name,
+        cat,
+        amount,
+        _hasDirectAmount: amount > 0,
+        subitems: itemName ? [{ name: itemName, amount }] : [],
+      };
+      continue;
+    }
+
+    // Subitem line: 品項名稱 (¥金額)
+    if (currentEntry) {
+      const subMatch = line.match(/^(.+?)\s*\(([¥￥][\d,，]+)\)\s*$/);
+      if (subMatch) {
+        const subAmt = parseAmount(subMatch[2]);
+        const subName = subMatch[1].trim();
+        currentEntry.subitems.push({ name: subName, amount: subAmt });
+        currentEntry._hasDirectAmount = false; // recalculate total from subitems
+      }
+    }
+  }
+
+  pushEntry();
+
+  const noDayDetected = !tripStart && entries.every(e => e.day === 1);
+  return { entries, issues, _noDayDetected: noDayDetected && entries.length > 0 };
+}
+
+function _applySmartExpense(result) {
+  const { entries, issues, _noDayDetected } = result;
+
+  if (!entries || entries.length === 0) {
+    document.getElementById('smart-expense-loading').style.display = 'none';
+    document.getElementById('smart-expense-actions').style.display = 'flex';
+    showToast('無法識別支出格式，請確認文字包含日期和金額');
+    return;
+  }
+
+  // No day detected — show day picker
+  if (_noDayDetected) {
+    document.getElementById('smart-expense-loading').style.display = 'none';
+    const listEl = document.getElementById('smart-expense-report-list');
+    const dayBtns = data.days.map((d, i) => {
+      const dateStr = d.banner?.date || '';
+      const dateShort = dateStr.replace(/^\d{4}\//, '').replace(/（[^）]+）/, m => m) || '';
+      return `<button onclick="_importExpenseToDay(${i})"
+        style="padding:10px 14px;background:#1A1A1A;color:#fff;border:none;font-family:var(--mono);cursor:pointer;border-radius:0;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px">
+        <span style="font-size:14px;font-weight:700">Day ${i+1}</span>
+        ${dateShort ? `<span style="font-size:11px;opacity:0.7">${dateShort}</span>` : ''}
+      </button>`;
+    }).join('');
+    listEl.innerHTML = `
+      <div style="font-family:var(--mono);font-size:14px;color:#1A1A1A;padding:8px 12px;background:#FFF8E1;border-left:3px solid #F5C518">
+        ⚠️ 未偵測到日期，請選擇要匯入至哪一天
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">${dayBtns}</div>`;
+    document.getElementById('smart-expense-report').style.display = 'block';
+    document.getElementById('smart-expense-done-actions').style.display = 'none';
+    document.getElementById('smart-expense-actions').style.display = 'none';
+    window._pendingSmartExpense = result;
+    return;
+  }
+
+  _writeExpenseEntries(entries, issues);
+}
+
+function _writeExpenseEntries(entries, issues) {
+  const reports = [];
+  const dayCount = {};
+  let written = 0;
+
+  entries.forEach(ev => {
+    const dayIdx = (ev.day || 1) - 1;
+    if (dayIdx < 0 || dayIdx >= data.expenses.length) return;
+    data.expenses[dayIdx].push({
+      id: Date.now() + Math.random(),
+      name:     ev.name,
+      amount:   ev.amount,
+      cat:      ev.cat,
+      subitems: ev.subitems || [],
+    });
+    dayCount[ev.day] = (dayCount[ev.day] || 0) + 1;
+    written++;
+  });
+
+  Object.keys(dayCount).sort((a,b)=>a-b).forEach(d => {
+    reports.push(`✓ Day ${d} 匯入 ${dayCount[d]} 筆支出`);
+  });
+  reports.unshift(`✓ 共匯入 ${written} 筆支出`);
+  if (issues?.length) issues.forEach(i => reports.push(i));
+
+  save();
+  renderExpenseList();
+
+  document.getElementById('smart-expense-loading').style.display = 'none';
+  const listEl = document.getElementById('smart-expense-report-list');
+  listEl.innerHTML = reports.map(r =>
+    `<div style="font-family:var(--mono);font-size:14px;color:#1A1A1A;padding:8px 12px;background:#F8F8F8;border-left:3px solid #1A1A1A">${r}</div>`
+  ).join('');
+  document.getElementById('smart-expense-report').style.display = 'block';
+  document.getElementById('smart-expense-done-actions').style.display = 'block';
+  window._pendingSmartExpense = null;
+}
+
+function _importExpenseToDay(dayIdx) {
+  const result = window._pendingSmartExpense;
+  if (!result) return;
+  const entries = result.entries.map(e => ({ ...e, day: dayIdx + 1 }));
+  _writeExpenseEntries(entries, result.issues);
+}
+
+function closeSmartExpenseDone() {
+  closeModal('modal-smart-expense');
+  switchTab('expense');
+}
+
 
 function openWeatherLocationSheet() {
   const s = data.settings;
