@@ -1803,7 +1803,7 @@ function renderExpenseList() {
       ? `<div class="exp-row-subitems">${validSubs.map(s =>
           `<div class="exp-row-subitem">
             <span>${esc(s.name)}</span>
-            <span>${s.amount > 0 ? sym + '&nbsp;' + parseFloat(s.amount).toLocaleString() : '⚠ 待填'}</span>
+            <span>${s.amount > 0 ? sym + '&nbsp;' + parseFloat(s.amount).toLocaleString() : ''}</span>
           </div>`).join('')}</div>`
       : '';
     return `
@@ -3792,8 +3792,16 @@ function _parseSubitemsFromLine(line) {
     const amtMatch = part.match(/[（(][各每]?¥\s*([\d,，]+)[）)]\s*$/) ||
                      part.match(/\([各每]?¥\s*([\d,，]+)\)\s*$/);
     if (amtMatch) {
-      const amount = parseInt(amtMatch[1].replace(/[,，]/g, ''));
+      const unitAmt = parseInt(amtMatch[1].replace(/[,，]/g, ''));
       const name = part.slice(0, part.lastIndexOf(amtMatch[0])).trim();
+      // Check if 各/每 → multiply by quantity (x 2, x2, ×2)
+      const isEach = /[各每]/.test(amtMatch[0]);
+      let qty = 1;
+      if (isEach) {
+        const qtyMatch = name.match(/[xX×]\s*(\d+)\s*$/);
+        if (qtyMatch) qty = parseInt(qtyMatch[1]);
+      }
+      const amount = unitAmt * qty;
       if (name && amount > 0) subitems.push({ name, amount });
     } else if (part.length > 1) {
       subitems.push({ name: part, amount: 0, _raw: true });
