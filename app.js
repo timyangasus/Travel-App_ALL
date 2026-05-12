@@ -1782,10 +1782,21 @@ function renderExpenseList() {
     list.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text-tertiary);font-size:13px;font-family:var(--mono)">尚無記錄</div>`;
     return;
   }
-  list.innerHTML = [...items].reverse().map((item, ri) => {
+  // Sort by time: timed items first (ascending), untimed last
+  const sorted = [...items].sort((a, b) => {
+    if (!a.time && !b.time) return 0;
+    if (!a.time) return 1;
+    if (!b.time) return -1;
+    return a.time.localeCompare(b.time);
+  });
+
+  list.innerHTML = sorted.map((item) => {
     const catObj = (typeof EXPENSE_CATS !== 'undefined') ? EXPENSE_CATS.find(c => c.label === item.cat) : null;
-    const iconSvg = catObj ? catObj.svg.replace(/height="\d+px"/, 'height="22px"').replace(/width="\d+px"/, 'width="22px"') : '';
+    const iconSvg = catObj ? catObj.svg.replace(/height="[0-9]+px"/, 'height="22px"').replace(/width="[0-9]+px"/, 'width="22px"') : '';
     const label   = item.name || item.cat || '其他';
+    const metaLine = (item.time || item.cat)
+      ? `<div style="font-size:12px;color:#AAAAAA;font-family:var(--mono);margin-top:2px">${item.time ? item.time + ' · ' : ''}${item.cat || ''}</div>`
+      : '';
     const subitemsHtml = (item.subitems && item.subitems.length > 0)
       ? `<div class="exp-row-subitems">${item.subitems.map(s =>
           `<div class="exp-row-subitem">
@@ -1798,6 +1809,7 @@ function renderExpenseList() {
         <div class="exp-row-icon">${iconSvg}</div>
         <div class="exp-row-body">
           <div class="exp-row-label">${esc(label)}</div>
+          ${metaLine}
           ${subitemsHtml}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
@@ -1811,15 +1823,15 @@ function renderExpenseList() {
 function addExpense() {
   const name   = document.getElementById('exp-name').value.trim();
   const amount = document.getElementById('exp-amount').value;
+  const time   = document.getElementById('exp-time')?.value?.trim() || '';
   const cat    = _selectedCat || '其他';
   if (!amount) return;
   if (window._expEditId) {
-    // 編輯模式：取代原有記錄
     const idx = data.expenses[expenseDay].findIndex(i => i.id === window._expEditId);
-    if (idx !== -1) data.expenses[expenseDay][idx] = { id: window._expEditId, name, amount: parseFloat(amount), cat };
+    if (idx !== -1) data.expenses[expenseDay][idx] = { id: window._expEditId, name, amount: parseFloat(amount), cat, time, subitems: data.expenses[expenseDay][idx].subitems || [] };
     window._expEditId = null;
   } else {
-    data.expenses[expenseDay].push({ id: Date.now(), name, amount: parseFloat(amount), cat });
+    data.expenses[expenseDay].push({ id: Date.now(), name, amount: parseFloat(amount), cat, time, subitems: [] });
   }
   save();
   closeModal('modal-expense-sheet');
@@ -2637,6 +2649,8 @@ function openExpenseSheetForEdit(id) {
   const amtEl  = document.getElementById('exp-amount');
   if (nameEl) nameEl.value = item.name || '';
   if (amtEl)  amtEl.value  = item.amount || '';
+  const timeEl = document.getElementById('exp-time');
+  if (timeEl) timeEl.value = item.time || '';
   document.getElementById('modal-expense-sheet').classList.add('open');
   setTimeout(() => document.getElementById('exp-amount')?.focus(), 340);
 }
@@ -3828,6 +3842,7 @@ function _parseExpenseText(text) {
 
       currentEntry = {
         day: currentDay || 1,
+        time: mainMatch[1], // HH:MM
         name,
         cat,
         amount,
@@ -3906,6 +3921,7 @@ function _writeExpenseEntries(entries, issues) {
       name:     ev.name,
       amount:   ev.amount,
       cat:      ev.cat,
+      time:     ev.time || '',
       subitems: ev.subitems || [],
     });
     dayCount[ev.day] = (dayCount[ev.day] || 0) + 1;
