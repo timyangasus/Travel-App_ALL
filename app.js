@@ -2651,6 +2651,26 @@ function openExpenseSheetForEdit(id) {
   if (amtEl)  amtEl.value  = item.amount || '';
   const timeEl = document.getElementById('exp-time');
   if (timeEl) timeEl.value = item.time || '';
+  // Show subitems
+  const subWrap = document.getElementById('exp-subitems-wrap');
+  const subList = document.getElementById('exp-subitems-list');
+  if (subWrap && subList) {
+    const subs = item.subitems || [];
+    if (subs.length > 0) {
+      const sym = getCurrencySymbol();
+      subList.innerHTML = subs.map((s,i) => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <input value="${esc(s.name)}" onchange="_updateSubitem(${item.id},${i},'name',this.value)"
+            style="flex:1;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:4px 0;outline:none;background:transparent">
+          <input value="${s.amount > 0 ? s.amount : ''}" placeholder="金額" type="text" inputmode="decimal"
+            onchange="_updateSubitem(${item.id},${i},'amount',this.value)"
+            style="width:80px;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:4px 0;outline:none;text-align:right;background:transparent">
+        </div>`).join('');
+      subWrap.style.display = 'block';
+    } else {
+      subWrap.style.display = 'none';
+    }
+  }
   document.getElementById('modal-expense-sheet').classList.add('open');
   setTimeout(() => document.getElementById('exp-amount')?.focus(), 340);
 }
@@ -3768,10 +3788,9 @@ function _parseSubitemsFromLine(line) {
   const parts = [];
   for (let i = 0; i < rawParts.length; i++) {
     let p = rawParts[i];
-    // Merge if next part starts with amount bracket (continuation after split)
     while (i + 1 < rawParts.length) {
       const next = rawParts[i + 1].trim();
-      if (next.match(/^[（(]¥\s*[\d,，]+[）)]/)) {
+      if (next.match(/^[（(][各每]?¥\s*[\d,，]+[）)]/)) {
         p = p + next; i++;
         continue;
       }
@@ -3782,7 +3801,9 @@ function _parseSubitemsFromLine(line) {
   parts.forEach(part => {
     part = part.trim().replace(/^[：:,\s]+/, '').trim().replace(/[。.]+$/, '').trim();
     if (!part) return;
-    const amtMatch = part.match(/\(¥\s*([\d,，]+)\)\s*$/) || part.match(/（¥\s*([\d,，]+)）\s*$/);
+    // Match （各 ¥xxx）or（¥xxx）or (¥xxx)
+    const amtMatch = part.match(/[（(][各每]?¥\s*([\d,，]+)[）)]\s*$/) ||
+                     part.match(/\([各每]?¥\s*([\d,，]+)\)\s*$/);
     if (amtMatch) {
       const amount = parseInt(amtMatch[1].replace(/[,，]/g, ''));
       const name = part.slice(0, part.lastIndexOf(amtMatch[0])).trim();
@@ -3898,11 +3919,17 @@ function _parseExpenseText(text) {
         }
       }
 
-      // Check for total: （共 ¥11,693）in rest
-      const totalMatch = rest.match(/[（(]共\s*[¥￥]?\s*([\d,，]+)[）)]/);
-      if (totalMatch) {
-        directAmount = parseInt(totalMatch[1].replace(/[,，]/g, ''));
+      // Check for total: （共 ¥11,693）in rest or itemsPart
+      const totalMatchRest = (itemsPart || rest).match(/[（(]共\s*[¥￥]?\s*([\d,，]+)[）)]/);
+      if (totalMatchRest) {
+        directAmount = parseInt(totalMatchRest[1].replace(/[,，]/g, ''));
         hasDirectAmount = true;
+        // Add descriptive text before 共 as subitem
+        const beforeTotal = (itemsPart || '').slice(0, (itemsPart || '').indexOf(totalMatchRest[0])).trim()
+          .replace(/^[：:,\s]+/, '').trim();
+        if (beforeTotal && beforeTotal.length > 1 && subitems.length === 0) {
+          subitems = [{ name: beforeTotal, amount: directAmount }];
+        }
       }
 
       currentEntry = {
@@ -3922,8 +3949,15 @@ function _parseExpenseText(text) {
       // Check for total marker: （共 ¥11,693）
       const totalMatch = line.match(/[（(]共\s*[¥￥]?\s*([\d,，]+)[）)]/);
       if (totalMatch) {
-        currentEntry.amount = parseInt(totalMatch[1].replace(/[,，]/g, ''));
+        const totalAmt = parseInt(totalMatch[1].replace(/[,，]/g, ''));
+        currentEntry.amount = totalAmt;
         currentEntry._hasDirectAmount = true;
+        // If there's descriptive text before the total, add it as a subitem
+        const beforeTotal = line.slice(0, line.indexOf(totalMatch[0])).trim()
+          .replace(/^[：:,\s]+/, '').trim();
+        if (beforeTotal && beforeTotal.length > 1) {
+          currentEntry.subitems.push({ name: beforeTotal, amount: totalAmt });
+        }
         continue;
       }
 
@@ -4054,6 +4088,25 @@ function closeSmartExpenseDone() {
 }
 
 
+
+function _updateSubitem(expId, subIdx, field, value) {
+  const item = (data.expenses[expenseDay] || []).find(i => i.id === expId);
+  if (!item || !item.subitems) return;
+  if (field === 'amount') {
+    item.subitems[subIdx].amount = parseFloat(value) || 0;
+    // Recalculate total
+    const amtEl = document.getElementById('exp-amount');
+    if (amtEl && !item._hasDirectAmount) {
+      const total = item.subitems.reduce((s,i) => s + i.amount, 0);
+      amtEl.value = total;
+      item.amount = total;
+    }
+  } else {
+    item.subitems[subIdx][field] = value;
+  }
+  item.subitems[subIdx]._raw = false;
+  save();
+}
 
 function openWeatherLocationSheet() {
   const s = data.settings;
