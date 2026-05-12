@@ -4026,11 +4026,16 @@ function _applySmartExpense(result) {
 function _writeExpenseEntries(entries, issues) {
   const reports = [];
   const dayCount = {};
-  let written = 0;
+  let written = 0, skipped = 0;
 
   entries.forEach(ev => {
     const dayIdx = (ev.day || 1) - 1;
     if (dayIdx < 0 || dayIdx >= data.expenses.length) return;
+    // Duplicate check: same time + same name
+    const isDup = data.expenses[dayIdx].some(e =>
+      e.time === (ev.time || '') && e.name === ev.name
+    );
+    if (isDup) { skipped++; return; }
     data.expenses[dayIdx].push({
       id: Date.now() + Math.random(),
       name:     ev.name,
@@ -4047,6 +4052,7 @@ function _writeExpenseEntries(entries, issues) {
     reports.push(`✓ Day ${d} 匯入 ${dayCount[d]} 筆支出`);
   });
   reports.unshift(`✓ 共匯入 ${written} 筆支出`);
+  if (skipped > 0) reports.push(`✓ ${skipped} 筆重複支出已略過`);
   if (issues?.length) issues.forEach(i => reports.push(i));
 
   save();
@@ -4079,20 +4085,21 @@ function closeSmartExpenseDone() {
 function addExpSubitemRow() {
   const list = document.getElementById('exp-subitems-list');
   if (!list) return;
-  const idx = list.children.length;
   const row = document.createElement('div');
-  row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px';
+  row.style.cssText = 'display:flex;align-items:flex-start;gap:8px;margin-bottom:12px';
   row.innerHTML = `
-    <input placeholder="品項名稱" type="text"
-      style="flex:1;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:6px 0;outline:none;background:transparent"
-      oninput="_recalcExpTotal()">
-    <input placeholder="金額" type="text" inputmode="decimal"
-      style="width:80px;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:6px 0;outline:none;text-align:right;background:transparent"
-      oninput="_recalcExpTotal()">
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid #E0E0E0;padding-bottom:6px">
+      <textarea placeholder="品項名稱" rows="2"
+        style="width:100%;font-family:var(--mono);font-size:14px;border:none;outline:none;background:transparent;resize:none;line-height:1.5"
+        oninput="_recalcExpTotal()"></textarea>
+      <input placeholder="金額" type="text" inputmode="decimal"
+        style="width:80px;font-family:var(--mono);font-size:14px;border:none;border-top:1px solid #F0F0F0;padding:4px 0;outline:none;background:transparent"
+        oninput="_recalcExpTotal()">
+    </div>
     <button onclick="this.parentElement.remove();_recalcExpTotal()"
-      style="background:none;border:none;color:#CCCCCC;font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0">×</button>`;
+      style="background:none;border:none;color:#CCCCCC;font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;margin-top:4px">×</button>`;
   list.appendChild(row);
-  row.querySelector('input').focus();
+  row.querySelector('textarea').focus();
 }
 
 function _recalcExpTotal() {
@@ -4102,7 +4109,7 @@ function _recalcExpTotal() {
   let total = 0;
   [...list.children].forEach(row => {
     const inputs = row.querySelectorAll('input');
-    const amt = parseFloat(inputs[1]?.value || 0);
+    const amt = parseFloat(inputs[0]?.value || 0);
     if (amt > 0) total += amt;
   });
   if (total > 0) amtEl.value = total;
@@ -4112,10 +4119,11 @@ function _getExpSubitems() {
   const list = document.getElementById('exp-subitems-list');
   if (!list) return [];
   return [...list.children].map(row => {
+    const ta = row.querySelector('textarea');
     const inputs = row.querySelectorAll('input');
     return {
-      name: inputs[0]?.value?.trim() || '',
-      amount: parseFloat(inputs[1]?.value || 0)
+      name: (ta?.value || inputs[0]?.value || '').trim(),
+      amount: parseFloat(inputs[0]?.value || 0)
     };
   }).filter(s => s.name || s.amount > 0);
 }
@@ -4128,14 +4136,16 @@ function _renderExpSubitemsForEdit(subitems) {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px';
     row.innerHTML = `
-      <input value="${esc(s.name)}" placeholder="品項名稱" type="text"
-        style="flex:1;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:6px 0;outline:none;background:transparent"
-        oninput="_recalcExpTotal()">
-      <input value="${s.amount > 0 ? s.amount : ''}" placeholder="金額" type="text" inputmode="decimal"
-        style="width:80px;font-family:var(--mono);font-size:14px;border:none;border-bottom:1px solid #E0E0E0;padding:6px 0;outline:none;text-align:right;background:transparent"
-        oninput="_recalcExpTotal()">
+      <div style="flex:1;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid #E0E0E0;padding-bottom:6px">
+        <textarea placeholder="品項名稱" rows="2"
+          style="width:100%;font-family:var(--mono);font-size:14px;border:none;outline:none;background:transparent;resize:none;line-height:1.5"
+          oninput="_recalcExpTotal()">${esc(s.name)}</textarea>
+        <input value="${s.amount > 0 ? s.amount : ''}" placeholder="金額" type="text" inputmode="decimal"
+          style="width:80px;font-family:var(--mono);font-size:14px;border:none;border-top:1px solid #F0F0F0;padding:4px 0;outline:none;text-align:left;background:transparent"
+          oninput="_recalcExpTotal()">
+      </div>
       <button onclick="this.parentElement.remove();_recalcExpTotal()"
-        style="background:none;border:none;color:#CCCCCC;font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0">×</button>`;
+        style="background:none;border:none;color:#CCCCCC;font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;align-self:flex-start;margin-top:4px">×</button>`;
     list.appendChild(row);
   });
 }
