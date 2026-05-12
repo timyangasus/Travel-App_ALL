@@ -1794,9 +1794,7 @@ function renderExpenseList() {
     const catObj = (typeof EXPENSE_CATS !== 'undefined') ? EXPENSE_CATS.find(c => c.label === item.cat) : null;
     const iconSvg = catObj ? catObj.svg.replace(/height="[0-9]+px"/, 'height="22px"').replace(/width="[0-9]+px"/, 'width="22px"') : '';
     const label   = item.name || item.cat || '其他';
-    const metaLine = (item.time || item.cat)
-      ? `<div style="font-size:12px;color:#AAAAAA;font-family:var(--mono);margin-top:2px">${item.time ? item.time + ' · ' : ''}${item.cat || ''}</div>`
-      : '';
+
     const subitemsHtml = (item.subitems && item.subitems.length > 0)
       ? `<div class="exp-row-subitems">${item.subitems.map(s =>
           `<div class="exp-row-subitem">
@@ -1806,16 +1804,18 @@ function renderExpenseList() {
       : '';
     return `
       <div class="exp-row" onclick="openExpenseSheetForEdit(${item.id})">
-        <div class="exp-row-icon">${iconSvg}</div>
+        <div class="exp-row-icon">
+          ${iconSvg}
+          ${item.time ? `<span class="exp-row-icon-time">${item.time}</span>` : ''}
+        </div>
         <div class="exp-row-body">
-          <div class="exp-row-label">${esc(label)}</div>
-          ${metaLine}
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+            <div class="exp-row-label">${esc(label)}</div>
+            <div class="exp-row-amt">${sym}&nbsp;${parseFloat(item.amount).toLocaleString()}</div>
+          </div>
           ${subitemsHtml}
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
-          <div class="exp-row-amt">${sym}&nbsp;${parseFloat(item.amount).toLocaleString()}</div>
-          <button class="exp-row-del" onclick="event.stopPropagation();deleteExpense(${item.id})">×</button>
-        </div>
+        <button class="exp-row-del" onclick="event.stopPropagation();deleteExpense(${item.id})">×</button>
       </div>`;
   }).join('');
 }
@@ -3696,11 +3696,10 @@ function _importToDay(dayIdx) {
    AI 記帳
 ═══════════════════════════════════════ */
 
-// Category keyword mapping
 const EXPENSE_CAT_MAP = {
-  '餐飲': ['餐飲','拉麵','壽司','咖啡','食','飲','餐','cafe','coffee','ramen','lunch','dinner','breakfast'],
-  '購物': ['購物','店','shop','store','買','商場','market','百貨'],
-  '交通': ['車票','交通','電車','地鐵','計程車','巴士','捷運','JR','MRT','BTS','taxi','bus','train'],
+  '餐飲': ['餐飲','拉麵','壽司','咖啡','食','飲','餐','cafe','coffee','ramen','lunch','dinner','breakfast','食堂','烏龍'],
+  '購物': ['購物','店','shop','store','買','商場','market','百貨','免稅'],
+  '交通': ['車票','交通','電車','地鐵','計程車','巴士','捷運','JR','MRT','BTS','taxi','bus','train','南海','近鐵'],
   '住宿': ['飯店','旅館','住宿','hotel','hostel','inn'],
   '門票': ['門票','入場','ticket','pass','樂園'],
   '其他': [],
@@ -3757,6 +3756,25 @@ function runSmartExpense() {
   }, 300);
 }
 
+function _parseAmount(str) {
+  const m = str.match(/[\(（]?[¥￥$]?\s*([\d,，]+)[\)）]?/);
+  return m ? parseInt(m[1].replace(/[,，]/g, '')) : 0;
+}
+
+function _parseSubitemsFromLine(line) {
+  // Parse: 品項A（¥1,668）、品項B（¥1,125）或 品項A (¥1,668)、品項B (¥1,125)
+  const subitems = [];
+  // Match pattern: 任意文字 + 金額括號
+  const pattern = /([^（(¥、，,]+?)\s*[（(][¥￥]?\s*([\d,，]+)\s*[）)]/g;
+  let m;
+  while ((m = pattern.exec(line)) !== null) {
+    const name = m[1].trim().replace(/^[：:、，,\s]+/, '').trim();
+    const amount = parseInt(m[2].replace(/[,，]/g, ''));
+    if (name && amount > 0) subitems.push({ name, amount });
+  }
+  return subitems;
+}
+
 function _parseExpenseText(text) {
   const lines = text.split('\n');
   const entries = [];
@@ -3764,8 +3782,7 @@ function _parseExpenseText(text) {
   let currentDay = 0;
   let currentEntry = null;
 
-  // Get trip start date
-  const tripDates = data?.settings?.tripDates || '';
+  const tripDates = (typeof data !== 'undefined') ? (data?.settings?.tripDates || '') : '';
   const dateMatch = tripDates.match(/(\d{4})\/(\d{2})\/(\d{2})/);
   const tripStart = dateMatch
     ? new Date(parseInt(dateMatch[1]), parseInt(dateMatch[2])-1, parseInt(dateMatch[3]))
@@ -3781,85 +3798,118 @@ function _parseExpenseText(text) {
 
   function pushEntry() {
     if (!currentEntry) return;
-    // Calculate total from subitems if present
-    if (currentEntry.subitems && currentEntry.subitems.length > 0 && !currentEntry._hasDirectAmount) {
+    // Recalculate total from subitems if no direct amount
+    if (currentEntry.subitems.length > 0 && !currentEntry._hasDirectAmount) {
       currentEntry.amount = currentEntry.subitems.reduce((s, i) => s + i.amount, 0);
     }
-    if (currentEntry.amount > 0) entries.push(currentEntry);
+    // Push even if amount is 0 (user can fill in)
+    entries.push(currentEntry);
     currentEntry = null;
-  }
-
-  function parseAmount(str) {
-    // Extract number from ¥1,560 or (¥1,560) or 1560
-    const m = str.match(/[\(（]?[¥￥$]?\s*([\d,，]+)[\)）]?/);
-    return m ? parseInt(m[1].replace(/[,，]/g, '')) : 0;
   }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Date header: 2026年5月7日 or 5/7 or 2026/05/07
+    // Date header: 2026年5月7日 or 5/7（週四）
     const dateFullMatch = line.match(/(\d{4})[年\/](\d{1,2})[月\/](\d{1,2})[日]?/);
-    const dateShortMatch = !dateFullMatch && line.match(/^(\d{1,2})\/(\d{1,2})/);
     if (dateFullMatch) {
       pushEntry();
       const dayNum = dateToDayNum(parseInt(dateFullMatch[1]), parseInt(dateFullMatch[2]), parseInt(dateFullMatch[3]));
       currentDay = dayNum || 1;
       continue;
     }
-    if (dateShortMatch) {
-      const hasWeekday = /[週一二三四五六日]/.test(line);
-      if (hasWeekday) {
-        pushEntry();
-        const dayNum = tripStart ? dateToDayNum(0, parseInt(dateShortMatch[1]), parseInt(dateShortMatch[2])) : 0;
-        currentDay = dayNum || (currentDay + 1) || 1;
-        continue;
-      }
+
+    const dateShortMatch = line.match(/^(\d{1,2})\/(\d{1,2})/);
+    if (dateShortMatch && /[週一二三四五六日]/.test(line)) {
+      pushEntry();
+      const dayNum = tripStart ? dateToDayNum(0, parseInt(dateShortMatch[1]), parseInt(dateShortMatch[2])) : 0;
+      currentDay = dayNum || (currentDay + 1) || 1;
+      continue;
     }
 
-    // Main expense line: 11:02 車票 — 南海電鐵：xxx (¥1,560)
-    // Format: HH:MM 類別 — 店名：品項 (¥金額)  or  HH:MM 類別 — 店名：(no amount, subitems follow)
-    const mainMatch = line.match(/^(\d{1,2}:\d{2})\s+(.+)/);
+    // Main expense line: HH:MM 類別 — 店名： or HH：MM 購物 — 店名：
+    // Support both : and ： for time
+    const mainMatch = line.match(/^(\d{1,2}[：:]\d{2})\s+(.+)/);
     if (mainMatch) {
       pushEntry();
+      const timeRaw = mainMatch[1].replace('：', ':');
       const rest = mainMatch[2];
-      // Try to split: cat — storeName: itemDesc (¥amt)
+
+      // Split on — or - to get category and store
       const dashSplit = rest.split(/\s*[—\-–]\s*/);
-      const catPart   = dashSplit[0]?.trim() || '';
+      const catPart  = dashSplit[0]?.trim() || '';
       const remainder = dashSplit.slice(1).join(' — ').trim();
-      const colonIdx  = remainder.lastIndexOf('：');
+
+      // Store name: before ：, items after
+      const colonIdx = remainder.indexOf('：');
       const storeName = colonIdx >= 0 ? remainder.slice(0, colonIdx).trim() : remainder.trim();
-      const itemDesc  = colonIdx >= 0 ? remainder.slice(colonIdx+1).trim() : '';
+      const itemsPart = colonIdx >= 0 ? remainder.slice(colonIdx+1).trim() : '';
 
-      // Extract amount from itemDesc
-      const amtMatch = itemDesc.match(/\(([¥￥][\d,，]+)\)\s*$/);
-      const amount   = amtMatch ? parseAmount(amtMatch[1]) : 0;
-      const itemName = amtMatch ? itemDesc.slice(0, itemDesc.lastIndexOf('(')).trim() : itemDesc.trim();
+      const cat = _guessExpenseCat(catPart + ' ' + storeName);
 
-      const name = storeName || catPart;
-      const cat  = _guessExpenseCat(catPart + ' ' + storeName);
+      // Try to parse subitems from items part (same line)
+      let subitems = [];
+      let directAmount = 0;
+      let hasDirectAmount = false;
+
+      if (itemsPart) {
+        // Check if single item with amount: 品項名（¥1,560）
+        const singleMatch = itemsPart.match(/^([^（(¥]+?)\s*[（(][¥￥]?\s*([\d,，]+)\s*[）)]\s*$/);
+        if (singleMatch) {
+          directAmount = parseInt(singleMatch[2].replace(/[,，]/g, ''));
+          subitems = [{ name: singleMatch[1].trim(), amount: directAmount }];
+          hasDirectAmount = true;
+        } else {
+          // Try 頓號-separated subitems on same line
+          subitems = _parseSubitemsFromLine(itemsPart);
+        }
+      }
+
+      // Check for total: （共 ¥11,693）in rest
+      const totalMatch = rest.match(/[（(]共\s*[¥￥]?\s*([\d,，]+)[）)]/);
+      if (totalMatch) {
+        directAmount = parseInt(totalMatch[1].replace(/[,，]/g, ''));
+        hasDirectAmount = true;
+      }
 
       currentEntry = {
         day: currentDay || 1,
-        time: mainMatch[1], // HH:MM
-        name,
+        time: timeRaw,
+        name: storeName || catPart,
         cat,
-        amount,
-        _hasDirectAmount: amount > 0,
-        subitems: itemName ? [{ name: itemName, amount }] : [],
+        amount: directAmount,
+        _hasDirectAmount: hasDirectAmount,
+        subitems,
       };
       continue;
     }
 
-    // Subitem line: 品項名稱 (¥金額)
+    // Continuation lines under current entry
     if (currentEntry) {
-      const subMatch = line.match(/^(.+?)\s*\(([¥￥][\d,，]+)\)\s*$/);
-      if (subMatch) {
-        const subAmt = parseAmount(subMatch[2]);
-        const subName = subMatch[1].trim();
-        currentEntry.subitems.push({ name: subName, amount: subAmt });
-        currentEntry._hasDirectAmount = false; // recalculate total from subitems
+      // Check for total marker: （共 ¥11,693）
+      const totalMatch = line.match(/[（(]共\s*[¥￥]?\s*([\d,，]+)[）)]/);
+      if (totalMatch) {
+        currentEntry.amount = parseInt(totalMatch[1].replace(/[,，]/g, ''));
+        currentEntry._hasDirectAmount = true;
+        continue;
+      }
+
+      // Try to parse as 頓號-separated subitems
+      const subs = _parseSubitemsFromLine(line);
+      if (subs.length > 0) {
+        currentEntry.subitems.push(...subs);
+        continue;
+      }
+
+      // Single item with amount: 品項（¥560）
+      const singleSub = line.match(/^([^（(¥\n]+?)\s*[（(][¥￥]?\s*([\d,，]+)\s*[）)]/);
+      if (singleSub) {
+        currentEntry.subitems.push({
+          name: singleSub[1].trim(),
+          amount: parseInt(singleSub[2].replace(/[,，]/g, ''))
+        });
+        continue;
       }
     }
   }
@@ -3876,11 +3926,10 @@ function _applySmartExpense(result) {
   if (!entries || entries.length === 0) {
     document.getElementById('smart-expense-loading').style.display = 'none';
     document.getElementById('smart-expense-actions').style.display = 'flex';
-    showToast('無法識別支出格式，請確認文字包含日期和金額');
+    showToast('無法識別支出格式，請確認文字包含時間和金額');
     return;
   }
 
-  // No day detected — show day picker
   if (_noDayDetected) {
     document.getElementById('smart-expense-loading').style.display = 'none';
     const listEl = document.getElementById('smart-expense-report-list');
@@ -3958,6 +4007,7 @@ function closeSmartExpenseDone() {
   closeModal('modal-smart-expense');
   switchTab('expense');
 }
+
 
 
 function openWeatherLocationSheet() {

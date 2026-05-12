@@ -1334,37 +1334,47 @@ canvas { display: block; width: 100%; height: 100%; }
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 14px 28px;
+  padding: 16px 20px 16px 20px;
   border-bottom: 0.5px solid var(--border-thin);
 }
 .exp-row-icon {
-  width: 28px; height: 28px;
+  width: 28px;
   flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-top: 2px;
+}
+.exp-row-icon-time {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: #AAAAAA;
+  white-space: nowrap;
+  line-height: 1;
 }
 .exp-row-body {
   flex: 1;
   min-width: 0;
 }
 .exp-row-label {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   font-family: var(--mono);
   color: #1A1A1A;
 }
 .exp-row-subitems {
-  margin-top: 4px;
+  margin-top: 6px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 .exp-row-subitem {
   display: flex;
   justify-content: space-between;
   font-size: 15px;
   font-family: var(--mono);
-  color: #888;
+  color: #2A2A2A;
 }
 .exp-row-amt {
   font-size: 17px;
