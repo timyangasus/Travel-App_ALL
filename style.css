@@ -1528,9 +1528,9 @@ canvas { display: block; width: 100%; height: 100%; }
 .info-section { padding: 32px 16px 20px; }
 #screen-info-flight .info-section { padding: 0; }
 #screen-info-hotel .info-section { padding: 0; }
+#screen-info-flight { background: #C8C8CC; }
+#screen-info-hotel  { background: #fff; }
 #screen-info,
-#screen-info-flight,
-#screen-info-hotel,
 #screen-info-checklist,
 #screen-info-shopping,
 #screen-info-ticket,
@@ -1780,21 +1780,22 @@ canvas { display: block; width: 100%; height: 100%; }
 ══════════════════════════════ */
 .fc2 {
   background: #fff;
-  border: 0.5px solid #E8E8E8;
-  border-radius: 14px;
+  border: 0.5px solid #CCCCCC;
+  border-radius: 0;
   margin: 0 16px 20px;
   overflow: hidden;
   cursor: pointer;
   transition: opacity 0.12s;
 }
+.fc2:first-child { margin-top: 40px; }
 .fc2:active { opacity: 0.75; }
 
-/* Head: PNR + airline + url btn */
+/* Head: PNR top-left, airline+url top-right, del */
 .fc2-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 16px 18px 14px;
+  padding: 16px 20px 14px;
   border-bottom: 0.5px solid #F0F0F0;
   gap: 12px;
 }
@@ -1814,8 +1815,11 @@ canvas { display: block; width: 100%; height: 100%; }
   line-height: 1;
 }
 .fc2-airline-block {
-  text-align: right;
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .fc2-airline-name {
   font-size: 13px;
@@ -1824,18 +1828,22 @@ canvas { display: block; width: 100%; height: 100%; }
   font-family: var(--mono);
 }
 .fc2-url-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: none;
-  border: none;
+  border: 1px solid #D4AF37;
+  border-radius: 999px;
   font-size: 11px;
   color: #D4AF37;
   font-family: var(--mono);
+  font-weight: 600;
   cursor: pointer;
-  padding: 0;
-  margin-top: 3px;
-  display: block;
-  text-align: right;
+  padding: 3px 10px 3px 8px;
+  white-space: nowrap;
+  transition: background 0.15s;
 }
-.fc2-url-btn:active { opacity: 0.6; }
+.fc2-url-btn:active { background: rgba(212,175,55,0.1); opacity: 1; }
 .fc2-del {
   background: none;
   border: none;
@@ -1853,7 +1861,12 @@ canvas { display: block; width: 100%; height: 100%; }
 /* Segments */
 .fc2-body { }
 .fc2-seg {
-  padding: 16px 18px 14px;
+  padding: 20px 20px 18px;
+}
+.fc2-seg + .fc2-seg {
+  border-top: 0.5px solid #F0F0F0;
+  margin-top: 0;
+  padding-top: 24px;
 }
 .fc2-seg-tag {
   font-size: 10px;
@@ -1945,10 +1958,10 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .fc2-meta {
   display: flex;
-  gap: 20px;
+  justify-content: space-between;
   padding-top: 10px;
   margin-top: 6px;
-  border-top: 0.5px solid #F4F4F4;
+  border-top: 0.5px solid #E8E8E8;
 }
 .fc2-meta-item {
   display: flex;
@@ -1984,9 +1997,8 @@ canvas { display: block; width: 100%; height: 100%; }
   transform: translateY(-50%);
   width: 20px;
   height: 20px;
-  background: var(--bg-tertiary, #F5F5F7);
+  background: #C8C8CC;
   border-radius: 50%;
-  border: 0.5px solid #E8E8E8;
   z-index: 2;
 }
 .fc2-tear::after {
@@ -1997,9 +2009,8 @@ canvas { display: block; width: 100%; height: 100%; }
   transform: translateY(-50%);
   width: 20px;
   height: 20px;
-  background: var(--bg-tertiary, #F5F5F7);
+  background: #C8C8CC;
   border-radius: 50%;
-  border: 0.5px solid #E8E8E8;
   z-index: 2;
 }
 .fc2-tear-line {
@@ -2020,6 +2031,12 @@ canvas { display: block; width: 100%; height: 100%; }
   text-transform: uppercase;
   padding-bottom: 4px;
   border-bottom: 1px solid #F0F0F0;
+}
+/* inbound section top divider in sheet */
+#ff-inbound-wrap {
+  border-top: 1px solid #EEEEEE;
+  margin-top: 24px;
+  padding-top: 8px;
 }
 
 /* ─── Flight Sheet Form (screenshot layout) ─── */
@@ -2127,15 +2144,17 @@ canvas { display: block; width: 100%; height: 100%; }
 /* Hotel Card v2 */
 .hotel-card2 {
   background: #fff;
-  border-bottom: 0.5px solid var(--border);
-  padding: 22px 32px 18px;
-  margin: 0;
+  border: 0.5px solid #CCCCCC;
+  border-radius: 0;
+  padding: 20px 20px 18px;
+  margin: 0 16px 20px;
   cursor: pointer;
   transition: opacity 0.1s;
+  overflow: hidden;
 }
 .hotel-card2 + .hotel-card2 { margin-top: 0; }
-.hotel-card2 + .hotel-card2::before { content:""; display:block; height:70px; background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 3 Q2.5 0 5 3 Q7.5 6 10 3" fill="none" stroke="%23000" stroke-width="1.5"/></svg>') repeat-x center; opacity:0.35; }
-.hotel-card2:first-child { margin-top: 30px; }
+.hotel-card2 + .hotel-card2::before { display: none; }
+.hotel-card2:first-child { margin-top: 40px; }
 .hotel-card2:active { opacity: 0.8; }
 .hotel2-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .hotel2-dates { font-size: 16px; font-weight: 700; color: #1A1A1A; font-family: var(--mono); flex: 1; }
