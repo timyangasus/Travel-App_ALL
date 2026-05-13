@@ -3037,7 +3037,7 @@ function renderFlightCards() {
   }
   // Parse times field "hh:mm — hh:mm"
   const parseTimes = (str) => {
-    const m = (str||'').match(/(\d{1,2}:\d{2})\s*[—–-]+\s*(\d{1,2}:\d{2})/);
+    const m = (str||'').match(/(\d{1,2}:\d{2})\s*[—–\-－]+\s*(\d{1,2}:\d{2})/);
     return m ? [m[1], m[2]] : [str||'', ''];
   };
   el.innerHTML = data.flights.map(f => {
