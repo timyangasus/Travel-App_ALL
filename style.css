@@ -3765,3 +3765,29 @@ textarea ~ .field-x {
   display: block;
   cursor: pointer;
 }
+
+/* ─── Photo screen FORCE fullwidth ─── */
+#screen-info-photo #photo-grid {
+  width: 100% !important;
+}
+#screen-info-photo .photo-grid-inner {
+  display: grid !important;
+  grid-template-columns: repeat(3, calc(100vw / 3)) !important;
+  gap: 2px !important;
+  padding-top: 30px !important;
+  width: 100% !important;
+}
+#screen-info-photo .photo-cell {
+  width: calc(100vw / 3) !important;
+  height: calc(100vw / 3) !important;
+  aspect-ratio: 1 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+#screen-info-photo .photo-thumb {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}

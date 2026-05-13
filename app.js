@@ -1911,7 +1911,7 @@ function renderPhotoPage() {
   const grid = document.getElementById('photo-page-grid');
   if (!grid) return;
   if (!photos.length) { grid.innerHTML = ''; return; }
-  grid.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;padding-top:20px;width:100%">${
+  grid.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;width:100%">${
     photos.map(p => `
     <div style="position:relative;width:100%;overflow:hidden;background:#F0F0F0">
       <img src="${resolvePhoto(p.url)}" style="width:100%;height:auto;display:block;cursor:pointer" onclick="openPhotoLightbox('${resolvePhoto(p.url)}')" loading="lazy">
