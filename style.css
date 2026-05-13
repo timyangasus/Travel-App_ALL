@@ -3685,7 +3685,8 @@ textarea ~ .field-x {
 .photo-grid-inner {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
+  gap: 10px;
+  padding: 30px 0 0;
 }
 .photo-cell {
   position: relative;
@@ -3702,24 +3703,23 @@ textarea ~ .field-x {
 }
 .photo-del {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0,0,0,0.5);
   color: #fff;
   border: none;
-  font-size: 14px;
-  line-height: 22px;
-  text-align: center;
+  font-size: 15px;
   cursor: pointer;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
 }
-.photo-del:active { background: rgba(229,57,53,0.8); }
+.photo-del:active { background: rgba(229,57,53,0.85); }
 #screen-info-photo { background: #fff; }
 
 #screen-info-photo .day-tab {
