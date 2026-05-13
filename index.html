@@ -64,7 +64,7 @@
     <div class="day-tabs-wrap">
       <div class="day-tabs-header">
         <span class="day-tabs-label">DAY</span>
-        <div style="display:flex;align-items:center;gap:0">
+        <div style="display:flex;align-items:center;gap:6px">
           <button onclick="openSmartImport()" class="day-tabs-add-event"><svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px"><path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg></button>
           <button class="day-tabs-add-event" onclick="openEventModal()"><svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg></button>
         </div>
@@ -128,7 +128,7 @@
       </div>
     </div>
     <div class="day-tabs-wrap" style="border-bottom: 0.5px solid var(--border-thin); padding:0 20px;">
-      <div id="expense-day-date" style="font-size:13px;color:#1A1A1A;font-family:var(--mono);font-weight:700;padding-top:12px;padding-bottom:4px"></div>
+      <div id="expense-day-date" style="font-size:30px;color:#1A1A1A;font-family:var(--mono);font-weight:700;padding-top:12px;padding-bottom:4px"></div>
       <div class="day-tabs-header">
         <span class="day-tabs-label">DAY</span>
       </div>
@@ -141,11 +141,13 @@
         </div>
         <div class="expense-total-amount" id="expense-total">0</div>
         <div class="expense-trip-total-row">
-          <span class="expense-count-label" id="expense-count">0 筆記錄</span>
           <span class="expense-trip-label">旅行總計</span>
           <span class="expense-trip-amount" id="expense-trip-total">0</span>
         </div>
       </div>
+    </div>
+    <div style="border-top:1.5px solid #555;margin:0 24px 0;padding:10px 0 6px">
+      <span class="expense-count-label" id="expense-count" style="padding:0 18px;display:block">0 筆記錄</span>
     </div>
     <div class="expense-list" id="expense-list"></div>
   </div>

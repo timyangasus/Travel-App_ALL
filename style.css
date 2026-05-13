@@ -1307,27 +1307,21 @@ canvas { display: block; width: 100%; height: 100%; }
 .expense-trip-total-row {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
-  margin-top: 16px;
-  padding-top: 20px;
-  border-top: 0.5px solid var(--border-thin);
-}
-.expense-count-label {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  font-family: var(--mono);
-  flex: 1;
+  margin-top: 8px;
 }
 .expense-trip-label {
-  font-size: 12px;
-  color: var(--text-tertiary);
+  font-size: 13px;
+  color: var(--text-secondary);
   font-family: var(--mono);
 }
 .expense-trip-amount {
-  font-size: 10px;
+  font-size: 25px;
   font-weight: 700;
   color: var(--text-secondary);
   font-family: var(--mono);
+  letter-spacing: -1px;
 }
 /* New expense row */
 .exp-row {
