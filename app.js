@@ -2913,41 +2913,99 @@ function saveNotes() {
 function flightDefaults() {
   return {
     id: Date.now(),
-    airline: '', flightNo: '',
-    fromDate: '', fromTime: '', fromCode: '', fromName: '', fromTerminal: '',
-    toDate: '',   toTime: '',   toCode: '',   toName: '',   toTerminal: '',
-    duration: '', baggage: '', seat: ''
+    pnr: '', airline: '', url: '',
+    outbound: { flightNo:'', date:'', fromTime:'', toTime:'', fromCode:'', fromName:'', fromTerminal:'', toCode:'', toName:'', toTerminal:'', baggage:'', seat:'' },
+    inbound: null
   };
 }
 
+function migrateFlights() {
+  if (!data.flights) { data.flights = []; return; }
+  data.flights = data.flights.map(f => {
+    if (f.outbound !== undefined) return f;
+    const parseTimes = (str) => {
+      const m = (str||'').match(/(\d{1,2}:\d{2})\s*[---]+\s*(\d{1,2}:\d{2})/);
+      return m ? [m[1], m[2]] : [str||'', ''];
+    };
+    const [ft, tt] = parseTimes(f.times);
+    return {
+      id: f.id || Date.now(),
+      pnr: '', airline: f.airline||'', url: '',
+      outbound: {
+        flightNo: f.flightNo||'', date: f.fromDate||'',
+        fromTime: ft, toTime: tt,
+        fromCode: f.fromCode||'', fromName: f.fromName||'', fromTerminal: f.fromTerminal||'',
+        toCode: f.toCode||'', toName: f.toName||'', toTerminal: f.toTerminal||'',
+        baggage: f.baggage||'', seat: f.seat||''
+      },
+      inbound: null
+    };
+  });
+}
+
 let _flightEditId = null;
+function _ffSet(id, val) { const el = document.getElementById(id); if (el) el.value = val||''; }
+function _ffGet(id) { return document.getElementById(id)?.value.trim()||''; }
 
 function openFlightSheet(editId) {
+  migrateFlights();
   _flightEditId = editId || null;
-  const fields = ['airline','flightNo','fromCode','fromName','fromTerminal','toCode','toName','toTerminal','times','baggage','seat'];
-  fields.forEach(k => { const el = document.getElementById('ff-'+k); if (el) el.value = ''; });
+  ['pnr','airline','url',
+   'ob-flightNo','ob-date','ob-times','ob-fromCode','ob-fromName','ob-fromTerminal','ob-toCode','ob-toName','ob-toTerminal','ob-baggage','ob-seat',
+   'ib-flightNo','ib-date','ib-times','ib-fromCode','ib-fromName','ib-fromTerminal','ib-toCode','ib-toName','ib-toTerminal','ib-baggage','ib-seat'
+  ].forEach(k => _ffSet('ff-'+k, ''));
+  const ibWrap   = document.getElementById('ff-inbound-wrap');
+  const ibToggle = document.getElementById('ff-inbound-toggle');
   if (editId) {
     const f = data.flights.find(f => f.id === editId);
     if (f) {
-      fields.forEach(k => { const el = document.getElementById('ff-'+k); if (el) el.value = f[k]||''; });
+      _ffSet('ff-pnr', f.pnr); _ffSet('ff-airline', f.airline); _ffSet('ff-url', f.url);
+      const fillSeg = (prefix, seg) => {
+        if (!seg) return;
+        _ffSet('ff-'+prefix+'-flightNo',     seg.flightNo);
+        _ffSet('ff-'+prefix+'-date',         seg.date);
+        _ffSet('ff-'+prefix+'-times',        seg.fromTime && seg.toTime ? seg.fromTime+'-'+seg.toTime : '');
+        _ffSet('ff-'+prefix+'-fromCode',     seg.fromCode);
+        _ffSet('ff-'+prefix+'-fromName',     seg.fromName);
+        _ffSet('ff-'+prefix+'-fromTerminal', seg.fromTerminal);
+        _ffSet('ff-'+prefix+'-toCode',       seg.toCode);
+        _ffSet('ff-'+prefix+'-toName',       seg.toName);
+        _ffSet('ff-'+prefix+'-toTerminal',   seg.toTerminal);
+        _ffSet('ff-'+prefix+'-baggage',      seg.baggage);
+        _ffSet('ff-'+prefix+'-seat',         seg.seat);
+      };
+      fillSeg('ob', f.outbound);
+      if (f.inbound) {
+        fillSeg('ib', f.inbound);
+        if (ibWrap)   ibWrap.style.display   = 'block';
+        if (ibToggle) ibToggle.style.display = 'none';
+      } else {
+        if (ibWrap)   ibWrap.style.display   = 'none';
+        if (ibToggle) ibToggle.style.display = 'flex';
+      }
     }
-  } else if (data.flights && data.flights.length > 0 && data.flights.length % 2 === 1) {
-    // Odd count = adding an even-numbered flight (2nd, 4th...) → swap last flight's from/to
-    const last = data.flights[data.flights.length - 1];
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-    set('ff-airline',      last.airline);
-    set('ff-fromCode',     last.toCode);
-    set('ff-fromName',     last.toName);
-    set('ff-fromTerminal', last.toTerminal);
-    set('ff-toCode',       last.fromCode);
-    set('ff-toName',       last.fromName);
-    set('ff-toTerminal',   last.fromTerminal);
-    // baggage, flightNo, times, seat left blank
+  } else {
+    if (ibWrap)   ibWrap.style.display   = 'none';
+    if (ibToggle) ibToggle.style.display = 'flex';
   }
   const title = document.getElementById('flight-sheet-title');
   if (title) title.textContent = editId ? '編輯機票' : '新增機票';
   document.getElementById('modal-flight-sheet').classList.add('open');
-  setTimeout(() => document.getElementById('ff-airline')?.focus(), 340);
+  setTimeout(() => document.getElementById('ff-pnr')?.focus(), 340);
+}
+
+function ffShowInbound() {
+  const ibWrap   = document.getElementById('ff-inbound-wrap');
+  const ibToggle = document.getElementById('ff-inbound-toggle');
+  if (ibWrap)   ibWrap.style.display   = 'block';
+  if (ibToggle) ibToggle.style.display = 'none';
+  _ffSet('ff-ib-fromCode',     _ffGet('ff-ob-toCode'));
+  _ffSet('ff-ib-fromName',     _ffGet('ff-ob-toName'));
+  _ffSet('ff-ib-fromTerminal', _ffGet('ff-ob-toTerminal'));
+  _ffSet('ff-ib-toCode',       _ffGet('ff-ob-fromCode'));
+  _ffSet('ff-ib-toName',       _ffGet('ff-ob-fromName'));
+  _ffSet('ff-ib-toTerminal',   _ffGet('ff-ob-fromTerminal'));
+  _ffSet('ff-ib-baggage',      _ffGet('ff-ob-baggage'));
 }
 
 function fmtFlightTimes(el) {
@@ -2999,19 +3057,32 @@ function fmtFlightTimes(el) {
 
 
 function saveFlightSheet() {
-  const get = id => document.getElementById(id)?.value.trim() || '';
+  const parseSeg = (prefix) => {
+    const times = _ffGet('ff-'+prefix+'-times');
+    const m = times.match(/(\d{1,2}:\d{2})\s*[-－—–]+\s*(\d{1,2}:\d{2})/);
+    return {
+      flightNo:     _ffGet('ff-'+prefix+'-flightNo'),
+      date:         _ffGet('ff-'+prefix+'-date'),
+      fromTime:     m ? m[1] : times,
+      toTime:       m ? m[2] : '',
+      fromCode:     _ffGet('ff-'+prefix+'-fromCode').toUpperCase(),
+      fromName:     _ffGet('ff-'+prefix+'-fromName'),
+      fromTerminal: _ffGet('ff-'+prefix+'-fromTerminal'),
+      toCode:       _ffGet('ff-'+prefix+'-toCode').toUpperCase(),
+      toName:       _ffGet('ff-'+prefix+'-toName'),
+      toTerminal:   _ffGet('ff-'+prefix+'-toTerminal'),
+      baggage:      _ffGet('ff-'+prefix+'-baggage'),
+      seat:         _ffGet('ff-'+prefix+'-seat'),
+    };
+  };
+  const ibWrap   = document.getElementById('ff-inbound-wrap');
+  const hasInbound = ibWrap && ibWrap.style.display !== 'none';
   const vals = {
-    airline:       get('ff-airline'),
-    flightNo:      get('ff-flightNo'),
-    fromCode:      get('ff-fromCode').toUpperCase(),
-    fromName:      get('ff-fromName'),
-    fromTerminal:  get('ff-fromTerminal'),
-    toCode:        get('ff-toCode').toUpperCase(),
-    toName:        get('ff-toName'),
-    toTerminal:    get('ff-toTerminal'),
-    times:         get('ff-times'),
-    baggage:       get('ff-baggage'),
-    seat:          get('ff-seat'),
+    pnr:      _ffGet('ff-pnr'),
+    airline:  _ffGet('ff-airline'),
+    url:      _ffGet('ff-url'),
+    outbound: parseSeg('ob'),
+    inbound:  hasInbound ? parseSeg('ib') : null,
   };
   if (_flightEditId) {
     const f = data.flights.find(f => f.id === _flightEditId);
@@ -3030,55 +3101,77 @@ function deleteFlightCard(id) {
 }
 
 function renderFlightCards() {
+  migrateFlights();
   const el = document.getElementById('flight-cards');
   if (!data.flights.length) {
     el.innerHTML = `<div class="list-empty" style="padding:40px 16px">點右上角 ＋ 新增機票</div>`;
     return;
   }
-  // Parse times field "hh:mm — hh:mm"
-  const parseTimes = (str) => {
-    const m = (str||'').match(/(\d{1,2}:\d{2})\s*[—–\-－]+\s*(\d{1,2}:\d{2})/);
-    return m ? [m[1], m[2]] : [str||'', ''];
-  };
-  el.innerHTML = data.flights.map(f => {
-    const [fromTime, toTime] = parseTimes(f.times);
+  const renderSeg = (seg, label) => {
+    if (!seg) return '';
+    const airportRow = (code, name, terminal, alignRight) => {
+      const cls = alignRight ? 'fc2-airport-right' : '';
+      return `<div class="fc2-airport-wrap ${cls}">
+        ${code ? `<span class="fc2-code">${esc(code)}</span>` : ''}
+        <span class="fc2-aname">${esc(name||'')}</span>
+        ${terminal ? `<span class="fc2-terminal">T${esc(terminal)}</span>` : ''}
+      </div>`;
+    };
     return `
-    <div class="fc" onclick="openFlightSheet(${f.id})">
-      <div class="fc-top">
-        <div class="fc-airline">${esc(f.airline || '')}</div>
-        <div class="fc-no">${esc(f.flightNo || '')}</div>
-        <button class="fc-del" onclick="event.stopPropagation();deleteFlightCard(${f.id})">×</button>
-      </div>
-      <div class="fc-divider"></div>
-      <div class="fc-route">
-        <div class="fc-city-time">${esc(fromTime)}</div>
-        <div class="fc-mid">
-          <div class="fc-line">
-            <div class="fc-line-bar"></div>
-            <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="var(--accent)"><path d="M280-80v-100l120-84v-144L80-280v-120l320-224v-176q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v176l320 224v120L560-408v144l120 84v100l-200-60-200 60Z"/></svg>
-            <div class="fc-line-bar"></div>
+      <div class="fc2-seg">
+        <div class="fc2-seg-tag">${label}</div>
+        <div class="fc2-date-row">
+          <span>${esc(seg.date||'')}</span>
+          <span class="fc2-flightno">${esc(seg.flightNo||'')}</span>
+        </div>
+        <div class="fc2-times-row">
+          <span class="fc2-time">${esc(seg.fromTime||'')}</span>
+          <div class="fc2-mid">
+            <div class="fc2-dashes">
+              <div class="fc2-dash"></div>
+              <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#D4AF37"><path d="M280-80v-100l120-84v-144L80-280v-120l320-224v-176q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v176l320 224v120L560-408v144l120 84v100l-200-60-200 60Z"/></svg>
+              <div class="fc2-dash"></div>
+            </div>
           </div>
+          <span class="fc2-time fc2-time-right">${esc(seg.toTime||'')}</span>
         </div>
-        <div class="fc-city-time fc-right">${esc(toTime)}</div>
+        <div class="fc2-airports">
+          ${airportRow(seg.fromCode, seg.fromName, seg.fromTerminal, false)}
+          ${airportRow(seg.toCode,   seg.toName,   seg.toTerminal,   true)}
+        </div>
+        ${(seg.baggage||seg.seat) ? `
+        <div class="fc2-meta">
+          ${seg.baggage ? `<div class="fc2-meta-item"><span class="fc2-meta-label">行李</span><span class="fc2-meta-val">${esc(seg.baggage)} kg</span></div>` : ''}
+          ${seg.seat    ? `<div class="fc2-meta-item"><span class="fc2-meta-label">座位</span><span class="fc2-meta-val">${esc(seg.seat)}</span></div>` : ''}
+        </div>` : ''}
+      </div>`;
+  };
+
+  el.innerHTML = data.flights.map(f => {
+    const hostname = (() => { try { return new URL(f.url||'').hostname.replace(/^www\./,''); } catch(e) { return f.url||''; } })();
+    const ibSeg = f.inbound ? renderSeg(f.inbound, '回程') : '';
+    const tear  = f.inbound ? `
+      <div class="fc2-tear">
+        <div class="fc2-tear-line"></div>
+      </div>` : '';
+    return `
+    <div class="fc2" onclick="openFlightSheet(${f.id})">
+      <div class="fc2-head">
+        <div>
+          <div class="fc2-pnr-label">訂位代號</div>
+          <div class="fc2-pnr">${esc(f.pnr||'—')}</div>
+        </div>
+        <div class="fc2-airline-block">
+          <div class="fc2-airline-name">${esc(f.airline||'')}</div>
+          ${f.url ? `<button class="fc2-url-btn" onclick="event.stopPropagation();window.open(${JSON.stringify(f.url)},'_blank')">${esc(hostname)} →</button>` : ''}
+        </div>
+        <button class="fc2-del" onclick="event.stopPropagation();deleteFlightCard(${f.id})">×</button>
       </div>
-      <div class="fc-airports">
-        <div class="fc-airport-wrap">
-          ${f.fromCode ? `<span class="fc-code">${esc(f.fromCode)}</span>` : ''}
-          <span class="fc-aname">${esc(f.fromName||'')}</span>
-          ${f.fromTerminal ? `<span class="fc-terminal">Terminal ${esc(f.fromTerminal)}</span>` : ''}
-        </div>
-        <div class="fc-airport-wrap fc-airport-right">
-          ${f.toCode ? `<span class="fc-code">${esc(f.toCode)}</span>` : ''}
-          <span class="fc-aname fc-aname-right">${esc(f.toName||'')}</span>
-          ${f.toTerminal ? `<span class="fc-terminal fc-aname-right">Terminal ${esc(f.toTerminal)}</span>` : ''}
-        </div>
+      <div class="fc2-body">
+        ${renderSeg(f.outbound, '去程')}
+        ${tear}
+        ${ibSeg}
       </div>
-      ${(f.baggage||f.seat) ? `
-      <div class="fc-divider"></div>
-      <div class="fc-bottom">
-        ${f.baggage ? `<div class="fc-detail"><span class="fc-detail-label">Baggage weight</span><span class="fc-detail-val">${esc(f.baggage)} Kg</span></div>` : ''}
-        ${f.seat    ? `<div class="fc-detail fc-detail-right"><span class="fc-detail-label">Seat</span><span class="fc-detail-val">${esc(f.seat)}</span></div>` : ''}
-      </div>` : ''}
     </div>`;
   }).join('');
 }
