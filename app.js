@@ -1911,11 +1911,11 @@ function renderPhotoPage() {
   const grid = document.getElementById('photo-grid');
   if (!grid) return;
   if (!photos.length) { grid.innerHTML = ''; return; }
-  grid.innerHTML = `<div class="photo-grid-inner">${photos.map(p => `
-    <div class="photo-cell">
-      <img class="photo-thumb" src="${resolvePhoto(p.url)}" onclick="openPhotoLightbox('${resolvePhoto(p.url)}')" loading="lazy">
+  grid.innerHTML = photos.map(p => `
+    <div class="photo-cell" style="position:relative;aspect-ratio:1;overflow:hidden;background:#F0F0F0">
+      <img style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" src="${resolvePhoto(p.url)}" onclick="openPhotoLightbox('${resolvePhoto(p.url)}')" loading="lazy">
       <button class="photo-del" onclick="deletePhoto(${p.id})">×</button>
-    </div>`).join('')}</div>`;
+    </div>`).join('');
 }
 
 function selectPhotoDay(idx) {

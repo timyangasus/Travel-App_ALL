@@ -1439,7 +1439,7 @@ canvas { display: block; width: 100%; height: 100%; }
   transition: color 0.15s;
 }
 .exp-row-del:active { color: var(--danger); }
-.expense-list { padding: 0; margin-top: 0; }
+.expense-list { padding: 0 0 calc(var(--tab-height) + 16px); margin-top: 0; }
 /* Sheet cat button */
 .exp-sheet-cat-btn {
   background: none;
@@ -1502,7 +1502,7 @@ canvas { display: block; width: 100%; height: 100%; }
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 12px;
   cursor: pointer;
   font-family: var(--mono);
   font-size: 16px;
@@ -1510,19 +1510,19 @@ canvas { display: block; width: 100%; height: 100%; }
   color: #D4AF37;
   letter-spacing: -0.2px;
   transition: opacity 0.12s;
-  padding: 30px 25px 25px;
+  padding: 22px 29px 20px;
 }
 .info-grid-btn:active { opacity: 0.5; }
 .info-grid-icon {
-  width: 75px;
-  height: 75px;
+  width: 86px;
+  height: 86px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .info-grid-icon svg {
-  width: 75px !important;
-  height: 75px !important;
+  width: 86px !important;
+  height: 86px !important;
 }
 
 /* Fill empty last cell white when 7 items */
@@ -3444,7 +3444,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
 /* Expense day tabs — compact, up to 10 before wrap */
 /* Expense screen */
-#screen-expense { background: #fff; }
+#screen-expense { background: #fff; padding-bottom: 0; }
 
 #screen-expense .day-tab {
   min-width: 36px;
@@ -3718,6 +3718,117 @@ textarea ~ .field-x {
 }
 @keyframes si-spin { to { transform: rotate(360deg); } }
 
+/* ═══ PHOTO MODULE ═══ */
+.photo-grid-inner {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 30px 0 0;
+}
+.photo-cell {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #F0F0F0;
+}
+.photo-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
+}
+.photo-del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.48);
+  color: #fff;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  line-height: 1;
+}
+.photo-del:active { background: rgba(229,57,53,0.85); }
+#screen-info-photo { background: #fff; }
+
+#screen-info-photo .day-tab {
+  min-width: 36px;
+  padding: 10px 16px 12px;
+  font-size: 17px;
+}
+#screen-info-photo .day-tab.active {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  line-height: 32px;
+  padding: 0;
+}
+
+/* ─── Photo screen override ─── */
+#screen-info-photo #photo-grid {
+  display: block;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#screen-info-photo .photo-grid-inner {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 30px 0 0;
+  width: 100%;
+}
+#screen-info-photo .photo-cell {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #F0F0F0;
+  border-radius: 0;
+  width: auto;
+  min-width: 0;
+}
+#screen-info-photo .photo-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
+}
+
+/* ─── Photo screen FORCE fullwidth ─── */
+#screen-info-photo #photo-grid {
+  width: 100% !important;
+}
+#screen-info-photo .photo-grid-inner {
+  display: grid !important;
+  grid-template-columns: repeat(3, calc(100vw / 3)) !important;
+  gap: 2px !important;
+  padding-top: 30px !important;
+  width: 100% !important;
+}
+#screen-info-photo .photo-cell {
+  width: calc(100vw / 3) !important;
+  height: calc(100vw / 3) !important;
+  aspect-ratio: 1 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+#screen-info-photo .photo-thumb {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
 </style>
 </head>
 <body>
@@ -3819,7 +3930,7 @@ textarea ~ .field-x {
         </div>
         <div class="day-tabs" id="expense-day-tabs"></div>
       </div>
-      <div style="padding:0 42px 6px;margin-top:-10px">
+      <div style="padding:0 42px 6px;margin-top:-20px">
         <div class="expense-total-card">
           <div class="expense-total-meta">
             <span class="expense-total-label">當日合計</span>
@@ -3833,10 +3944,10 @@ textarea ~ .field-x {
       </div>
       <div style="margin:-20px 24px 0">
         <div style="height:1.5px;background:#C2C2C2;width:100%"></div>
-        <span class="expense-count-label" id="expense-count" style="display:block;color:#AAAAAA;font-size:10px;margin-top:8px;margin-bottom:20px">0 筆記錄</span>
+        <span class="expense-count-label" id="expense-count" style="display:block;color:#AAAAAA;font-size:10px;margin-top:8px;margin-bottom:8px">0 筆記錄</span>
       </div>
     </div>
-    <div class="expense-list" id="expense-list" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;padding-bottom:calc(var(--tab-height) + 16px)"></div>
+    <div class="expense-list" id="expense-list" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;height:0;background:#fff"></div>
   </div>
 
   <!-- ═══ INFO HUB ═══ -->
@@ -3886,6 +3997,12 @@ textarea ~ .field-x {
         </div>
         <span>備忘錄</span>
       </button>
+      <button class="info-grid-btn" id="info-btn-photo" onclick="openInfoSub('photo')">
+        <div class="info-grid-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" height="90px" viewBox="0 -960 960 960" width="90px" fill="#1A1A1A"><path d="M368-416h332L598-552 498-428l-64-74-66 86Zm-42 124q-26 0-43-17t-17-43v-416q0-26 17-43t43-17h416q26 0 43 17t17 43v416q0 26-17 43t-43 17H326Zm0-28h416q12 0 22-10t10-22v-416q0-12-10-22t-22-10H326q-12 0-22 10t-10 22v416q0 12 10 22t22 10ZM218-184q-26 0-43-17t-17-43v-444h28v444q0 12 10 22t22 10h444v28H218Zm76-616v480-480Z"/></svg>
+        </div>
+        <span>相片</span>
+      </button>
       <button class="info-grid-btn info-btn-map-hidden" id="info-btn-map" onclick="openInfoSub('map')" style="display:none">
         <div class="info-grid-icon">
           <svg xmlns="http://www.w3.org/2000/svg" height="90px" viewBox="0 -960 960 960" width="90px" fill="#1A1A1A"><path d="m600-176-240-84-150 58q-14 5-26-3t-12-23v-468q0-10 4.5-18.5T190-726l170-58 240 84 150-58q14-5 26 1.5t12 20.5v476q0 11-6 19t-16 11l-166 54Zm-14-34v-468l-212-74v468l212 74Zm28 0 146-48v-474l-146 54v468Zm-414-18 146-56v-468l-146 50v474Zm414-450v468-468Zm-268-74v468-468Z"/></svg>
@@ -3921,7 +4038,7 @@ textarea ~ .field-x {
         <!-- 訂單共通資訊 -->
         <div style="padding:4px 0 0">
           <div class="ff-label">訂位代號</div>
-          <input class="ff-input" id="ff-pnr" placeholder="ABCXYZ" style="text-transform:uppercase;letter-spacing:0.1em">
+          <input class="ff-input" id="ff-pnr" placeholder="" style="text-transform:uppercase;letter-spacing:0.1em">
         </div>
         <div style="display:flex;gap:16px;padding:12px 0 0">
           <div style="flex:1">
@@ -3953,7 +4070,7 @@ textarea ~ .field-x {
         <div style="display:flex;gap:16px;padding:12px 0 0">
           <div style="flex:1">
             <div class="ff-label">出發 IATA</div>
-            <input class="ff-input" id="ff-ob-fromCode" placeholder="TPE" style="text-transform:uppercase">
+            <input class="ff-input" id="ff-ob-fromCode" placeholder="" style="text-transform:uppercase">
           </div>
           <div style="flex:2">
             <div class="ff-label">出發機場名稱</div>
@@ -3967,7 +4084,7 @@ textarea ~ .field-x {
         <div style="display:flex;gap:16px;padding:12px 0 0">
           <div style="flex:1">
             <div class="ff-label">抵達 IATA</div>
-            <input class="ff-input" id="ff-ob-toCode" placeholder="NRT" style="text-transform:uppercase">
+            <input class="ff-input" id="ff-ob-toCode" placeholder="" style="text-transform:uppercase">
           </div>
           <div style="flex:2">
             <div class="ff-label">抵達機場名稱</div>
@@ -4221,6 +4338,28 @@ textarea ~ .field-x {
       </button>
     </div>
     <div class="info-section" id="notes-card-list" style="padding:30px 20px 16px;display:flex;flex-direction:column;gap:16px"></div>
+  </div>
+
+  <!-- ═══ INFO SUB: PHOTO ═══ -->
+  <div id="screen-info-photo" class="page" style="overflow:hidden">
+    <div id="photo-fixed-header">
+      <div class="screen-header sub-header" style="position:relative">
+        <button class="sub-back-btn" onclick="closeInfoSub('photo')">
+          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z"/></svg>
+        </button>
+        <div class="screen-title" style="flex:1">相片</div>
+        <label class="sub-header-action" style="cursor:pointer">
+          <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 -960 960 960" width="30px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+          <input type="file" accept="image/*" multiple style="display:none" onchange="addPhotoFromPicker(this)">
+        </label>
+      </div>
+      <div class="day-tabs-wrap" style="border-bottom:0.5px solid var(--border-thin);padding:0 20px">
+        <div id="photo-day-date" style="font-size:20px;color:#1A1A1A;font-family:var(--mono);font-weight:700;padding-top:12px;padding-bottom:4px"></div>
+        <div class="day-tabs-header"><span class="day-tabs-label">DAY</span></div>
+        <div class="day-tabs" id="photo-day-tabs"></div>
+      </div>
+    </div>
+    <div id="photo-grid" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;height:0;background:#fff;padding:0 0 calc(var(--tab-height)+16px);display:grid;grid-template-columns:repeat(3,1fr);gap:2px;align-content:start;padding-top:30px"></div>
   </div>
 
   <!-- ═══ SETTINGS ═══ -->
@@ -4819,7 +4958,7 @@ async function uploadToImgBB(file) {
   });
   const json = await res.json();
   if (!json.success) throw new Error(json.error?.message || 'Upload failed');
-  return json.data.url;
+  return json.data.display_url || json.data.image?.url || json.data.url;
 }
 
 function showUploadStatus(msg) {
@@ -5569,10 +5708,11 @@ const INFO_MODULE_DEFS = [
   { id: 'ticket',    label: '票券' },
   { id: 'checklist', label: '待辦清單' },
   { id: 'notes',     label: '備忘錄' },
+  { id: 'photo',     label: '相片' },
   { id: 'map',       label: '地圖' },
 ];
 
-const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes'];
+const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes','photo'];
 
 function getInfoModules() {
   if (!data) return DEFAULT_MODULES;
@@ -6657,12 +6797,87 @@ function openInfoSub(name) {
   if (name === 'shopping')  renderShopItems();
   if (name === 'ticket')    renderTicketCards();
   if (name === 'notes')     renderNotes();
+  if (name === 'photo')     renderPhotoPage();
   if (name === 'map')       renderMapSub();
 }
 
 function closeInfoSub(name) {
   document.getElementById('screen-info-' + name).classList.remove('active');
   document.getElementById('screen-info').classList.add('active');
+}
+
+/* ═══════════════════════════════════════
+   PHOTO MODULE
+═══════════════════════════════════════ */
+let _photoDayIdx = 0;
+
+function renderPhotoPage() {
+  if (!data.photos) data.photos = [];
+  const days = data.days || [];
+  if (!days.length) return;
+  _photoDayIdx = Math.min(_photoDayIdx, days.length - 1);
+
+  // Render day tabs
+  const tabsEl = document.getElementById('photo-day-tabs');
+  if (tabsEl) {
+    tabsEl.innerHTML = days.map((_, i) =>
+      `<button class="day-tab${i === _photoDayIdx ? ' active' : ''}" onclick="selectPhotoDay(${i})">${i + 1}</button>`
+    ).join('');
+  }
+  // Date label
+  const dateEl = document.getElementById('photo-day-date');
+  if (dateEl && days[_photoDayIdx]) {
+    const raw = days[_photoDayIdx].banner?.date || '';
+    dateEl.textContent = raw.replace(/\d{4}\//, '').trim();
+  }
+
+  // Filter photos for selected day (1-based)
+  const dayKey = _photoDayIdx + 1;
+  const photos = data.photos.filter(p => p.day === dayKey);
+
+  const grid = document.getElementById('photo-grid');
+  if (!grid) return;
+  if (!photos.length) { grid.innerHTML = ''; return; }
+  grid.innerHTML = photos.map(p => `
+    <div class="photo-cell" style="position:relative;aspect-ratio:1;overflow:hidden;background:#F0F0F0">
+      <img style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" src="${resolvePhoto(p.url)}" onclick="openPhotoLightbox('${resolvePhoto(p.url)}')" loading="lazy">
+      <button class="photo-del" onclick="deletePhoto(${p.id})">×</button>
+    </div>`).join('');
+}
+
+function selectPhotoDay(idx) {
+  _photoDayIdx = idx;
+  renderPhotoPage();
+}
+
+async function addPhotoFromPicker(input) {
+  const files = [...input.files];
+  if (!data.photos) data.photos = [];
+  const dayKey = _photoDayIdx + 1;
+  for (const file of files) {
+    showUploadStatus('上傳中...');
+    try {
+      const url = await uploadToImgBB(file);
+      data.photos.push({ id: Date.now() + Math.random(), url, day: dayKey });
+      save();
+      renderPhotoPage();
+    } catch(err) {
+      alert('上傳失敗：' + err.message);
+    } finally {
+      showUploadStatus('');
+    }
+  }
+  input.value = '';
+}
+
+function deletePhoto(id) {
+  data.photos = (data.photos || []).filter(p => p.id !== id);
+  save(); renderPhotoPage();
+}
+
+function openPhotoLightbox(url) {
+  if (typeof openTicketLightbox === 'function') { openTicketLightbox(url); return; }
+  window.open(url, '_blank');
 }
 
 /* ═══════════════════════════════════════
