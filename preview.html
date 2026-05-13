@@ -4359,7 +4359,7 @@ textarea ~ .field-x {
         <div class="day-tabs" id="photo-day-tabs"></div>
       </div>
     </div>
-    <div id="photo-page-grid" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;height:0;background:#fff;padding-bottom:calc(var(--tab-height)+16px)"></div>
+    <div id="photo-page-grid" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;height:0;background:#fff;padding-bottom:calc(var(--tab-height)+16px);width:100%;box-sizing:border-box"></div>
   </div>
 
   <!-- ═══ SETTINGS ═══ -->
@@ -6838,11 +6838,11 @@ function renderPhotoPage() {
   const grid = document.getElementById('photo-page-grid');
   if (!grid) return;
   if (!photos.length) { grid.innerHTML = ''; return; }
-  grid.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding-top:30px;width:100%">${
+  grid.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;padding-top:20px;width:100%">${
     photos.map(p => `
-    <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#F0F0F0">
-      <img src="${resolvePhoto(p.url)}" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="openPhotoLightbox('${resolvePhoto(p.url)}')" loading="lazy">
-      <button onclick="deletePhoto(${p.id})" style="position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.5);color:#fff;border:none;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;line-height:1">×</button>
+    <div style="position:relative;width:100%;overflow:hidden;background:#F0F0F0">
+      <img src="${resolvePhoto(p.url)}" style="width:100%;height:auto;display:block;cursor:pointer" onclick="openPhotoLightbox('${resolvePhoto(p.url)}')" loading="lazy">
+      <button onclick="deletePhoto(${p.id})" style="position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.5);color:#fff;border:none;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;line-height:1">×</button>
     </div>`).join('')
   }</div>`;
 }
