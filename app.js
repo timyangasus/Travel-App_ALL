@@ -1884,11 +1884,39 @@ function closeInfoSub(name) {
 ═══════════════════════════════════════ */
 let _photoDayIdx = 0;
 
+let _photoSwipeInited = false;
+function initPhotoSwipe() {
+  if (_photoSwipeInited) return;
+  _photoSwipeInited = true;
+  const screen = document.getElementById('screen-info-photo');
+  if (!screen) return;
+  let startX = 0, startY = 0;
+  screen.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  screen.addEventListener('touchend', e => {
+    if (!data) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
+    const total = (data.days || []).length;
+    if (!total) return;
+    if (dx < 0) {
+      _photoDayIdx = (_photoDayIdx + 1) % total;
+    } else {
+      _photoDayIdx = (_photoDayIdx - 1 + total) % total;
+    }
+    renderPhotoPage();
+  }, { passive: true });
+}
+
 function renderPhotoPage() {
   if (!data.photos) data.photos = [];
   const days = data.days || [];
   if (!days.length) return;
   _photoDayIdx = Math.min(_photoDayIdx, days.length - 1);
+  initPhotoSwipe();
 
   // Render day tabs
   const tabsEl = document.getElementById('photo-day-tabs');
