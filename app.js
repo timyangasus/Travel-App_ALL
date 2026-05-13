@@ -775,16 +775,17 @@ function saveTripSheet() {
    INFO MODULES CUSTOMIZATION
 ═══════════════════════════════════════ */
 const INFO_MODULE_DEFS = [
-  { id: 'flight',   label: 'Flight ticket' },
-  { id: 'hotel',    label: 'Hotel' },
-  { id: 'shopping', label: 'Shopping list' },
-  { id: 'ticket',   label: 'Tickets' },
-  { id: 'checklist',label: 'Checklist' },
-  { id: 'notes',    label: 'Notes' },
-  { id: 'map',      label: 'Map' },
+  { id: 'flight',    label: '機票' },
+  { id: 'hotel',     label: '飯店' },
+  { id: 'shopping',  label: '購物清單' },
+  { id: 'ticket',    label: '票券' },
+  { id: 'checklist', label: '待辦清單' },
+  { id: 'notes',     label: '備忘錄' },
+  { id: 'photo',     label: '相片' },
+  { id: 'map',       label: '地圖' },
 ];
 
-const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes'];
+const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes','photo'];
 
 function getInfoModules() {
   if (!data) return DEFAULT_MODULES;
@@ -1869,12 +1870,87 @@ function openInfoSub(name) {
   if (name === 'shopping')  renderShopItems();
   if (name === 'ticket')    renderTicketCards();
   if (name === 'notes')     renderNotes();
+  if (name === 'photo')     renderPhotoPage();
   if (name === 'map')       renderMapSub();
 }
 
 function closeInfoSub(name) {
   document.getElementById('screen-info-' + name).classList.remove('active');
   document.getElementById('screen-info').classList.add('active');
+}
+
+/* ═══════════════════════════════════════
+   PHOTO MODULE
+═══════════════════════════════════════ */
+let _photoDayIdx = 0;
+
+function renderPhotoPage() {
+  if (!data.photos) data.photos = [];
+  const days = data.days || [];
+  if (!days.length) return;
+  _photoDayIdx = Math.min(_photoDayIdx, days.length - 1);
+
+  // Render day tabs
+  const tabsEl = document.getElementById('photo-day-tabs');
+  if (tabsEl) {
+    tabsEl.innerHTML = days.map((_, i) =>
+      `<button class="day-tab${i === _photoDayIdx ? ' active' : ''}" onclick="selectPhotoDay(${i})">${i + 1}</button>`
+    ).join('');
+  }
+  // Date label
+  const dateEl = document.getElementById('photo-day-date');
+  if (dateEl && days[_photoDayIdx]) {
+    const raw = days[_photoDayIdx].banner?.date || '';
+    dateEl.textContent = raw.replace(/\d{4}\//, '').trim();
+  }
+
+  // Filter photos for selected day (1-based)
+  const dayKey = _photoDayIdx + 1;
+  const photos = data.photos.filter(p => p.day === dayKey);
+
+  const grid = document.getElementById('photo-grid');
+  if (!grid) return;
+  if (!photos.length) { grid.innerHTML = ''; return; }
+  grid.innerHTML = `<div class="photo-grid-inner">${photos.map(p => `
+    <div class="photo-cell">
+      <img class="photo-thumb" src="${resolvePhoto(p.url)}" onclick="openPhotoLightbox('${resolvePhoto(p.url)}')" loading="lazy">
+      <button class="photo-del" onclick="deletePhoto(${p.id})">×</button>
+    </div>`).join('')}</div>`;
+}
+
+function selectPhotoDay(idx) {
+  _photoDayIdx = idx;
+  renderPhotoPage();
+}
+
+async function addPhotoFromPicker(input) {
+  const files = [...input.files];
+  if (!data.photos) data.photos = [];
+  const dayKey = _photoDayIdx + 1;
+  for (const file of files) {
+    showUploadStatus('上傳中...');
+    try {
+      const url = await uploadToImgBB(file);
+      data.photos.push({ id: Date.now() + Math.random(), url, day: dayKey });
+      save();
+      renderPhotoPage();
+    } catch(err) {
+      alert('上傳失敗：' + err.message);
+    } finally {
+      showUploadStatus('');
+    }
+  }
+  input.value = '';
+}
+
+function deletePhoto(id) {
+  data.photos = (data.photos || []).filter(p => p.id !== id);
+  save(); renderPhotoPage();
+}
+
+function openPhotoLightbox(url) {
+  if (typeof openTicketLightbox === 'function') { openTicketLightbox(url); return; }
+  window.open(url, '_blank');
 }
 
 /* ═══════════════════════════════════════
@@ -2246,7 +2322,7 @@ function deleteCheckItem(i) {
 function renderShopItems() {
   const items = data.shopping || [];
   const el = document.getElementById('shopping-items');
-  if (!items.length) { el.innerHTML = `<div class="list-empty">點右上角 ＋ 新增品項</div>`; return; }
+  if (!items.length) { el.innerHTML = `<div class="list-empty"></div>`; return; }
 
   el.innerHTML = items.map((item, i) => {
     const photoUrl = item.photo ? resolvePhoto(item.photo) : '';
@@ -2686,7 +2762,7 @@ function renderTicketCards() {
           </div>
         </div>`;
       }).join('')
-    : `<div class="list-empty">點右上角 ＋ 新增票券圖片</div>`;
+    : `<div class="list-empty"></div>`;
 }
 
 function deleteTicketPhoto(id) {
@@ -3061,7 +3137,7 @@ function saveFlightSheet() {
     const times = _ffGet('ff-'+prefix+'-times');
     const m = times.match(/(\d{1,2}:\d{2})\s*[-－—–]+\s*(\d{1,2}:\d{2})/);
     return {
-      flightNo:     _ffGet('ff-'+prefix+'-flightNo'),
+      flightNo:     _ffGet('ff-'+prefix+'-flightNo').toUpperCase(),
       date:         _ffGet('ff-'+prefix+'-date'),
       fromTime:     m ? m[1] : times,
       toTime:       m ? m[2] : '',
@@ -3072,13 +3148,13 @@ function saveFlightSheet() {
       toName:       _ffGet('ff-'+prefix+'-toName'),
       toTerminal:   _ffGet('ff-'+prefix+'-toTerminal'),
       baggage:      _ffGet('ff-'+prefix+'-baggage'),
-      seat:         _ffGet('ff-'+prefix+'-seat'),
+      seat:         _ffGet('ff-'+prefix+'-seat').toUpperCase(),
     };
   };
   const ibWrap   = document.getElementById('ff-inbound-wrap');
   const hasInbound = ibWrap && ibWrap.style.display !== 'none';
   const vals = {
-    pnr:      _ffGet('ff-pnr'),
+    pnr:      _ffGet('ff-pnr').toUpperCase(),
     airline:  _ffGet('ff-airline'),
     url:      _ffGet('ff-url'),
     outbound: parseSeg('ob'),
@@ -3104,7 +3180,7 @@ function renderFlightCards() {
   migrateFlights();
   const el = document.getElementById('flight-cards');
   if (!data.flights.length) {
-    el.innerHTML = `<div class="list-empty" style="padding:40px 16px">點右上角 ＋ 新增機票</div>`;
+    el.innerHTML = `<div class="list-empty"></div>`;
     return;
   }
   const renderSeg = (seg, label) => {
@@ -3114,7 +3190,7 @@ function renderFlightCards() {
       return `<div class="fc2-airport-wrap ${cls}">
         ${code ? `<span class="fc2-code">${esc(code)}</span>` : ''}
         <span class="fc2-aname">${esc(name||'')}</span>
-        ${terminal ? `<span class="fc2-terminal">T${esc(terminal)}</span>` : ''}
+        ${terminal ? `<span class="fc2-terminal">Terminal ${esc(terminal)}</span>` : ''}
       </div>`;
     };
     return `
@@ -3141,8 +3217,8 @@ function renderFlightCards() {
         </div>
         ${(seg.baggage||seg.seat) ? `
         <div class="fc2-meta">
-          ${seg.baggage ? `<div class="fc2-meta-item"><span class="fc2-meta-label">行李</span><span class="fc2-meta-val">${esc(seg.baggage)} kg</span></div>` : ''}
-          ${seg.seat    ? `<div class="fc2-meta-item"><span class="fc2-meta-label">座位</span><span class="fc2-meta-val">${esc(seg.seat)}</span></div>` : ''}
+          ${seg.baggage ? `<div class="fc2-meta-item"><span class="fc2-meta-label">行李</span><span class="fc2-meta-val">${esc(seg.baggage)} kg</span></div>` : '<div></div>'}
+          ${seg.seat    ? `<div class="fc2-meta-item" style="align-items:flex-end"><span class="fc2-meta-label">座位</span><span class="fc2-meta-val">${esc(seg.seat)}</span></div>` : ''}
         </div>` : ''}
       </div>`;
   };
@@ -3162,8 +3238,8 @@ function renderFlightCards() {
           <div class="fc2-pnr">${esc(f.pnr||'—')}</div>
         </div>
         <div class="fc2-airline-block">
+          <div class="fc2-pnr-label" style="text-align:right">航空公司</div>
           <div class="fc2-airline-name">${esc(f.airline||'')}</div>
-          ${f.url ? `<button class="fc2-url-btn" onclick="event.stopPropagation();window.open(${JSON.stringify(f.url)},'_blank')">${esc(hostname)} →</button>` : ''}
         </div>
         <button class="fc2-del" onclick="event.stopPropagation();deleteFlightCard(${f.id})">×</button>
       </div>
@@ -3172,6 +3248,7 @@ function renderFlightCards() {
         ${tear}
         ${ibSeg}
       </div>
+      ${f.url ? `<div class="fc2-url-row" onclick="event.stopPropagation();window.open(${JSON.stringify(f.url)},'_blank')">${esc(f.url)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -3305,7 +3382,7 @@ function renderHotelCards() {
   const sym = getCurrencySymbol();
   const el  = document.getElementById('hotel-cards');
   if (!data.hotels.length) {
-    el.innerHTML = `<div class="list-empty">點右上角 ＋ 新增住宿</div>`;
+    el.innerHTML = `<div class="list-empty"></div>`;
     return;
   }
   // Sort by checkin date ascending

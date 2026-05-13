@@ -202,6 +202,12 @@
         </div>
         <span>備忘錄</span>
       </button>
+      <button class="info-grid-btn" id="info-btn-photo" onclick="openInfoSub('photo')">
+        <div class="info-grid-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" height="90px" viewBox="0 -960 960 960" width="90px" fill="#1A1A1A"><path d="M368-416h332L598-552 498-428l-64-74-66 86Zm-42 124q-26 0-43-17t-17-43v-416q0-26 17-43t43-17h416q26 0 43 17t17 43v416q0 26-17 43t-43 17H326Zm0-28h416q12 0 22-10t10-22v-416q0-12-10-22t-22-10H326q-12 0-22 10t-10 22v416q0 12 10 22t22 10ZM218-184q-26 0-43-17t-17-43v-444h28v444q0 12 10 22t22 10h444v28H218Zm76-616v480-480Z"/></svg>
+        </div>
+        <span>相片</span>
+      </button>
       <button class="info-grid-btn info-btn-map-hidden" id="info-btn-map" onclick="openInfoSub('map')" style="display:none">
         <div class="info-grid-icon">
           <svg xmlns="http://www.w3.org/2000/svg" height="90px" viewBox="0 -960 960 960" width="90px" fill="#1A1A1A"><path d="m600-176-240-84-150 58q-14 5-26-3t-12-23v-468q0-10 4.5-18.5T190-726l170-58 240 84 150-58q14-5 26 1.5t12 20.5v476q0 11-6 19t-16 11l-166 54Zm-14-34v-468l-212-74v468l212 74Zm28 0 146-48v-474l-146 54v468Zm-414-18 146-56v-468l-146 50v474Zm414-450v468-468Zm-268-74v468-468Z"/></svg>
@@ -537,6 +543,28 @@
       </button>
     </div>
     <div class="info-section" id="notes-card-list" style="padding:30px 20px 16px;display:flex;flex-direction:column;gap:16px"></div>
+  </div>
+
+  <!-- ═══ INFO SUB: PHOTO ═══ -->
+  <div id="screen-info-photo" class="page" style="overflow:hidden">
+    <div id="photo-fixed-header">
+      <div class="screen-header sub-header" style="position:relative">
+        <button class="sub-back-btn" onclick="closeInfoSub('photo')">
+          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z"/></svg>
+        </button>
+        <div class="screen-title" style="flex:1">相片</div>
+        <label class="sub-header-action" style="cursor:pointer">
+          <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 -960 960 960" width="30px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+          <input type="file" accept="image/*" multiple style="display:none" onchange="addPhotoFromPicker(this)">
+        </label>
+      </div>
+      <div class="day-tabs-wrap" style="border-bottom:0.5px solid var(--border-thin);padding:0 20px">
+        <div id="photo-day-date" style="font-size:20px;color:#1A1A1A;font-family:var(--mono);font-weight:700;padding-top:12px;padding-bottom:4px"></div>
+        <div class="day-tabs-header"><span class="day-tabs-label">DAY</span></div>
+        <div class="day-tabs" id="photo-day-tabs"></div>
+      </div>
+    </div>
+    <div id="photo-grid" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;height:0;background:#fff;padding:16px 16px calc(var(--tab-height)+16px)"></div>
   </div>
 
   <!-- ═══ SETTINGS ═══ -->
