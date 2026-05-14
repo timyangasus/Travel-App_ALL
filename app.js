@@ -2180,14 +2180,7 @@ let _mapEngineReady = false;
 const MAP_MAX_SCALE = 8;
 
 function _mapGetMinScale() {
-  const viewer = document.getElementById('map-viewer');
-  const img    = document.getElementById('map-img');
-  if (!viewer || !img || !img.naturalWidth) return 1;
-  const vw = viewer.clientWidth;
-  const vh = viewer.clientHeight;
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
-  return vh / (vw * (ih / iw));
+  return 1; // scale=1 is the initial fit state, don't zoom out further
 }
 
 function _mapClamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
@@ -2196,13 +2189,13 @@ function _mapConstrain() {
   const viewer = document.getElementById('map-viewer');
   const img    = document.getElementById('map-img');
   if (!viewer || !img) return;
-  const vw = viewer.clientWidth, vh = viewer.clientHeight;
-  const iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
+  const vw = viewer.clientWidth || window.innerWidth;
+  const vh = viewer.clientHeight || (window.innerHeight - 120);
   const renderedW = vw * _mapScale;
-  const renderedH = vw * (ih / iw) * _mapScale;
+  const renderedH = (img.naturalHeight / img.naturalWidth) * vw * _mapScale;
   if (renderedW <= vw) _mapTx = (vw - renderedW) / 2;
   else _mapTx = _mapClamp(_mapTx, vw - renderedW, 0);
-  if (renderedH <= vh) _mapTy = (vh - renderedH) / 2;
+  if (renderedH <= vh) _mapTy = 0;
   else _mapTy = _mapClamp(_mapTy, vh - renderedH, 0);
 }
 
@@ -2340,20 +2333,17 @@ function _mapLoadImage(url) {
 
   _mapScale = 1; _mapTx = 0; _mapTy = 0;
   _mapEngineReady = false;
-  img.style.transform = '';
+  img.style.transform = 'none';
+  img.style.width  = '100%';
+  img.style.height = 'auto';
 
   img.onload = () => {
-    requestAnimationFrame(() => {
-      const vw = viewer.clientWidth, vh = viewer.clientHeight;
-      const iw = img.naturalWidth  || vw;
-      const ih = img.naturalHeight || vh;
-      _mapScale = vh / (vw * (ih / iw));
-      const renderedW = vw * _mapScale;
-      _mapTx = (vw - renderedW) / 2;
-      _mapTy = 0;
-      _mapApply(false);
-      mapInitPanZoom();
-    });
+    // scale=1, width:100% — image naturally fills viewer width
+    // No need for clientHeight calculation
+    _mapScale = 1; _mapTx = 0; _mapTy = 0;
+    _mapApply(false);
+    _mapSizeViewer();
+    mapInitPanZoom();
   };
   img.onerror = () => showToast('地圖圖片載入失敗');
   img.src = url;
