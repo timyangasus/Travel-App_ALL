@@ -1726,18 +1726,18 @@ let _itinSwipeInited = false;
 function initItinerarySwipe() {
   if (_itinSwipeInited) return;
   _itinSwipeInited = true;
-  const screen = document.getElementById('screen-itinerary');
-  if (!screen) return;
+  const tl = document.getElementById('timeline-section');
+  if (!tl) return;
   let startX = 0, startY = 0;
-  screen.addEventListener('touchstart', e => {
+  tl.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
   }, { passive: true });
-  screen.addEventListener('touchend', e => {
+  tl.addEventListener('touchend', e => {
     if (!data) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.5) return;
     const total = data.days.length;
     if (dx < 0) {
       currentDay = (currentDay + 1) % total;
@@ -1745,8 +1745,7 @@ function initItinerarySwipe() {
       currentDay = (currentDay - 1 + total) % total;
     }
     renderItinerary();
-    const tl = document.getElementById('timeline-section');
-    if (tl) tl.scrollTop = 0;
+    tl.scrollTop = 0;
   }, { passive: true });
 }
 
@@ -2304,8 +2303,11 @@ function _mapLoadImage(url) {
   img.style.cssText = 'position:absolute;top:0;left:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;display:block;width:100%;height:auto';
 
   img.onload = () => {
-    const vw = viewer.clientWidth  || window.innerWidth;
-    const vh = viewer.clientHeight || (window.innerHeight - 150);
+    const vw = viewer.clientWidth || window.innerWidth;
+    const hH = document.getElementById('map-sub-header')?.getBoundingClientRect().height || 56;
+    const tH = document.getElementById('map-tabs-bar')?.getBoundingClientRect().height   || 44;
+    const bH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tab-height')) || 80;
+    const vh = window.innerHeight - hH - tH - bH;
     const iw = img.naturalWidth  || vw;
     const ih = img.naturalHeight || vh;
     _mapScale = Math.min(vw / iw, vh / ih);
