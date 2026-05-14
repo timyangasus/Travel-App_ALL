@@ -1073,7 +1073,7 @@ function renderDayTabs() {
       setTimeout(() => {
         const screen = document.getElementById('screen-itinerary');
         if (screen) screen.scrollTop = 0;
-      }, 0);
+      }, 50);
     };
 
     // Long-press to delete
@@ -1992,76 +1992,79 @@ function openPhotoLightbox(url) {
 }
 
 /* ═══════════════════════════════════════
-   MAP MODULE
-═══════════════════════════════════════ */
-
-/* ─── Render / state ─── */
-/* ═══════════════════════════════════════
    MAP MODULE — Multi-map with tabs
+   Rewrites: stable tab display, correct image sizing
 ═══════════════════════════════════════ */
-let _mapTabTimer = null, _mapTabCancelled = false;
-function _mapTabTouchStart(idx, el) {
-  _mapTabCancelled = false;
-  _mapTabTimer = setTimeout(() => {
-    if (!_mapTabCancelled) mapLongPressTab(idx);
-  }, 500);
-}
-function _mapTabTouchEnd(idx, el) {
-  clearTimeout(_mapTabTimer);
-}
-function _mapTabTouchCancel() {
-  _mapTabCancelled = true;
-  clearTimeout(_mapTabTimer);
-}
 
+let _mapActiveIdx   = 0;
+let _mapEditingId   = null;
+let _mapScale = 1, _mapTx = 0, _mapTy = 0;
+let _mapDragging = false, _mapLastX = 0, _mapLastY = 0;
+let _mapPinchDist = null, _mapPinchMidX = 0, _mapPinchMidY = 0;
+let _mapEngineReady = false;
+const MAP_MAX_SCALE = 8;
 
-let _mapEditingId = null; // for rename
-
+/* ── Render ───────────────────────────── */
 function renderMapSub() {
   if (!data.maps) data.maps = [];
-  // migrate old single-map format, strip file extension from name
+  // Migrate: ensure id and clean name
+  let changed = false;
   data.maps = data.maps.map(m => {
-    if (!m.id) m.id = Date.now() + Math.random();
-    if (!m.name) m.name = '地圖';
-    m.name = m.name.replace(/\.[a-zA-Z]{2,5}$/, ''); // strip .jpeg .png etc
-    if (!m.name) m.name = '地圖';
+    if (!m.id) { m.id = Date.now() + Math.random(); changed = true; }
+    if (!m.name) { m.name = '地圖'; changed = true; }
+    const clean = m.name.replace(/\.[a-zA-Z]{2,5}$/, '') || '地圖';
+    if (clean !== m.name) { m.name = clean; changed = true; }
     return m;
   });
-  save();
+  if (changed) save();
 
   const maps    = data.maps;
   const emptyEl = document.getElementById('map-empty-state');
-  const viewerEl= document.getElementById('map-viewer');
-  const tabsBar = document.getElementById('map-tabs-bar');
+  const viewerEl = document.getElementById('map-viewer');
+  const tabsBar  = document.getElementById('map-tabs-bar');
 
   if (!maps.length) {
-    emptyEl.style.display  = 'flex';
-    viewerEl.style.display = 'none';
-    tabsBar.style.display  = 'none';
+    if (emptyEl)  emptyEl.style.display  = 'flex';
+    if (viewerEl) viewerEl.style.display = 'none';
+    if (tabsBar)  tabsBar.style.display  = 'none';
     return;
   }
 
-  emptyEl.style.display  = 'none';
-  viewerEl.style.display = 'block';
-  tabsBar.style.display  = 'block';
+  if (emptyEl)  emptyEl.style.display  = 'none';
+  if (tabsBar)  tabsBar.style.display  = 'block';
+  if (viewerEl) viewerEl.style.display = 'block';
 
   _mapActiveIdx = Math.min(_mapActiveIdx, maps.length - 1);
-  _mapEngineReady = false; // reset engine so pan/zoom re-inits
+  _mapEngineReady = false;
   _renderMapTabs();
-  setTimeout(() => {
-    _mapSizeViewerSync();
-    _mapLoadImage(maps[_mapActiveIdx].url);
-  }, 100);
+
+  // Wait for DOM to reflow after display:block, then size and load
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    _mapDoSizeAndLoad(maps[_mapActiveIdx].url);
+  }));
+}
+
+function _mapDoSizeAndLoad(url) {
+  const header  = document.getElementById('map-sub-header');
+  const tabsBar = document.getElementById('map-tabs-bar');
+  const viewer  = document.getElementById('map-viewer');
+  if (!header || !viewer) return;
+  const hH = header.getBoundingClientRect().height;
+  const tH = (tabsBar && tabsBar.offsetHeight > 0) ? tabsBar.getBoundingClientRect().height : 0;
+  viewer.style.top    = (hH + tH) + 'px';
+  viewer.style.bottom = '0';
+  viewer.style.height = '';
+  _mapLoadImage(url);
 }
 
 function _renderMapTabs() {
-  const maps  = data.maps || [];
+  const maps   = data.maps || [];
   const tabsEl = document.getElementById('map-tabs');
   if (!tabsEl) return;
   tabsEl.innerHTML = maps.map((m, i) => `
     <button
       onclick="mapSelectTab(${i})"
-      ondblclick="mapLongPressTab(${i})"
+      ondblclick="event.stopPropagation();mapLongPressTab(${i})"
       style="flex-shrink:0;padding:10px 20px;border:none;background:none;font-family:var(--mono);font-size:14px;font-weight:${i===_mapActiveIdx?700:400};color:${i===_mapActiveIdx?'#1A1A1A':'#AAAAAA'};border-bottom:${i===_mapActiveIdx?'2px solid #1A1A1A':'2px solid transparent'};cursor:pointer;white-space:nowrap;transition:all 0.15s">
       ${esc(m.name)}
     </button>`).join('');
@@ -2069,35 +2072,34 @@ function _renderMapTabs() {
 
 function mapSelectTab(idx) {
   _mapActiveIdx = idx;
+  _mapEngineReady = false;
   _renderMapTabs();
-  _mapLoadImage(data.maps[idx].url);
-  mapResetView();
+  const maps = data.maps || [];
+  if (maps[idx]) _mapDoSizeAndLoad(maps[idx].url);
 }
 
-// Long-press or right-click tab → rename/delete menu
+/* ── Add / Rename / Delete ────────────── */
+function mapAddNew() {
+  _mapEditingId = null;
+  document.getElementById('modal-map-name-title').textContent = '新增地圖';
+  const inp = document.getElementById('map-name-input');
+  inp.value = '';
+  const delBtn = document.getElementById('map-delete-btn');
+  if (delBtn) delBtn.style.display = 'none';
+  document.getElementById('modal-map-name').classList.add('open');
+  inp.focus();
+}
+
 function mapLongPressTab(idx) {
-  const m = data.maps[idx];
+  const m = (data.maps || [])[idx];
   if (!m) return;
   _mapEditingId = m.id;
   _mapActiveIdx = idx;
   document.getElementById('modal-map-name-title').textContent = '地圖選項';
   const inp = document.getElementById('map-name-input');
   inp.value = m.name;
-  inp.readOnly = false;
-  document.getElementById('map-delete-btn').style.display = 'block';
-  document.getElementById('modal-map-name').classList.add('open');
-  // Tap the input to trigger keyboard on Safari
-  setTimeout(() => inp.focus(), 50);
-}
-
-// Add new map: prompt name first
-function mapAddNew() {
-  _mapEditingId = null;
-  document.getElementById('modal-map-name-title').textContent = '新增地圖';
-  const inp = document.getElementById('map-name-input');
-  inp.value = '';
-  inp.readOnly = false;
-  document.getElementById('map-delete-btn').style.display = 'none';
+  const delBtn = document.getElementById('map-delete-btn');
+  if (delBtn) delBtn.style.display = 'block';
   document.getElementById('modal-map-name').classList.add('open');
   inp.focus();
 }
@@ -2107,17 +2109,11 @@ function mapConfirmName() {
   closeModal('modal-map-name');
 
   if (_mapEditingId) {
-    // Rename existing map
-    const m = (data.maps||[]).find(m => m.id === _mapEditingId);
-    if (m) {
-      m.name = name;
-      save();
-      _renderMapTabs();
-    }
+    const m = (data.maps || []).find(m => m.id === _mapEditingId);
+    if (m) { m.name = name; save(); _renderMapTabs(); }
     return;
   }
 
-  // New map: pick image file
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
@@ -2144,93 +2140,42 @@ function mapConfirmName() {
 function mapDeleteCurrent() {
   if (!_mapEditingId) return;
   closeModal('modal-map-name');
-  data.maps = (data.maps||[]).filter(m => m.id !== _mapEditingId);
+  data.maps = (data.maps || []).filter(m => m.id !== _mapEditingId);
   _mapActiveIdx = Math.max(0, _mapActiveIdx - 1);
   save();
   renderMapSub();
 }
 
-// Legacy: keep onMapActionBtn pointing to mapAddNew
 function onMapActionBtn() { mapAddNew(); }
 
-
-
-function _mapSizeViewerSync() {
-  const header  = document.getElementById('map-sub-header');
-  const tabsBar = document.getElementById('map-tabs-bar');
-  const viewer  = document.getElementById('map-viewer');
-  if (!header || !viewer) return;
-  const hH = header.getBoundingClientRect().height;
-  const tH = (tabsBar && tabsBar.style.display !== 'none') ? tabsBar.getBoundingClientRect().height : 0;
-  viewer.style.top    = (hH + tH) + 'px';
-  viewer.style.bottom = '0';
-  viewer.style.height = '';
-}
-
-function _mapSizeViewer() {
-  const header  = document.getElementById('map-sub-header');
-  const tabsBar = document.getElementById('map-tabs-bar');
-  const viewer  = document.getElementById('map-viewer');
-  if (!header || !viewer) return;
-  requestAnimationFrame(() => {
-    const hH = header.getBoundingClientRect().height;
-    const tH = (tabsBar && tabsBar.style.display !== 'none') ? tabsBar.getBoundingClientRect().height : 0;
-    viewer.style.top    = (hH + tH) + 'px';
-    viewer.style.bottom = '0';
-    viewer.style.height = '';
-  });
-}
-let _mapScale = 1, _mapTx = 0, _mapTy = 0;
-let _mapDragging = false;
-let _mapLastX = 0, _mapLastY = 0;
-let _mapPinchDist = null;
-let _mapPinchMidX = 0, _mapPinchMidY = 0;
-let _mapEngineReady = false;
-const MAP_MAX_SCALE = 8;
-
-function _mapGetMinScale() {
-  return 1; // scale=1 is the initial fit state, don't zoom out further
-}
-
-function _mapClamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+/* ── Pan / Zoom Engine ────────────────── */
+function _mapGetMinScale() { return 1; }
+function _mapClamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
 function _mapConstrain() {
   const viewer = document.getElementById('map-viewer');
   const img    = document.getElementById('map-img');
   if (!viewer || !img) return;
   const vw = viewer.clientWidth || window.innerWidth;
-  const vh = viewer.clientHeight || (window.innerHeight - 120);
+  const vh = viewer.clientHeight || (window.innerHeight - 150);
   const renderedW = vw * _mapScale;
-  const renderedH = (img.naturalHeight / img.naturalWidth) * vw * _mapScale;
-  if (renderedW <= vw) _mapTx = (vw - renderedW) / 2;
-  else _mapTx = _mapClamp(_mapTx, vw - renderedW, 0);
-  if (renderedH <= vh) _mapTy = 0;
-  else _mapTy = _mapClamp(_mapTy, vh - renderedH, 0);
+  const aspect = img.naturalWidth ? (img.naturalHeight / img.naturalWidth) : 1.5;
+  const renderedH = vw * aspect * _mapScale;
+  _mapTx = renderedW <= vw ? (vw - renderedW) / 2 : _mapClamp(_mapTx, vw - renderedW, 0);
+  _mapTy = renderedH <= vh ? 0 : _mapClamp(_mapTy, vh - renderedH, 0);
 }
 
 function _mapApply(smooth) {
   const img = document.getElementById('map-img');
   if (!img) return;
-  img.style.transition = smooth ? 'transform 0.18s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none';
-  img.style.transform  = `translate(${_mapTx}px,${_mapTy}px) scale(${_mapScale})`;
+  img.style.transition   = smooth ? 'transform 0.18s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none';
+  img.style.transform    = `translate(${_mapTx}px,${_mapTy}px) scale(${_mapScale})`;
+  img.style.transformOrigin = '0 0';
 }
 
 function mapResetView() {
-  const viewer = document.getElementById('map-viewer');
-  const img    = document.getElementById('map-img');
-  if (!viewer || !img) return;
-  _mapSizeViewer();
-  requestAnimationFrame(() => {
-    const vw = viewer.clientWidth;
-    const vh = viewer.clientHeight;
-    const iw = img.naturalWidth  || vw;
-    const ih = img.naturalHeight || vh;
-    _mapScale = vh / (vw * (ih / iw));
-    const renderedW = vw * _mapScale;
-    _mapTx = (vw - renderedW) / 2;
-    _mapTy = 0;
-    _mapApply(true);
-  });
+  _mapScale = 1; _mapTx = 0; _mapTy = 0;
+  _mapApply(true);
 }
 
 function _mapZoomAt(px, py, factor) {
@@ -2243,15 +2188,9 @@ function _mapZoomAt(px, py, factor) {
   _mapApply(false);
 }
 
-function _mapDist(t1, t2) {
-  return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-}
-
+function _mapDist(t1, t2) { return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY); }
 function _mapMid(t1, t2, rect) {
-  return {
-    x: (t1.clientX + t2.clientX) / 2 - rect.left,
-    y: (t1.clientY + t2.clientY) / 2 - rect.top
-  };
+  return { x: (t1.clientX + t2.clientX) / 2 - rect.left, y: (t1.clientY + t2.clientY) / 2 - rect.top };
 }
 
 function mapInitPanZoom() {
@@ -2260,21 +2199,16 @@ function mapInitPanZoom() {
   if (!viewer || !img || _mapEngineReady) return;
   _mapEngineReady = true;
 
-  // Touch events
   viewer.addEventListener('touchstart', e => {
     img.style.transition = 'none';
     if (e.touches.length === 1) {
-      _mapDragging = true;
-      _mapLastX = e.touches[0].clientX;
-      _mapLastY = e.touches[0].clientY;
+      _mapDragging = true; _mapLastX = e.touches[0].clientX; _mapLastY = e.touches[0].clientY;
       _mapPinchDist = null;
     } else if (e.touches.length === 2) {
       _mapDragging = false;
       _mapPinchDist = _mapDist(e.touches[0], e.touches[1]);
-      const rect = viewer.getBoundingClientRect();
-      const mid  = _mapMid(e.touches[0], e.touches[1], rect);
-      _mapPinchMidX = mid.x;
-      _mapPinchMidY = mid.y;
+      const mid = _mapMid(e.touches[0], e.touches[1], viewer.getBoundingClientRect());
+      _mapPinchMidX = mid.x; _mapPinchMidY = mid.y;
     }
   }, { passive: true });
 
@@ -2283,20 +2217,13 @@ function mapInitPanZoom() {
     if (e.touches.length === 1 && _mapDragging && _mapPinchDist === null) {
       _mapTx += e.touches[0].clientX - _mapLastX;
       _mapTy += e.touches[0].clientY - _mapLastY;
-      _mapLastX = e.touches[0].clientX;
-      _mapLastY = e.touches[0].clientY;
-      _mapConstrain();
-      _mapApply(false);
+      _mapLastX = e.touches[0].clientX; _mapLastY = e.touches[0].clientY;
+      _mapConstrain(); _mapApply(false);
     } else if (e.touches.length === 2 && _mapPinchDist !== null) {
       const newDist = _mapDist(e.touches[0], e.touches[1]);
-      const rect = viewer.getBoundingClientRect();
-      const mid  = _mapMid(e.touches[0], e.touches[1], rect);
-      // pan from mid delta
-      _mapTx += mid.x - _mapPinchMidX;
-      _mapTy += mid.y - _mapPinchMidY;
-      _mapPinchMidX = mid.x;
-      _mapPinchMidY = mid.y;
-      // zoom
+      const mid = _mapMid(e.touches[0], e.touches[1], viewer.getBoundingClientRect());
+      _mapTx += mid.x - _mapPinchMidX; _mapTy += mid.y - _mapPinchMidY;
+      _mapPinchMidX = mid.x; _mapPinchMidY = mid.y;
       _mapZoomAt(mid.x, mid.y, newDist / _mapPinchDist);
       _mapPinchDist = newDist;
     }
@@ -2307,55 +2234,37 @@ function mapInitPanZoom() {
     if (e.touches.length === 0) _mapDragging = false;
   }, { passive: true });
 
-  // Mouse drag (desktop)
   viewer.addEventListener('mousedown', e => {
-    _mapDragging = true;
-    _mapLastX = e.clientX;
-    _mapLastY = e.clientY;
-    img.style.transition = 'none';
-    e.preventDefault();
+    _mapDragging = true; _mapLastX = e.clientX; _mapLastY = e.clientY;
+    img.style.transition = 'none'; e.preventDefault();
   });
   window.addEventListener('mousemove', e => {
     if (!_mapDragging) return;
-    _mapTx += e.clientX - _mapLastX;
-    _mapTy += e.clientY - _mapLastY;
-    _mapLastX = e.clientX;
-    _mapLastY = e.clientY;
-    _mapConstrain();
-    _mapApply(false);
+    _mapTx += e.clientX - _mapLastX; _mapTy += e.clientY - _mapLastY;
+    _mapLastX = e.clientX; _mapLastY = e.clientY;
+    _mapConstrain(); _mapApply(false);
   });
   window.addEventListener('mouseup', () => { _mapDragging = false; });
 
-  // Wheel zoom (desktop)
   viewer.addEventListener('wheel', e => {
     e.preventDefault();
     const rect = viewer.getBoundingClientRect();
-    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-    _mapZoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
+    _mapZoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 1/1.12);
   }, { passive: false });
 }
 
 function _mapLoadImage(url) {
   const img    = document.getElementById('map-img');
-  const viewer = document.getElementById('map-viewer');
-  if (!img) return;
-
+  if (!img || !url) return;
   _mapScale = 1; _mapTx = 0; _mapTy = 0;
-  _mapEngineReady = false;
-  img.style.transform = 'none';
-  img.style.width  = '100%';
-  img.style.height = 'auto';
-
+  img.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:auto;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;display:block';
   img.onload = () => {
-    // scale=1, width:100% — image naturally fills viewer width
-    // No need for clientHeight calculation
-    _mapScale = 1; _mapTx = 0; _mapTy = 0;
     _mapApply(false);
-    _mapSizeViewer();
     mapInitPanZoom();
   };
   img.onerror = () => showToast('地圖圖片載入失敗');
-  img.src = url;
+  if (img.src !== url) img.src = url;
+  else if (img.complete && img.naturalWidth) { _mapApply(false); mapInitPanZoom(); }
 }
 
 /* ─── Checklist ─── */
