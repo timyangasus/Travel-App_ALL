@@ -1067,7 +1067,12 @@ function renderDayTabs() {
     const b = document.createElement('button');
     b.className = 'day-tab' + (i === currentDay ? ' active' : '');
     b.textContent = i + 1;
-    b.onclick = () => { currentDay = i; renderItinerary(); };
+    b.onclick = () => {
+      currentDay = i;
+      renderItinerary();
+      const screen = document.getElementById('screen-itinerary');
+      if (screen) screen.scrollTop = 0;
+    };
 
     // Long-press to delete
     let pressTimer = null;
@@ -1740,7 +1745,8 @@ function initExpenseSwipe() {
     }
     renderExpenseDayTabs();
     renderExpenseList();
-  }, { passive: true });
+    const list = document.getElementById('expense-list');
+    if (list) list.scrollTop = 0;
 }
 
 function renderExpenseDayTabs() {
@@ -1761,12 +1767,11 @@ function renderExpenseDayTabs() {
 
 function switchExpDay(i) {
   const total = data.days.length;
-  expenseDay = ((i % total) + total) % total; // circular
+  expenseDay = ((i % total) + total) % total;
   renderExpenseDayTabs();
   renderExpenseList();
-  // Reset scroll to top when switching days
-  const screen = document.getElementById('screen-expense');
-  if (screen) screen.scrollTop = 0;
+  const list = document.getElementById('expense-list');
+  if (list) list.scrollTop = 0;
 }
 
 function renderExpenseList() {
