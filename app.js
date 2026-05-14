@@ -2057,8 +2057,11 @@ function _mapShow(url) {
   _mapEngineReady = false;
 
   function render() {
-    const vw = viewer.offsetWidth  || window.innerWidth;
-    const vh = viewer.offsetHeight || (window.innerHeight - 140);
+    const vw = window.innerWidth;
+    const headerH = document.getElementById('map-sub-header')?.offsetHeight || 56;
+    const tabBarEl = document.getElementById('tab-bar') || document.querySelector('nav') || document.querySelector('.tab-bar');
+    const tabBarH = tabBarEl?.offsetHeight || 83;
+    const vh = window.innerHeight - headerH - tabBarH;
     const iw = img.naturalWidth;
     const ih = img.naturalHeight;
     if (!iw || !ih) return;
@@ -2155,12 +2158,17 @@ function onMapActionBtn() { mapAddNew(); }
 // ── Pan / Zoom ────────────────────────────
 function _mapClamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
+function _mapVWH() {
+  const headerH = document.getElementById('map-sub-header')?.offsetHeight || 56;
+  const tabBarEl = document.getElementById('tab-bar') || document.querySelector('nav') || document.querySelector('.tab-bar');
+  const tabBarH = tabBarEl?.offsetHeight || 83;
+  return { vw: window.innerWidth, vh: window.innerHeight - headerH - tabBarH };
+}
+
 function _mapConstrain() {
-  const img    = document.getElementById('map-img');
-  const viewer = document.getElementById('map-viewer');
-  if (!img || !viewer || !img.naturalWidth) return;
-  const vw = viewer.offsetWidth  || window.innerWidth;
-  const vh = viewer.offsetHeight || (window.innerHeight - 140);
+  const img = document.getElementById('map-img');
+  if (!img || !img.naturalWidth) return;
+  const { vw, vh } = _mapVWH();
   const rw = img.naturalWidth  * _mapScale;
   const rh = img.naturalHeight * _mapScale;
   _mapTx = rw <= vw ? (vw - rw) / 2 : _mapClamp(_mapTx, vw - rw, 0);
@@ -2170,17 +2178,15 @@ function _mapConstrain() {
 function _mapApply(smooth) {
   const img = document.getElementById('map-img');
   if (!img) return;
-  img.style.transition     = smooth ? 'transform 0.18s ease' : 'none';
-  img.style.transform      = 'translate(' + _mapTx + 'px,' + _mapTy + 'px) scale(' + _mapScale + ')';
+  img.style.transition      = smooth ? 'transform 0.18s ease' : 'none';
+  img.style.transform       = 'translate(' + _mapTx + 'px,' + _mapTy + 'px) scale(' + _mapScale + ')';
   img.style.transformOrigin = '0 0';
 }
 
 function mapResetView() {
-  const img    = document.getElementById('map-img');
-  const viewer = document.getElementById('map-viewer');
-  if (!img || !viewer || !img.naturalWidth) return;
-  const vw = viewer.offsetWidth  || window.innerWidth;
-  const vh = viewer.offsetHeight || (window.innerHeight - 140);
+  const img = document.getElementById('map-img');
+  if (!img || !img.naturalWidth) return;
+  const { vw, vh } = _mapVWH();
   _mapScale = Math.min(vw / img.naturalWidth, vh / img.naturalHeight);
   _mapTx = (vw - img.naturalWidth  * _mapScale) / 2;
   _mapTy = (vh - img.naturalHeight * _mapScale) / 2;
