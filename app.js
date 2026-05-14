@@ -1747,6 +1747,7 @@ function initExpenseSwipe() {
     renderExpenseList();
     const list = document.getElementById('expense-list');
     if (list) list.scrollTop = 0;
+  }, { passive: true });
 }
 
 function renderExpenseDayTabs() {
