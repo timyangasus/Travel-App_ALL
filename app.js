@@ -2039,8 +2039,9 @@ function renderMapSub() {
 
   _mapActiveIdx = Math.min(_mapActiveIdx, maps.length - 1);
   _renderMapTabs();
+  // Size viewer synchronously first, then load image
+  _mapSizeViewerSync();
   _mapLoadImage(maps[_mapActiveIdx].url);
-  _mapSizeViewer();
 }
 
 function _renderMapTabs() {
@@ -2144,6 +2145,18 @@ function onMapActionBtn() { mapAddNew(); }
 
 
 
+function _mapSizeViewerSync() {
+  const header  = document.getElementById('map-sub-header');
+  const tabsBar = document.getElementById('map-tabs-bar');
+  const viewer  = document.getElementById('map-viewer');
+  if (!header || !viewer) return;
+  const hH = header.getBoundingClientRect().height;
+  const tH = (tabsBar && tabsBar.style.display !== 'none') ? tabsBar.getBoundingClientRect().height : 0;
+  viewer.style.top    = (hH + tH) + 'px';
+  viewer.style.bottom = '0';
+  viewer.style.height = '';
+}
+
 function _mapSizeViewer() {
   const header  = document.getElementById('map-sub-header');
   const tabsBar = document.getElementById('map-tabs-bar');
@@ -2151,7 +2164,7 @@ function _mapSizeViewer() {
   if (!header || !viewer) return;
   requestAnimationFrame(() => {
     const hH = header.getBoundingClientRect().height;
-    const tH = tabsBar ? tabsBar.getBoundingClientRect().height : 0;
+    const tH = (tabsBar && tabsBar.style.display !== 'none') ? tabsBar.getBoundingClientRect().height : 0;
     viewer.style.top    = (hH + tH) + 'px';
     viewer.style.bottom = '0';
     viewer.style.height = '';
