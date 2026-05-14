@@ -1988,45 +1988,108 @@ function openPhotoLightbox(url) {
 ═══════════════════════════════════════ */
 
 /* ─── Render / state ─── */
+/* ═══════════════════════════════════════
+   MAP MODULE — Multi-map with tabs
+═══════════════════════════════════════ */
+let _mapActiveIdx = 0;
+let _mapEditingId = null; // for rename
+
 function renderMapSub() {
-  const maps = data.maps || [];
-  const hasMap = maps.length > 0;
-
-  const emptyEl     = document.getElementById('map-empty-state');
-  const viewerEl    = document.getElementById('map-viewer');
-  const iconAdd     = document.getElementById('map-action-icon-add');
-  const iconRefresh = document.getElementById('map-action-icon-refresh');
-
-  if (hasMap) {
-    emptyEl.style.display     = 'none';
-    viewerEl.style.display    = 'block';
-    iconAdd.style.display     = 'none';
-    iconRefresh.style.display = '';
-    // Position viewer: top = below header, bottom = above tab bar
-    _mapSizeViewer();
-    const m = maps[maps.length - 1];
-    _mapLoadImage(m.url);
-  } else {
-    emptyEl.style.display     = 'flex';
-    viewerEl.style.display    = 'none';
-    iconAdd.style.display     = '';
-    iconRefresh.style.display = 'none';
-  }
-}
-
-function _mapSizeViewer() {
-  const header   = document.getElementById('map-sub-header');
-  const viewerEl = document.getElementById('map-viewer');
-  if (!header || !viewerEl) return;
-  requestAnimationFrame(() => {
-    const topPx = header.getBoundingClientRect().height + 15; // 15px gap below header
-    viewerEl.style.top    = topPx + 'px';
-    viewerEl.style.bottom = '0';
-    viewerEl.style.height = '';
+  if (!data.maps) data.maps = [];
+  // migrate old single-map format
+  data.maps = data.maps.map(m => {
+    if (!m.id) m.id = Date.now() + Math.random();
+    if (!m.name) m.name = '地圖';
+    return m;
   });
+
+  const maps = data.maps;
+  const emptyEl  = document.getElementById('map-empty-state');
+  const viewerEl = document.getElementById('map-viewer');
+  const tabsBar  = document.getElementById('map-tabs-bar');
+
+  if (!maps.length) {
+    emptyEl.style.display  = 'flex';
+    viewerEl.style.display = 'none';
+    tabsBar.style.display  = 'none';
+    return;
+  }
+
+  emptyEl.style.display  = 'none';
+  viewerEl.style.display = 'flex';
+  tabsBar.style.display  = 'block';
+
+  _mapActiveIdx = Math.min(_mapActiveIdx, maps.length - 1);
+  _renderMapTabs();
+  _mapLoadImage(maps[_mapActiveIdx].url);
+  _mapSizeViewer();
 }
 
-function onMapActionBtn() {
+function _renderMapTabs() {
+  const maps  = data.maps || [];
+  const tabsEl = document.getElementById('map-tabs');
+  if (!tabsEl) return;
+  tabsEl.innerHTML = maps.map((m, i) => `
+    <button onclick="mapSelectTab(${i})"
+      oncontextmenu="event.preventDefault();mapLongPressTab(${i})"
+      style="flex-shrink:0;padding:10px 16px;border:none;background:none;font-family:var(--mono);font-size:14px;font-weight:${i===_mapActiveIdx?700:400};color:${i===_mapActiveIdx?'#1A1A1A':'#AAAAAA'};border-bottom:${i===_mapActiveIdx?'2px solid #1A1A1A':'2px solid transparent'};cursor:pointer;white-space:nowrap;transition:all 0.15s">
+      ${esc(m.name)}
+    </button>`).join('');
+}
+
+function mapSelectTab(idx) {
+  _mapActiveIdx = idx;
+  _renderMapTabs();
+  _mapLoadImage(data.maps[idx].url);
+  mapResetView();
+}
+
+// Long-press or right-click tab → rename/delete menu
+function mapLongPressTab(idx) {
+  const m = data.maps[idx];
+  if (!m) return;
+  _mapEditingId = m.id;
+  document.getElementById('modal-map-name-title').textContent = '地圖選項';
+  document.getElementById('map-name-input').value = m.name;
+  // Show delete button
+  let delBtn = document.getElementById('map-delete-btn');
+  if (!delBtn) {
+    delBtn = document.createElement('button');
+    delBtn.id = 'map-delete-btn';
+    delBtn.className = 'modal-btn';
+    delBtn.style.cssText = 'background:none;border:1px solid #E53935;color:#E53935;flex:1';
+    delBtn.textContent = '刪除此地圖';
+    delBtn.onclick = mapDeleteCurrent;
+    document.querySelector('#modal-map-name .modal-btn-row').prepend(delBtn);
+  }
+  delBtn.style.display = '';
+  document.getElementById('modal-map-name').classList.add('open');
+  setTimeout(() => document.getElementById('map-name-input')?.focus(), 340);
+}
+
+// Add new map: prompt name first
+function mapAddNew() {
+  _mapEditingId = null;
+  document.getElementById('modal-map-name-title').textContent = '新增地圖';
+  document.getElementById('map-name-input').value = '';
+  const delBtn = document.getElementById('map-delete-btn');
+  if (delBtn) delBtn.style.display = 'none';
+  document.getElementById('modal-map-name').classList.add('open');
+  setTimeout(() => document.getElementById('map-name-input')?.focus(), 340);
+}
+
+function mapConfirmName() {
+  const name = document.getElementById('map-name-input').value.trim() || '地圖';
+  closeModal('modal-map-name');
+
+  if (_mapEditingId) {
+    // Rename
+    const m = (data.maps||[]).find(m => m.id === _mapEditingId);
+    if (m) { m.name = name; save(); renderMapSub(); }
+    return;
+  }
+
+  // New map: pick image
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
@@ -2037,7 +2100,8 @@ function onMapActionBtn() {
     try {
       const url = await uploadToImgBB(file);
       if (!data.maps) data.maps = [];
-      data.maps = [{ name: file.name || '地圖', url }];
+      data.maps.push({ id: Date.now(), name, url });
+      _mapActiveIdx = data.maps.length - 1;
       save();
       showUploadStatus('');
       renderMapSub();
@@ -2049,7 +2113,23 @@ function onMapActionBtn() {
   input.click();
 }
 
-/* ─── Pan / Zoom Engine (曼谷地圖寫法) ─── */
+function mapDeleteCurrent() {
+  if (!_mapEditingId) return;
+  closeModal('modal-map-name');
+  data.maps = (data.maps||[]).filter(m => m.id !== _mapEditingId);
+  _mapActiveIdx = Math.max(0, _mapActiveIdx - 1);
+  save();
+  renderMapSub();
+}
+
+// Legacy: keep onMapActionBtn pointing to mapAddNew
+function onMapActionBtn() { mapAddNew(); }
+
+
+
+function _mapSizeViewer() {
+  // flex layout handles sizing automatically
+}
 let _mapScale = 1, _mapTx = 0, _mapTy = 0;
 let _mapDragging = false;
 let _mapLastX = 0, _mapLastY = 0;
