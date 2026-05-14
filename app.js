@@ -1070,10 +1070,8 @@ function renderDayTabs() {
     b.onclick = () => {
       currentDay = i;
       renderItinerary();
-      requestAnimationFrame(() => {
-        const timeline = document.getElementById('timeline-section');
-        if (timeline) timeline.scrollTop = 0;
-      });
+      const timeline = document.getElementById('timeline-section');
+      if (timeline) timeline.scrollTop = 0;
     };
 
     // Long-press to delete
@@ -2165,10 +2163,11 @@ function _mapConstrain() {
   if (!viewer || !img || !img.naturalWidth) return;
   const vw = viewer.clientWidth  || window.innerWidth;
   const vh = viewer.clientHeight || (window.innerHeight - 150);
-  const renderedW = img.naturalWidth  * _mapScale;
-  const renderedH = img.naturalHeight * _mapScale;
-  _mapTx = renderedW <= vw ? (vw - renderedW) / 2 : _mapClamp(_mapTx, vw - renderedW, 0);
-  _mapTy = renderedH <= vh ? (vh - renderedH) / 2 : _mapClamp(_mapTy, vh - renderedH, 0);
+  const rw = img.naturalWidth  * _mapScale;
+  const rh = img.naturalHeight * _mapScale;
+  // Center if smaller than viewer, clamp if larger
+  _mapTx = rw <= vw ? (vw - rw) / 2 : _mapClamp(_mapTx, vw - rw, 0);
+  _mapTy = rh <= vh ? (vh - rh) / 2 : _mapClamp(_mapTy, vh - rh, 0);
 }
 
 function _mapApply(smooth) {
@@ -2279,10 +2278,10 @@ function _mapLoadImage(url) {
     const iw = img.naturalWidth  || vw;
     const ih = img.naturalHeight || vh;
 
-    // Scale to fit width, let user scroll down for rest
-    _mapScale = vw / iw;
-    _mapTx = 0;
-    _mapTy = 0;
+    // Scale to fit entire image within viewer (both width and height)
+    _mapScale = Math.min(vw / iw, vh / ih);
+    _mapTx = (vw - iw * _mapScale) / 2;
+    _mapTy = (vh - ih * _mapScale) / 2;
 
     // Set img to natural size, use transform for scale/position
     img.style.width  = iw + 'px';
