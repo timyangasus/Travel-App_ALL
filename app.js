@@ -1070,10 +1070,10 @@ function renderDayTabs() {
     b.onclick = () => {
       currentDay = i;
       renderItinerary();
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         const screen = document.getElementById('screen-itinerary');
         if (screen) screen.scrollTop = 0;
-      }, 50);
+      });
     };
 
     // Long-press to delete
@@ -2149,20 +2149,26 @@ function mapDeleteCurrent() {
 function onMapActionBtn() { mapAddNew(); }
 
 /* ── Pan / Zoom Engine ────────────────── */
-function _mapGetMinScale() { return 1; }
+function _mapGetMinScale() {
+  const viewer = document.getElementById('map-viewer');
+  const img    = document.getElementById('map-img');
+  if (!viewer || !img || !img.naturalWidth) return 0.1;
+  const vw = viewer.clientWidth  || window.innerWidth;
+  const vh = viewer.clientHeight || (window.innerHeight - 150);
+  return Math.min(vw / img.naturalWidth, vh / img.naturalHeight);
+}
 function _mapClamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
 function _mapConstrain() {
   const viewer = document.getElementById('map-viewer');
   const img    = document.getElementById('map-img');
-  if (!viewer || !img) return;
-  const vw = viewer.clientWidth || window.innerWidth;
+  if (!viewer || !img || !img.naturalWidth) return;
+  const vw = viewer.clientWidth  || window.innerWidth;
   const vh = viewer.clientHeight || (window.innerHeight - 150);
-  const renderedW = vw * _mapScale;
-  const aspect = img.naturalWidth ? (img.naturalHeight / img.naturalWidth) : 1.5;
-  const renderedH = vw * aspect * _mapScale;
+  const renderedW = img.naturalWidth  * _mapScale;
+  const renderedH = img.naturalHeight * _mapScale;
   _mapTx = renderedW <= vw ? (vw - renderedW) / 2 : _mapClamp(_mapTx, vw - renderedW, 0);
-  _mapTy = renderedH <= vh ? 0 : _mapClamp(_mapTy, vh - renderedH, 0);
+  _mapTy = renderedH <= vh ? (vh - renderedH) / 2 : _mapClamp(_mapTy, vh - renderedH, 0);
 }
 
 function _mapApply(smooth) {
@@ -2174,7 +2180,14 @@ function _mapApply(smooth) {
 }
 
 function mapResetView() {
-  _mapScale = 1; _mapTx = 0; _mapTy = 0;
+  const viewer = document.getElementById('map-viewer');
+  const img    = document.getElementById('map-img');
+  if (!viewer || !img || !img.naturalWidth) return;
+  const vw = viewer.clientWidth  || window.innerWidth;
+  const vh = viewer.clientHeight || (window.innerHeight - 150);
+  _mapScale = Math.min(vw / img.naturalWidth, vh / img.naturalHeight);
+  _mapTx = (vw - img.naturalWidth  * _mapScale) / 2;
+  _mapTy = (vh - img.naturalHeight * _mapScale) / 2;
   _mapApply(true);
 }
 
@@ -2255,16 +2268,35 @@ function mapInitPanZoom() {
 
 function _mapLoadImage(url) {
   const img    = document.getElementById('map-img');
+  const viewer = document.getElementById('map-viewer');
   if (!img || !url) return;
   _mapScale = 1; _mapTx = 0; _mapTy = 0;
-  img.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:auto;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;display:block';
+  img.style.cssText = 'position:absolute;top:0;left:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;display:block;width:100%;height:auto';
+
   img.onload = () => {
+    const vw = viewer.clientWidth  || window.innerWidth;
+    const vh = viewer.clientHeight || (window.innerHeight - 150);
+    const iw = img.naturalWidth  || vw;
+    const ih = img.naturalHeight || vh;
+
+    // Scale to fit height, center horizontally
+    const scaleH = vh / ih;
+    const scaleW = vw / iw;
+    _mapScale = Math.min(scaleH, scaleW); // fit entire image
+    const renderedW = iw * _mapScale;
+    const renderedH = ih * _mapScale;
+    _mapTx = (vw - renderedW) / 2;
+    _mapTy = (vh - renderedH) / 2;
+
+    // Set img to natural size, use transform for scale/position
+    img.style.width  = iw + 'px';
+    img.style.height = ih + 'px';
     _mapApply(false);
     mapInitPanZoom();
   };
   img.onerror = () => showToast('地圖圖片載入失敗');
   if (img.src !== url) img.src = url;
-  else if (img.complete && img.naturalWidth) { _mapApply(false); mapInitPanZoom(); }
+  else if (img.complete && img.naturalWidth) { img.onload(); }
 }
 
 /* ─── Checklist ─── */
