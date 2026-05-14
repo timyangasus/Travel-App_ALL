@@ -104,7 +104,7 @@
     </div>
 
     <!-- Map Viewer -->
-    <div id="map-viewer" style="display:none;flex:1;position:relative;overflow:hidden;background:#F0F0F0;touch-action:none">
+    <div id="map-viewer" style="display:none;position:absolute;left:0;right:0;bottom:0;overflow:hidden;background:#F0F0F0;touch-action:none">
       <img id="map-img" src="" alt="map"
         style="position:absolute;top:0;left:0;width:100%;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;display:block"/>
       <button id="map-reset-btn" onclick="mapResetView()"
@@ -122,11 +122,12 @@
       <div class="modal-body" style="padding:0 20px 20px">
         <div class="ff-label">地圖名稱</div>
         <input class="ff-input" id="map-name-input" placeholder="" style="font-size:18px;font-weight:700">
-        <div style="margin-top:16px">
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
           <div class="modal-btn-row" style="padding:0">
             <button class="modal-btn modal-btn-cancel" onclick="closeModal('modal-map-name')">取消</button>
             <button class="modal-btn modal-btn-save" onclick="mapConfirmName()">完成</button>
           </div>
+          <button id="map-delete-btn" onclick="mapDeleteCurrent()" style="display:none;width:100%;padding:14px;background:none;border:1px solid #E53935;color:#E53935;font-family:var(--mono);font-size:15px;cursor:pointer;box-sizing:border-box">刪除此地圖</button>
         </div>
       </div>
     </div>

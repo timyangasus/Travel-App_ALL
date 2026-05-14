@@ -1996,17 +1996,20 @@ let _mapEditingId = null; // for rename
 
 function renderMapSub() {
   if (!data.maps) data.maps = [];
-  // migrate old single-map format
+  // migrate old single-map format, strip file extension from name
   data.maps = data.maps.map(m => {
     if (!m.id) m.id = Date.now() + Math.random();
     if (!m.name) m.name = '地圖';
+    m.name = m.name.replace(/\.[a-zA-Z]{2,5}$/, ''); // strip .jpeg .png etc
+    if (!m.name) m.name = '地圖';
     return m;
   });
+  save();
 
-  const maps = data.maps;
-  const emptyEl  = document.getElementById('map-empty-state');
-  const viewerEl = document.getElementById('map-viewer');
-  const tabsBar  = document.getElementById('map-tabs-bar');
+  const maps    = data.maps;
+  const emptyEl = document.getElementById('map-empty-state');
+  const viewerEl= document.getElementById('map-viewer');
+  const tabsBar = document.getElementById('map-tabs-bar');
 
   if (!maps.length) {
     emptyEl.style.display  = 'flex';
@@ -2016,7 +2019,7 @@ function renderMapSub() {
   }
 
   emptyEl.style.display  = 'none';
-  viewerEl.style.display = 'flex';
+  viewerEl.style.display = 'block';
   tabsBar.style.display  = 'block';
 
   _mapActiveIdx = Math.min(_mapActiveIdx, maps.length - 1);
@@ -2049,20 +2052,10 @@ function mapLongPressTab(idx) {
   const m = data.maps[idx];
   if (!m) return;
   _mapEditingId = m.id;
+  _mapActiveIdx = idx;
   document.getElementById('modal-map-name-title').textContent = '地圖選項';
   document.getElementById('map-name-input').value = m.name;
-  // Show delete button
-  let delBtn = document.getElementById('map-delete-btn');
-  if (!delBtn) {
-    delBtn = document.createElement('button');
-    delBtn.id = 'map-delete-btn';
-    delBtn.className = 'modal-btn';
-    delBtn.style.cssText = 'background:none;border:1px solid #E53935;color:#E53935;flex:1';
-    delBtn.textContent = '刪除此地圖';
-    delBtn.onclick = mapDeleteCurrent;
-    document.querySelector('#modal-map-name .modal-btn-row').prepend(delBtn);
-  }
-  delBtn.style.display = '';
+  document.getElementById('map-delete-btn').style.display = 'block';
   document.getElementById('modal-map-name').classList.add('open');
   setTimeout(() => document.getElementById('map-name-input')?.focus(), 340);
 }
@@ -2072,8 +2065,7 @@ function mapAddNew() {
   _mapEditingId = null;
   document.getElementById('modal-map-name-title').textContent = '新增地圖';
   document.getElementById('map-name-input').value = '';
-  const delBtn = document.getElementById('map-delete-btn');
-  if (delBtn) delBtn.style.display = 'none';
+  document.getElementById('map-delete-btn').style.display = 'none';
   document.getElementById('modal-map-name').classList.add('open');
   setTimeout(() => document.getElementById('map-name-input')?.focus(), 340);
 }
@@ -2128,7 +2120,15 @@ function onMapActionBtn() { mapAddNew(); }
 
 
 function _mapSizeViewer() {
-  // flex layout handles sizing automatically
+  const header  = document.getElementById('map-sub-header');
+  const tabsBar = document.getElementById('map-tabs-bar');
+  const viewer  = document.getElementById('map-viewer');
+  if (!viewer) return;
+  requestAnimationFrame(() => {
+    const hH = header?.getBoundingClientRect().height || 0;
+    const tH = tabsBar?.getBoundingClientRect().height || 0;
+    viewer.style.top = (hH + tH) + 'px';
+  });
 }
 let _mapScale = 1, _mapTx = 0, _mapTy = 0;
 let _mapDragging = false;
@@ -3358,7 +3358,7 @@ function renderFlightCards() {
         ${tear}
         ${ibSeg}
       </div>
-      ${f.url ? `<div class="fc2-url-row" onclick="event.stopPropagation();window.open(${JSON.stringify(f.url)},'_blank')">${esc(f.url)}</div>` : ''}
+      ${f.url ? `<div class="fc2-url-row" onclick="event.stopPropagation();event.preventDefault();window.open(${JSON.stringify(f.url)},'_blank');return false">${esc(f.url)}</div>` : ''}
     </div>`;
   }).join('');
 }
