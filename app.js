@@ -2039,9 +2039,10 @@ function renderMapSub() {
 
   _mapActiveIdx = Math.min(_mapActiveIdx, maps.length - 1);
   _renderMapTabs();
-  // Size viewer synchronously first, then load image
-  _mapSizeViewerSync();
-  _mapLoadImage(maps[_mapActiveIdx].url);
+  setTimeout(() => {
+    _mapSizeViewerSync();
+    _mapLoadImage(maps[_mapActiveIdx].url);
+  }, 50);
 }
 
 function _renderMapTabs() {
