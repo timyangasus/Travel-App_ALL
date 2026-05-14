@@ -2166,13 +2166,11 @@ const MAP_MAX_SCALE = 8;
 function _mapGetMinScale() {
   const viewer = document.getElementById('map-viewer');
   const img    = document.getElementById('map-img');
-  if (!viewer || !img || !img.naturalWidth) return 1;
-  const vw = viewer.clientWidth;
-  const vh = viewer.clientHeight;
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
-  // Min scale = fit height exactly — cannot zoom out further
-  return vh / (vw * (ih / iw));
+  if (!viewer || !img || !img.naturalWidth) return 0.1;
+  const vw = viewer.clientWidth, vh = viewer.clientHeight;
+  const iw = img.naturalWidth,   ih = img.naturalHeight;
+  // Min = fit entire image within viewer
+  return Math.min(vw / iw, vh / ih);
 }
 
 function _mapClamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
@@ -2183,9 +2181,8 @@ function _mapConstrain() {
   if (!viewer || !img) return;
   const vw = viewer.clientWidth, vh = viewer.clientHeight;
   const iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
-  const renderedW = vw * _mapScale;
-  const renderedH = vw * (ih / iw) * _mapScale;
-  // Allow free pan when image smaller than viewport
+  const renderedW = iw * _mapScale;
+  const renderedH = ih * _mapScale;
   if (renderedW <= vw) _mapTx = (vw - renderedW) / 2;
   else _mapTx = _mapClamp(_mapTx, vw - renderedW, 0);
   if (renderedH <= vh) _mapTy = (vh - renderedH) / 2;
@@ -2203,17 +2200,14 @@ function _mapApply(smooth) {
 function mapResetView() {
   const viewer = document.getElementById('map-viewer');
   const img    = document.getElementById('map-img');
-  if (!viewer || !img) return;
+  if (!viewer || !img || !img.naturalWidth) return;
   _mapSizeViewer();
   requestAnimationFrame(() => {
-    const vw = viewer.clientWidth;
-    const vh = viewer.clientHeight;
-    const iw = img.naturalWidth  || vw;
-    const ih = img.naturalHeight || vh;
-    _mapScale = vh / (vw * (ih / iw));
-    const renderedW = vw * _mapScale;
-    _mapTx = (vw - renderedW) / 2;
-    _mapTy = 0;
+    const vw = viewer.clientWidth, vh = viewer.clientHeight;
+    const iw = img.naturalWidth,   ih = img.naturalHeight;
+    _mapScale = Math.min(vw / iw, vh / ih);
+    _mapTx = (vw - iw * _mapScale) / 2;
+    _mapTy = (vh - ih * _mapScale) / 2;
     _mapApply(true);
   });
 }
