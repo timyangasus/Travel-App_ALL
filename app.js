@@ -2203,49 +2203,50 @@ let _mapPinchMidX = 0, _mapPinchMidY = 0;
 let _mapEngineReady = false;
 const MAP_MAX_SCALE = 8;
 
+function _mapVH() {
+  const headerH = document.getElementById('map-sub-header')?.getBoundingClientRect().height || 56;
+  const tabBarH = document.querySelector('.tab-bar')?.getBoundingClientRect().height || 83;
+  return window.innerHeight - headerH - tabBarH;
+}
+
 function _mapGetMinScale() {
-  return 1; // scale=1 is the initial fit state, don't zoom out further
+  const img = document.getElementById('map-img');
+  if (!img || !img.naturalWidth) return 0.1;
+  const vw = window.innerWidth;
+  const vh = _mapVH();
+  return Math.min(vw / img.naturalWidth, vh / img.naturalHeight);
 }
 
 function _mapClamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
 
 function _mapConstrain() {
-  const viewer = document.getElementById('map-viewer');
-  const img    = document.getElementById('map-img');
-  if (!viewer || !img) return;
-  const vw = viewer.clientWidth || window.innerWidth;
-  const vh = viewer.clientHeight || (window.innerHeight - 120);
-  const renderedW = vw * _mapScale;
-  const renderedH = (img.naturalHeight / img.naturalWidth) * vw * _mapScale;
-  if (renderedW <= vw) _mapTx = (vw - renderedW) / 2;
-  else _mapTx = _mapClamp(_mapTx, vw - renderedW, 0);
-  if (renderedH <= vh) _mapTy = 0;
-  else _mapTy = _mapClamp(_mapTy, vh - renderedH, 0);
+  const img = document.getElementById('map-img');
+  if (!img || !img.naturalWidth) return;
+  const vw = window.innerWidth;
+  const vh = _mapVH();
+  const rw = img.naturalWidth  * _mapScale;
+  const rh = img.naturalHeight * _mapScale;
+  _mapTx = rw <= vw ? (vw - rw) / 2 : _mapClamp(_mapTx, vw - rw, 0);
+  _mapTy = rh <= vh ? (vh - rh) / 2 : _mapClamp(_mapTy, vh - rh, 0);
 }
 
 function _mapApply(smooth) {
   const img = document.getElementById('map-img');
   if (!img) return;
+  img.style.transformOrigin = '0 0';
   img.style.transition = smooth ? 'transform 0.18s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none';
   img.style.transform  = `translate(${_mapTx}px,${_mapTy}px) scale(${_mapScale})`;
 }
 
 function mapResetView() {
-  const viewer = document.getElementById('map-viewer');
-  const img    = document.getElementById('map-img');
-  if (!viewer || !img) return;
-  _mapSizeViewer();
-  requestAnimationFrame(() => {
-    const vw = viewer.clientWidth;
-    const vh = viewer.clientHeight;
-    const iw = img.naturalWidth  || vw;
-    const ih = img.naturalHeight || vh;
-    _mapScale = vh / (vw * (ih / iw));
-    const renderedW = vw * _mapScale;
-    _mapTx = (vw - renderedW) / 2;
-    _mapTy = 0;
-    _mapApply(true);
-  });
+  const img = document.getElementById('map-img');
+  if (!img || !img.naturalWidth) return;
+  const vw = window.innerWidth;
+  const vh = _mapVH();
+  _mapScale = Math.min(vw / img.naturalWidth, vh / img.naturalHeight);
+  _mapTx = (vw - img.naturalWidth  * _mapScale) / 2;
+  _mapTy = (vh - img.naturalHeight * _mapScale) / 2;
+  _mapApply(true);
 }
 
 function _mapZoomAt(px, py, factor) {
@@ -2362,14 +2363,15 @@ function _mapLoadImage(url) {
   img.onload = () => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const vw = viewer.clientWidth  || window.innerWidth;
-        const vh = viewer.clientHeight || (window.innerHeight - 56);
+        const vw = window.innerWidth;
+        const vh = _mapVH();
         const iw = img.naturalWidth  || vw;
         const ih = img.naturalHeight || vh;
-        _mapScale = vh / (vw * (ih / iw));
-        const renderedW = vw * _mapScale;
-        _mapTx = (vw - renderedW) / 2;
-        _mapTy = 0;
+        _mapScale = Math.min(vw / iw, vh / ih);
+        _mapTx = (vw - iw * _mapScale) / 2;
+        _mapTy = (vh - ih * _mapScale) / 2;
+        img.style.width  = iw + 'px';
+        img.style.height = ih + 'px';
         _mapApply(false);
         mapInitPanZoom();
       });
