@@ -997,6 +997,7 @@ function renderItinerary() {
   renderDayTabs();
   renderBanner();
   renderTimeline();
+  initItinerarySwipe();
 }
 
 /* ─── Custom Confirm Dialog ─── */
@@ -1070,8 +1071,8 @@ function renderDayTabs() {
     b.onclick = () => {
       currentDay = i;
       renderItinerary();
-      const timeline = document.getElementById('timeline-section');
-      if (timeline) timeline.scrollTop = 0;
+      const tl = document.getElementById('timeline-section');
+      if (tl) tl.scrollTop = 0;
     };
 
     // Long-press to delete
@@ -1721,7 +1722,35 @@ function renderExpense() {
   initExpenseSwipe();
 }
 
-let _expSwipeInited = false;
+let _itinSwipeInited = false;
+function initItinerarySwipe() {
+  if (_itinSwipeInited) return;
+  _itinSwipeInited = true;
+  const screen = document.getElementById('screen-itinerary');
+  if (!screen) return;
+  let startX = 0, startY = 0;
+  screen.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  screen.addEventListener('touchend', e => {
+    if (!data) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
+    const total = data.days.length;
+    if (dx < 0) {
+      currentDay = (currentDay + 1) % total;
+    } else {
+      currentDay = (currentDay - 1 + total) % total;
+    }
+    renderItinerary();
+    const tl = document.getElementById('timeline-section');
+    if (tl) tl.scrollTop = 0;
+  }, { passive: true });
+}
+
+
 function initExpenseSwipe() {
   if (_expSwipeInited) return;
   _expSwipeInited = true;
@@ -2052,6 +2081,8 @@ function _mapDoSizeAndLoad(url) {
   viewer.style.top    = (hH + tH) + 'px';
   viewer.style.bottom = '0';
   viewer.style.height = '';
+  // Force layout so clientHeight is correct before loading image
+  viewer.getBoundingClientRect();
   _mapLoadImage(url);
 }
 
@@ -2277,13 +2308,9 @@ function _mapLoadImage(url) {
     const vh = viewer.clientHeight || (window.innerHeight - 150);
     const iw = img.naturalWidth  || vw;
     const ih = img.naturalHeight || vh;
-
-    // Scale to fit entire image within viewer (both width and height)
     _mapScale = Math.min(vw / iw, vh / ih);
     _mapTx = (vw - iw * _mapScale) / 2;
     _mapTy = (vh - ih * _mapScale) / 2;
-
-    // Set img to natural size, use transform for scale/position
     img.style.width  = iw + 'px';
     img.style.height = ih + 'px';
     _mapApply(false);
