@@ -997,7 +997,6 @@ function renderItinerary() {
   renderDayTabs();
   renderBanner();
   renderTimeline();
-  initItinerarySwipe();
 }
 
 /* ─── Custom Confirm Dialog ─── */
@@ -1726,26 +1725,23 @@ let _itinSwipeInited = false;
 function initItinerarySwipe() {
   if (_itinSwipeInited) return;
   _itinSwipeInited = true;
-  const tl = document.getElementById('timeline-section');
-  if (!tl) return;
+  const screen = document.getElementById('screen-itinerary');
+  if (!screen) return;
   let startX = 0, startY = 0;
-  tl.addEventListener('touchstart', e => {
+  screen.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
   }, { passive: true });
-  tl.addEventListener('touchend', e => {
+  screen.addEventListener('touchend', e => {
     if (!data) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.5) return;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx)) return;
     const total = data.days.length;
-    if (dx < 0) {
-      currentDay = (currentDay + 1) % total;
-    } else {
-      currentDay = (currentDay - 1 + total) % total;
-    }
+    currentDay = dx < 0 ? (currentDay + 1) % total : (currentDay - 1 + total) % total;
     renderItinerary();
-    tl.scrollTop = 0;
+    const tl = document.getElementById('timeline-section');
+    if (tl) tl.scrollTop = 0;
   }, { passive: true });
 }
 
@@ -5185,6 +5181,7 @@ applyTheme('light');
 
 // Start on Home screen
 switchTab('home');
+initItinerarySwipe();
 
 
 
