@@ -2079,6 +2079,19 @@ function mapDeleteFromDropdown(idx) {
   renderMapSub();
 }
 
+function _mapSizeAndLoad() {
+  const header  = document.getElementById('map-sub-header');
+  const viewer  = document.getElementById('map-viewer');
+  if (!header || !viewer) return;
+  requestAnimationFrame(() => {
+    const hH = header.getBoundingClientRect().height || 56;
+    viewer.style.top    = hH + 'px';
+    viewer.style.bottom = '0';
+    const maps = data.maps || [];
+    if (maps[_mapActiveIdx]) _mapLoadImage(maps[_mapActiveIdx].url);
+  });
+}
+
 
 
 // Long-press or right-click tab → rename/delete menu
