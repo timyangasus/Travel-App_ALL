@@ -3648,9 +3648,15 @@ function _parseItineraryText(text) {
   // Get trip start date from settings to map dates → day number
   const tripDates = (typeof data !== 'undefined') ? (data?.settings?.tripDates || '') : '';
   const dateMatch = tripDates.match(/(\d{4})\/(\d{2})\/(\d{2})/);
-  const tripStart = dateMatch
-    ? new Date(parseInt(dateMatch[1]), parseInt(dateMatch[2])-1, parseInt(dateMatch[3]))
-    : null;
+  // Fallback: try to get start date from first day's banner date
+  let tripStart = null;
+  if (dateMatch) {
+    tripStart = new Date(parseInt(dateMatch[1]), parseInt(dateMatch[2])-1, parseInt(dateMatch[3]));
+  } else if (typeof data !== 'undefined' && data?.days?.length > 0) {
+    const firstDate = data.days[0]?.banner?.date || '';
+    const dm = firstDate.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+    if (dm) tripStart = new Date(parseInt(dm[1]), parseInt(dm[2])-1, parseInt(dm[3]));
+  }
 
   function dateToDayNum(month, day) {
     if (!tripStart) return 0;
@@ -3718,29 +3724,27 @@ function _parseItineraryText(text) {
                             line.match(/^[-*]\s+(\d{1,2}:\d{2})\s+(.+)$/);
     if (bulletTimeMatch) {
       pushCurrentEvent();
-      let time, title;
+      let time, title, note = '';
       if (bulletTimeMatch[3]) {
-        // time range
         time = padTime(bulletTimeMatch[1]);
         const endTime = padTime(bulletTimeMatch[2]);
         title = bulletTimeMatch[3].trim().replace(/。$/, '');
-        currentEvent = { day: currentDay||1, time, title, note: time + '–' + endTime + ' ' + title, addr: '', station: '', line: '' };
+        note = time + '–' + endTime + ' ' + title;
       } else {
         time = padTime(bulletTimeMatch[1]);
         title = bulletTimeMatch[2].trim().replace(/。$/, '');
-        currentEvent = { day: currentDay||1, time, title, note: '', addr: '', station: '', line: '' };
       }
+      currentEvent = { day: currentDay||1, time, title, note, addr: '', station: '', line: '' };
       noteLines = [];
       continue;
     }
 
-    // Indented sub-bullet (攻略 / note): "   * ..." treat as note for current event
+    // Indented sub-bullet: treat as note for current event
     const indentedBullet = lines[i].match(/^\s{2,}[-*]\s+(.+)$/);
     if (indentedBullet) {
       if (currentEvent) noteLines.push(indentedBullet[1].trim().replace(/。$/, ''));
       continue;
     }
-
 
     if (timeRangeMatch) {
       pushCurrentEvent();
