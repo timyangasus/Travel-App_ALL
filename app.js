@@ -2050,10 +2050,8 @@ function _renderMapTabs() {
   tabsEl.innerHTML = maps.map((m, i) => `
     <button
       onclick="mapSelectTab(${i})"
-      ontouchstart="_mapTabTouchStart(${i},this)"
-      ontouchend="_mapTabTouchEnd(${i},this)"
-      ontouchmove="_mapTabTouchCancel()"
-      style="flex-shrink:0;padding:10px 16px;border:none;background:none;font-family:var(--mono);font-size:14px;font-weight:${i===_mapActiveIdx?700:400};color:${i===_mapActiveIdx?'#1A1A1A':'#AAAAAA'};border-bottom:${i===_mapActiveIdx?'2px solid #1A1A1A':'2px solid transparent'};cursor:pointer;white-space:nowrap;transition:all 0.15s">
+      ondblclick="mapLongPressTab(${i})"
+      style="flex-shrink:0;padding:10px 20px;border:none;background:none;font-family:var(--mono);font-size:14px;font-weight:${i===_mapActiveIdx?700:400};color:${i===_mapActiveIdx?'#1A1A1A':'#AAAAAA'};border-bottom:${i===_mapActiveIdx?'2px solid #1A1A1A':'2px solid transparent'};cursor:pointer;white-space:nowrap;transition:all 0.15s">
       ${esc(m.name)}
     </button>`).join('');
 }
@@ -3368,7 +3366,7 @@ function renderFlightCards() {
         <div class="fc2-tear-line"></div>
       </div>` : '';
     return `
-    <div class="fc2" onclick="openFlightSheet(${f.id})">
+    <div class="fc2" onclick="if(!event.target.closest('.fc2-url-row'))openFlightSheet(${f.id})">
       <div class="fc2-head">
         <div>
           <div class="fc2-pnr-label">訂位代號</div>
@@ -3385,7 +3383,7 @@ function renderFlightCards() {
         ${tear}
         ${ibSeg}
       </div>
-      ${f.url ? `<a class="fc2-url-row" href="${esc(f.url)}" target="_blank" rel="noopener" ontouchstart="event.stopPropagation()" onclick="event.stopPropagation()">${esc(f.url)}</a>` : ''}
+      ${f.url ? `<div class="fc2-url-row" onclick="window.open(${JSON.stringify(f.url)},'_blank')">${esc(f.url)}</div>` : ''}
     </div>`;
   }).join('');
 }
