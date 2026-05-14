@@ -2149,11 +2149,9 @@ function _mapSizeViewer() {
   const tabsBar = document.getElementById('map-tabs-bar');
   const viewer  = document.getElementById('map-viewer');
   if (!viewer) return;
-  requestAnimationFrame(() => {
-    const hH = header?.getBoundingClientRect().height || 0;
-    const tH = tabsBar?.getBoundingClientRect().height || 0;
-    viewer.style.top = (hH + tH) + 'px';
-  });
+  const hH = header?.getBoundingClientRect().height || 0;
+  const tH = tabsBar?.getBoundingClientRect().height || 0;
+  viewer.style.top = (hH + tH) + 'px';
 }
 let _mapScale = 1, _mapTx = 0, _mapTy = 0;
 let _mapDragging = false;
@@ -2169,8 +2167,7 @@ function _mapGetMinScale() {
   if (!viewer || !img || !img.naturalWidth) return 0.1;
   const vw = viewer.clientWidth, vh = viewer.clientHeight;
   const iw = img.naturalWidth,   ih = img.naturalHeight;
-  // Min = fit entire image within viewer
-  return Math.min(vw / iw, vh / ih);
+  return vh / (vw * (ih / iw));
 }
 
 function _mapClamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
@@ -2181,8 +2178,8 @@ function _mapConstrain() {
   if (!viewer || !img) return;
   const vw = viewer.clientWidth, vh = viewer.clientHeight;
   const iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
-  const renderedW = iw * _mapScale;
-  const renderedH = ih * _mapScale;
+  const renderedW = vw * _mapScale;
+  const renderedH = vw * (ih / iw) * _mapScale;
   if (renderedW <= vw) _mapTx = (vw - renderedW) / 2;
   else _mapTx = _mapClamp(_mapTx, vw - renderedW, 0);
   if (renderedH <= vh) _mapTy = (vh - renderedH) / 2;
@@ -2205,9 +2202,10 @@ function mapResetView() {
   requestAnimationFrame(() => {
     const vw = viewer.clientWidth, vh = viewer.clientHeight;
     const iw = img.naturalWidth,   ih = img.naturalHeight;
-    _mapScale = Math.min(vw / iw, vh / ih);
-    _mapTx = (vw - iw * _mapScale) / 2;
-    _mapTy = (vh - ih * _mapScale) / 2;
+    _mapScale = vh / (vw * (ih / iw));
+    const renderedW = vw * _mapScale;
+    _mapTx = (vw - renderedW) / 2;
+    _mapTy = 0;
     _mapApply(true);
   });
 }
@@ -2322,24 +2320,18 @@ function _mapLoadImage(url) {
   _mapScale = 1; _mapTx = 0; _mapTy = 0;
   _mapEngineReady = false;
   img.style.transform = '';
-  img.style.width = 'auto';
+  img.style.width = '100%';
   img.style.height = 'auto';
 
   img.onload = () => {
+    _mapSizeViewer();
     requestAnimationFrame(() => {
       const vw = viewer.clientWidth, vh = viewer.clientHeight;
       const iw = img.naturalWidth  || vw;
       const ih = img.naturalHeight || vh;
-
-      // Set image to its natural size — scaling is done via transform only
-      img.style.width  = iw + 'px';
-      img.style.height = ih + 'px';
-
-      // Fit: scale so image fills width
-      const scaleW = vw / iw;
-      const scaleH = vh / ih;
-      _mapScale = Math.min(scaleW, scaleH); // fit within viewer
-      _mapTx = (vw - iw * _mapScale) / 2;
+      _mapScale = vh / (vw * (ih / iw));
+      const renderedW = vw * _mapScale;
+      _mapTx = (vw - renderedW) / 2;
       _mapTy = 0;
       _mapApply(false);
       mapInitPanZoom();
