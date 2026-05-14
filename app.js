@@ -2041,9 +2041,16 @@ function renderMapSub() {
   _mapActiveIdx = Math.min(_mapActiveIdx, maps.length - 1);
   _mapUpdateDropdown();
 
-  // 舊版做法：rAF 設定 viewer top，然後載入圖片
-  _mapSizeViewer();
-  _mapLoadImage(maps[_mapActiveIdx].url);
+  // 先設好 viewer 位置，rAF 結束後才載入圖片
+  const header = document.getElementById('map-sub-header');
+  requestAnimationFrame(() => {
+    const topPx = header ? header.getBoundingClientRect().height : 56;
+    viewerEl.style.top    = topPx + 'px';
+    viewerEl.style.bottom = '0';
+    viewerEl.style.height = '';
+    // 現在 viewer 有正確尺寸，才載入圖片
+    _mapLoadImage(maps[_mapActiveIdx].url);
+  });
 }
 
 function _mapUpdateDropdown() {
@@ -2354,15 +2361,18 @@ function _mapLoadImage(url) {
 
   img.onload = () => {
     requestAnimationFrame(() => {
-      const vw = viewer.clientWidth, vh = viewer.clientHeight;
-      const iw = img.naturalWidth  || vw;
-      const ih = img.naturalHeight || vh;
-      _mapScale = vh / (vw * (ih / iw));
-      const renderedW = vw * _mapScale;
-      _mapTx = (vw - renderedW) / 2;
-      _mapTy = 0;
-      _mapApply(false);
-      mapInitPanZoom();
+      requestAnimationFrame(() => {
+        const vw = viewer.clientWidth  || window.innerWidth;
+        const vh = viewer.clientHeight || (window.innerHeight - 56);
+        const iw = img.naturalWidth  || vw;
+        const ih = img.naturalHeight || vh;
+        _mapScale = vh / (vw * (ih / iw));
+        const renderedW = vw * _mapScale;
+        _mapTx = (vw - renderedW) / 2;
+        _mapTy = 0;
+        _mapApply(false);
+        mapInitPanZoom();
+      });
     });
   };
   img.onerror = () => showToast('地圖圖片載入失敗');
