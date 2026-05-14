@@ -1876,7 +1876,7 @@ function openInfoSub(name) {
   if (name === 'ticket')    renderTicketCards();
   if (name === 'notes')     renderNotes();
   if (name === 'photo')     renderPhotoPage();
-  if (name === 'map')       setTimeout(renderMapSub, 80);
+  if (name === 'map')       renderMapSub();
 }
 
 function closeInfoSub(name) {
@@ -2016,61 +2016,70 @@ let _mapEditingId = null; // for rename
 
 function renderMapSub() {
   if (!data.maps) data.maps = [];
-  // migrate old single-map format, strip file extension from name
-  data.maps = data.maps.map(m => {
+  // Migrate names
+  data.maps.forEach(m => {
     if (!m.id) m.id = Date.now() + Math.random();
     if (!m.name) m.name = '地圖';
-    m.name = m.name.replace(/\.[a-zA-Z]{2,5}$/, ''); // strip .jpeg .png etc
-    if (!m.name) m.name = '地圖';
-    return m;
+    m.name = m.name.replace(/\.[a-zA-Z]{2,5}$/, '') || '地圖';
   });
-  save();
 
-  const maps    = data.maps;
-  const emptyEl = document.getElementById('map-empty-state');
-  const viewerEl= document.getElementById('map-viewer');
-  const tabsBar = document.getElementById('map-tabs-bar');
+  const maps     = data.maps;
+  const emptyEl  = document.getElementById('map-empty-state');
+  const viewerEl = document.getElementById('map-viewer');
+  const selectorWrap = document.getElementById('map-selector-wrap');
 
   if (!maps.length) {
     emptyEl.style.display  = 'flex';
     viewerEl.style.display = 'none';
-    tabsBar.style.display  = 'none';
+    if (selectorWrap) selectorWrap.style.display = 'none';
     return;
   }
 
   emptyEl.style.display  = 'none';
-  tabsBar.style.display  = 'block';
   viewerEl.style.display = 'block';
+  if (selectorWrap) selectorWrap.style.display = maps.length > 1 ? 'flex' : 'none';
 
   _mapActiveIdx = Math.min(_mapActiveIdx, maps.length - 1);
-  _renderMapTabs();
-
-  // Wait for tabs bar to reflow, then size viewer and load image
-  setTimeout(() => {
-    _mapSizeViewerSync();
-    _mapLoadImage(maps[_mapActiveIdx].url);
-  }, 120);
+  _mapUpdateDropdown();
+  _mapSizeAndLoad();
 }
 
-function _renderMapTabs() {
-  const maps  = data.maps || [];
-  const tabsEl = document.getElementById('map-tabs');
-  if (!tabsEl) return;
-  tabsEl.innerHTML = maps.map((m, i) => `
-    <button
-      onclick="mapSelectTab(${i})"
-      ondblclick="mapLongPressTab(${i})"
-      style="flex-shrink:0;padding:10px 20px;border:none;background:none;font-family:var(--mono);font-size:14px;font-weight:${i===_mapActiveIdx?700:400};color:${i===_mapActiveIdx?'#1A1A1A':'#AAAAAA'};border-bottom:${i===_mapActiveIdx?'2px solid #1A1A1A':'2px solid transparent'};cursor:pointer;white-space:nowrap;transition:all 0.15s">
+function _mapUpdateDropdown() {
+  const maps = data.maps || [];
+  const nameEl = document.getElementById('map-current-name');
+  if (nameEl) nameEl.textContent = maps[_mapActiveIdx]?.name || '地圖';
+  const dd = document.getElementById('map-dropdown');
+  if (!dd) return;
+  dd.innerHTML = maps.map((m, i) => `
+    <div onclick="mapSelectFromDropdown(${i})"
+      style="padding:12px 16px;font-family:var(--mono);font-size:14px;color:${i===_mapActiveIdx?'#D4AF37':'#1A1A1A'};font-weight:${i===_mapActiveIdx?700:400};cursor:pointer;border-bottom:${i<maps.length-1?'0.5px solid #F0F0F0':'none'};display:flex;justify-content:space-between;align-items:center">
       ${esc(m.name)}
-    </button>`).join('');
+      <button onclick="event.stopPropagation();mapDeleteFromDropdown(${i})" style="background:none;border:none;color:#CCCCCC;font-size:16px;cursor:pointer;padding:0 0 0 12px">×</button>
+    </div>`).join('');
 }
 
-function mapSelectTab(idx) {
-  _mapActiveIdx = idx;
-  _renderMapTabs();
-  _mapLoadImage(data.maps[idx].url);
-  mapResetView();
+function mapToggleDropdown() {
+  const dd = document.getElementById('map-dropdown');
+  if (!dd) return;
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
 }
+
+function mapSelectFromDropdown(idx) {
+  _mapActiveIdx = idx;
+  document.getElementById('map-dropdown').style.display = 'none';
+  _mapUpdateDropdown();
+  _mapSizeAndLoad();
+}
+
+function mapDeleteFromDropdown(idx) {
+  document.getElementById('map-dropdown').style.display = 'none';
+  data.maps.splice(idx, 1);
+  _mapActiveIdx = Math.max(0, Math.min(_mapActiveIdx, data.maps.length - 1));
+  save();
+  renderMapSub();
+}
+
+
 
 // Long-press or right-click tab → rename/delete menu
 function mapLongPressTab(idx) {
