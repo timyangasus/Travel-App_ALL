@@ -1991,7 +1991,22 @@ function openPhotoLightbox(url) {
 /* ═══════════════════════════════════════
    MAP MODULE — Multi-map with tabs
 ═══════════════════════════════════════ */
-let _mapActiveIdx = 0;
+let _mapTabTimer = null, _mapTabCancelled = false;
+function _mapTabTouchStart(idx, el) {
+  _mapTabCancelled = false;
+  _mapTabTimer = setTimeout(() => {
+    if (!_mapTabCancelled) mapLongPressTab(idx);
+  }, 500);
+}
+function _mapTabTouchEnd(idx, el) {
+  clearTimeout(_mapTabTimer);
+}
+function _mapTabTouchCancel() {
+  _mapTabCancelled = true;
+  clearTimeout(_mapTabTimer);
+}
+
+
 let _mapEditingId = null; // for rename
 
 function renderMapSub() {
@@ -2033,8 +2048,11 @@ function _renderMapTabs() {
   const tabsEl = document.getElementById('map-tabs');
   if (!tabsEl) return;
   tabsEl.innerHTML = maps.map((m, i) => `
-    <button onclick="mapSelectTab(${i})"
-      oncontextmenu="event.preventDefault();mapLongPressTab(${i})"
+    <button
+      onclick="mapSelectTab(${i})"
+      ontouchstart="_mapTabTouchStart(${i},this)"
+      ontouchend="_mapTabTouchEnd(${i},this)"
+      ontouchmove="_mapTabTouchCancel()"
       style="flex-shrink:0;padding:10px 16px;border:none;background:none;font-family:var(--mono);font-size:14px;font-weight:${i===_mapActiveIdx?700:400};color:${i===_mapActiveIdx?'#1A1A1A':'#AAAAAA'};border-bottom:${i===_mapActiveIdx?'2px solid #1A1A1A':'2px solid transparent'};cursor:pointer;white-space:nowrap;transition:all 0.15s">
       ${esc(m.name)}
     </button>`).join('');
@@ -2059,8 +2077,8 @@ function mapLongPressTab(idx) {
   inp.readOnly = false;
   document.getElementById('map-delete-btn').style.display = 'block';
   document.getElementById('modal-map-name').classList.add('open');
-  // Safari requires focus inside user gesture
-  inp.focus();
+  // Tap the input to trigger keyboard on Safari
+  setTimeout(() => inp.focus(), 50);
 }
 
 // Add new map: prompt name first
@@ -3363,7 +3381,7 @@ function renderFlightCards() {
         ${tear}
         ${ibSeg}
       </div>
-      ${f.url ? `<div class="fc2-url-row" ontouchstart="event.stopPropagation()" onclick="event.stopPropagation();event.preventDefault();window.open(${JSON.stringify(f.url)},'_blank');return false">${esc(f.url)}</div>` : ''}
+      ${f.url ? `<div class="fc2-url-row" ontouchend="event.stopPropagation();event.preventDefault();window.open(${JSON.stringify(f.url)},'_blank')" onclick="event.stopPropagation();event.preventDefault()">${esc(f.url)}</div>` : ''}
     </div>`;
   }).join('');
 }
