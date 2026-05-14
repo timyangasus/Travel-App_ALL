@@ -2098,13 +2098,17 @@ function mapConfirmName() {
   closeModal('modal-map-name');
 
   if (_mapEditingId) {
-    // Rename
+    // Rename existing map
     const m = (data.maps||[]).find(m => m.id === _mapEditingId);
-    if (m) { m.name = name; save(); renderMapSub(); }
+    if (m) {
+      m.name = name;
+      save();
+      _renderMapTabs();
+    }
     return;
   }
 
-  // New map: pick image
+  // New map: pick image file
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
@@ -3381,7 +3385,7 @@ function renderFlightCards() {
         ${tear}
         ${ibSeg}
       </div>
-      ${f.url ? `<div class="fc2-url-row" ontouchend="event.stopPropagation();event.preventDefault();window.open(${JSON.stringify(f.url)},'_blank')" onclick="event.stopPropagation();event.preventDefault()">${esc(f.url)}</div>` : ''}
+      ${f.url ? `<a class="fc2-url-row" href="${esc(f.url)}" target="_blank" rel="noopener" ontouchstart="event.stopPropagation()" onclick="event.stopPropagation()">${esc(f.url)}</a>` : ''}
     </div>`;
   }).join('');
 }
