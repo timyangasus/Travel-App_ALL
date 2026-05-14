@@ -2360,7 +2360,9 @@ function _mapLoadImage(url) {
   _mapEngineReady = false;
   img.style.transform = '';
 
-  img.onload = () => {
+  img.onerror = () => showToast('地圖圖片載入失敗');
+
+  function _doRender() {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const vw = window.innerWidth;
@@ -2376,9 +2378,18 @@ function _mapLoadImage(url) {
         mapInitPanZoom();
       });
     });
-  };
-  img.onerror = () => showToast('地圖圖片載入失敗');
+  }
+
+  img.onload = _doRender;
+
+  // 先清空再設，確保 onload 一定觸發（包括 cached 圖片）
+  img.src = '';
   img.src = url;
+
+  // 如果圖片已在 cache 且 complete，直接執行
+  if (img.complete && img.naturalWidth > 0) {
+    _doRender();
+  }
 }
 
 /* ─── Checklist ─── */
