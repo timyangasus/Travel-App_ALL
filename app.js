@@ -2195,6 +2195,7 @@ function _mapConstrain() {
 function _mapApply(smooth) {
   const img = document.getElementById('map-img');
   if (!img) return;
+  img.style.transformOrigin = '0 0';
   img.style.transition = smooth ? 'transform 0.18s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none';
   img.style.transform  = `translate(${_mapTx}px,${_mapTy}px) scale(${_mapScale})`;
 }
@@ -2324,22 +2325,27 @@ function _mapLoadImage(url) {
   const viewer = document.getElementById('map-viewer');
   if (!img) return;
 
-  // Reset pan/zoom state and engine flag for new image
   _mapScale = 1; _mapTx = 0; _mapTy = 0;
   _mapEngineReady = false;
   img.style.transform = '';
+  img.style.width = 'auto';
+  img.style.height = 'auto';
 
   img.onload = () => {
-    // rAF ensures viewer has its final dimensions after layout
     requestAnimationFrame(() => {
       const vw = viewer.clientWidth, vh = viewer.clientHeight;
       const iw = img.naturalWidth  || vw;
       const ih = img.naturalHeight || vh;
-      // Always fit height — image fills viewer top to bottom, no gap
-      _mapScale = vh / (vw * (ih / iw));
-      const renderedW = vw * _mapScale;
-      // Centre horizontally
-      _mapTx = (vw - renderedW) / 2;
+
+      // Set image to its natural size — scaling is done via transform only
+      img.style.width  = iw + 'px';
+      img.style.height = ih + 'px';
+
+      // Fit: scale so image fills width
+      const scaleW = vw / iw;
+      const scaleH = vh / ih;
+      _mapScale = Math.min(scaleW, scaleH); // fit within viewer
+      _mapTx = (vw - iw * _mapScale) / 2;
       _mapTy = 0;
       _mapApply(false);
       mapInitPanZoom();
