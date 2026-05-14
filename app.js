@@ -2054,20 +2054,25 @@ function mapLongPressTab(idx) {
   _mapEditingId = m.id;
   _mapActiveIdx = idx;
   document.getElementById('modal-map-name-title').textContent = '地圖選項';
-  document.getElementById('map-name-input').value = m.name;
+  const inp = document.getElementById('map-name-input');
+  inp.value = m.name;
+  inp.readOnly = false;
   document.getElementById('map-delete-btn').style.display = 'block';
   document.getElementById('modal-map-name').classList.add('open');
-  setTimeout(() => document.getElementById('map-name-input')?.focus(), 340);
+  // Safari requires focus inside user gesture
+  inp.focus();
 }
 
 // Add new map: prompt name first
 function mapAddNew() {
   _mapEditingId = null;
   document.getElementById('modal-map-name-title').textContent = '新增地圖';
-  document.getElementById('map-name-input').value = '';
+  const inp = document.getElementById('map-name-input');
+  inp.value = '';
+  inp.readOnly = false;
   document.getElementById('map-delete-btn').style.display = 'none';
   document.getElementById('modal-map-name').classList.add('open');
-  setTimeout(() => document.getElementById('map-name-input')?.focus(), 340);
+  inp.focus();
 }
 
 function mapConfirmName() {
@@ -3358,7 +3363,7 @@ function renderFlightCards() {
         ${tear}
         ${ibSeg}
       </div>
-      ${f.url ? `<div class="fc2-url-row" onclick="event.stopPropagation();event.preventDefault();window.open(${JSON.stringify(f.url)},'_blank');return false">${esc(f.url)}</div>` : ''}
+      ${f.url ? `<div class="fc2-url-row" ontouchstart="event.stopPropagation()" onclick="event.stopPropagation();event.preventDefault();window.open(${JSON.stringify(f.url)},'_blank');return false">${esc(f.url)}</div>` : ''}
     </div>`;
   }).join('');
 }
