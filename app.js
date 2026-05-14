@@ -3713,8 +3713,35 @@ function _parseItineraryText(text) {
       }
     }
 
-    // Time range: 09:00 - 11:00 Title or 09:00–11:00 Title
-    const timeRangeMatch = line.match(/^(\d{1,2}:\d{2})\s*[-\u2013\u2014]\s*(\d{1,2}:\d{2})\s*[|\uff5c]?\s*(.+)$/);
+    // Bullet time: * 15:00 Title or - 15:00 Title or * 14:30 - 16:30 Title
+    const bulletTimeMatch = line.match(/^[-*]\s+(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})\s+(.+)$/) ||
+                            line.match(/^[-*]\s+(\d{1,2}:\d{2})\s+(.+)$/);
+    if (bulletTimeMatch) {
+      pushCurrentEvent();
+      let time, title;
+      if (bulletTimeMatch[3]) {
+        // time range
+        time = padTime(bulletTimeMatch[1]);
+        const endTime = padTime(bulletTimeMatch[2]);
+        title = bulletTimeMatch[3].trim().replace(/。$/, '');
+        currentEvent = { day: currentDay||1, time, title, note: time + '–' + endTime + ' ' + title, addr: '', station: '', line: '' };
+      } else {
+        time = padTime(bulletTimeMatch[1]);
+        title = bulletTimeMatch[2].trim().replace(/。$/, '');
+        currentEvent = { day: currentDay||1, time, title, note: '', addr: '', station: '', line: '' };
+      }
+      noteLines = [];
+      continue;
+    }
+
+    // Indented sub-bullet (攻略 / note): "   * ..." treat as note for current event
+    const indentedBullet = lines[i].match(/^\s{2,}[-*]\s+(.+)$/);
+    if (indentedBullet) {
+      if (currentEvent) noteLines.push(indentedBullet[1].trim().replace(/。$/, ''));
+      continue;
+    }
+
+
     if (timeRangeMatch) {
       pushCurrentEvent();
       const time = padTime(timeRangeMatch[1]);
