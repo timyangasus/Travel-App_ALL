@@ -2162,12 +2162,7 @@ let _mapEngineReady = false;
 const MAP_MAX_SCALE = 8;
 
 function _mapGetMinScale() {
-  const viewer = document.getElementById('map-viewer');
-  const img    = document.getElementById('map-img');
-  if (!viewer || !img || !img.naturalWidth) return 0.1;
-  const vw = viewer.clientWidth, vh = viewer.clientHeight;
-  const iw = img.naturalWidth,   ih = img.naturalHeight;
-  return vh / (vw * (ih / iw));
+  return 0.5; // minimum zoom out to 50%
 }
 
 function _mapClamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
@@ -2177,12 +2172,11 @@ function _mapConstrain() {
   const img    = document.getElementById('map-img');
   if (!viewer || !img) return;
   const vw = viewer.clientWidth, vh = viewer.clientHeight;
-  const iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
   const renderedW = vw * _mapScale;
-  const renderedH = vw * (ih / iw) * _mapScale;
+  const renderedH = img.offsetHeight * _mapScale;
   if (renderedW <= vw) _mapTx = (vw - renderedW) / 2;
   else _mapTx = _mapClamp(_mapTx, vw - renderedW, 0);
-  if (renderedH <= vh) _mapTy = (vh - renderedH) / 2;
+  if (renderedH <= vh) _mapTy = 0;
   else _mapTy = _mapClamp(_mapTy, vh - renderedH, 0);
 }
 
@@ -2197,17 +2191,12 @@ function _mapApply(smooth) {
 function mapResetView() {
   const viewer = document.getElementById('map-viewer');
   const img    = document.getElementById('map-img');
-  if (!viewer || !img || !img.naturalWidth) return;
+  if (!viewer || !img) return;
   _mapSizeViewer();
-  requestAnimationFrame(() => {
-    const vw = viewer.clientWidth, vh = viewer.clientHeight;
-    const iw = img.naturalWidth,   ih = img.naturalHeight;
-    _mapScale = vh / (vw * (ih / iw));
-    const renderedW = vw * _mapScale;
-    _mapTx = (vw - renderedW) / 2;
-    _mapTy = 0;
-    _mapApply(true);
-  });
+  _mapScale = 1;
+  _mapTx = 0;
+  _mapTy = 0;
+  _mapApply(true);
 }
 
 function _mapZoomAt(px, py, factor) {
@@ -2326,12 +2315,8 @@ function _mapLoadImage(url) {
   img.onload = () => {
     _mapSizeViewer();
     requestAnimationFrame(() => {
-      const vw = viewer.clientWidth, vh = viewer.clientHeight;
-      const iw = img.naturalWidth  || vw;
-      const ih = img.naturalHeight || vh;
-      _mapScale = vh / (vw * (ih / iw));
-      const renderedW = vw * _mapScale;
-      _mapTx = (vw - renderedW) / 2;
+      _mapScale = 1;
+      _mapTx = 0;
       _mapTy = 0;
       _mapApply(false);
       mapInitPanZoom();
