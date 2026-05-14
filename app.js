@@ -2065,9 +2065,10 @@ function _mapShow(url) {
     const iw = img.naturalWidth;
     const ih = img.naturalHeight;
     if (!iw || !ih) return;
-    _mapScale = Math.min(vw / iw, vh / ih);
+    // fit height — image fills full viewer height, may overflow horizontally
+    _mapScale = vh / ih;
     _mapTx = (vw - iw * _mapScale) / 2;
-    _mapTy = (vh - ih * _mapScale) / 2;
+    _mapTy = 0;
     img.style.position       = 'absolute';
     img.style.top            = '0';
     img.style.left           = '0';
@@ -2187,9 +2188,9 @@ function mapResetView() {
   const img = document.getElementById('map-img');
   if (!img || !img.naturalWidth) return;
   const { vw, vh } = _mapVWH();
-  _mapScale = Math.min(vw / img.naturalWidth, vh / img.naturalHeight);
+  _mapScale = vh / img.naturalHeight;
   _mapTx = (vw - img.naturalWidth  * _mapScale) / 2;
-  _mapTy = (vh - img.naturalHeight * _mapScale) / 2;
+  _mapTy = 0;
   _mapApply(true);
 }
 
