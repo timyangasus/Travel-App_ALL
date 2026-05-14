@@ -3605,7 +3605,7 @@ textarea ~ .field-x {
 
 /* ===================== MAP SUB-SCREEN ===================== */
 #screen-info-map {
-  display: none;
+  display: none !important;
   padding: 0 !important;
   margin: 0 !important;
   overflow: hidden !important;
@@ -3617,10 +3617,9 @@ textarea ~ .field-x {
   right: 0 !important;
   bottom: var(--tab-height) !important;
   z-index: 10;
-  flex-direction: column !important;
 }
 #screen-info-map.active {
-  display: flex !important;
+  display: block !important;
 }
 #map-sub-header {
   position: relative;

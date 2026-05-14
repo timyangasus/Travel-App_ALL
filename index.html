@@ -79,14 +79,14 @@
   </div>
 
   <!-- ═══ INFO SUB: MAP ═══ -->
-  <div id="screen-info-map" class="page" style="overflow:hidden;flex-direction:column">
+  <div id="screen-info-map" class="page">
     <!-- Header -->
-    <div class="screen-header sub-header" id="map-sub-header" style="flex-shrink:0">
+    <div class="screen-header sub-header" id="map-sub-header">
       <button class="sub-back-btn" onclick="closeInfoSub('map')">
         <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z"/></svg>
       </button>
       <div class="screen-title" style="flex:1;font-family:var(--mono)">地圖</div>
-      <!-- Map selector dropdown (visible when maps exist) -->
+      <!-- Dropdown selector (多張地圖時顯示) -->
       <div id="map-selector-wrap" style="display:none;position:relative;margin-right:8px">
         <button onclick="mapToggleDropdown()" style="display:flex;align-items:center;gap:6px;background:none;border:1px solid #DDDDDD;border-radius:8px;padding:6px 10px;font-family:var(--mono);font-size:13px;color:#1A1A1A;cursor:pointer">
           <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#888"><path d="m600-176-240-84-150 58q-14 5-26-3t-12-23v-468q0-10 4.5-18.5T190-726l170-58 240 84 150-58q14-5 26 1.5t12 20.5v476q0 11-6 19t-16 11l-166 54Z"/></svg>
@@ -108,11 +108,11 @@
     </div>
 
     <!-- Map Viewer -->
-    <div id="map-viewer" style="display:none;position:absolute;left:0;right:0;bottom:0;overflow:hidden;background:#F0F0F0;touch-action:none">
+    <div id="map-viewer" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;background:#F0F0F0;touch-action:none">
       <img id="map-img" src="" alt="map"
         style="position:absolute;top:0;left:0;width:100%;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;display:block"/>
       <button id="map-reset-btn" onclick="mapResetView()"
-        style="position:absolute;bottom:20px;right:16px;z-index:10;width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.95);border:1px solid rgba(0,0,0,0.10);box-shadow:0 2px 8px rgba(0,0,0,0.12);cursor:pointer;display:flex;align-items:center;justify-content:center">
+        style="position:absolute;bottom:20px;right:16px;z-index:10;width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.95);border:1px solid rgba(0,0,0,0.10);box-shadow:0 2px 8px rgba(0,0,0,0.12);cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent">
         <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px" fill="#555"><path d="M200-120q-33 0-56.5-23.5T120-200v-160h80v160h160v80H200Zm400 0v-80h160v-160h80v160q0 33-23.5 56.5T760-120H600ZM120-600v-160q0-33 23.5-56.5T200-840h160v80H200v160h-80Zm640 0v-160H600v-80h160q33 0 56.5 23.5T840-760v160h-80Z"/></svg>
       </button>
     </div>

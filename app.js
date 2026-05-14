@@ -2016,7 +2016,6 @@ let _mapEditingId = null; // for rename
 
 function renderMapSub() {
   if (!data.maps) data.maps = [];
-  // Migrate names
   data.maps.forEach(m => {
     if (!m.id) m.id = Date.now() + Math.random();
     if (!m.name) m.name = '地圖';
@@ -2041,7 +2040,10 @@ function renderMapSub() {
 
   _mapActiveIdx = Math.min(_mapActiveIdx, maps.length - 1);
   _mapUpdateDropdown();
-  _mapSizeAndLoad();
+
+  // 舊版做法：rAF 設定 viewer top，然後載入圖片
+  _mapSizeViewer();
+  _mapLoadImage(maps[_mapActiveIdx].url);
 }
 
 function _mapUpdateDropdown() {
@@ -2175,29 +2177,15 @@ function onMapActionBtn() { mapAddNew(); }
 
 
 
-function _mapSizeViewerSync() {
-  const header  = document.getElementById('map-sub-header');
-  const tabsBar = document.getElementById('map-tabs-bar');
-  const viewer  = document.getElementById('map-viewer');
-  if (!header || !viewer) return;
-  const hH = header.getBoundingClientRect().height;
-  const tH = (tabsBar && tabsBar.style.display !== 'none') ? tabsBar.getBoundingClientRect().height : 0;
-  viewer.style.top    = (hH + tH) + 'px';
-  viewer.style.bottom = '0';
-  viewer.style.height = '';
-}
-
 function _mapSizeViewer() {
-  const header  = document.getElementById('map-sub-header');
-  const tabsBar = document.getElementById('map-tabs-bar');
-  const viewer  = document.getElementById('map-viewer');
-  if (!header || !viewer) return;
+  const header   = document.getElementById('map-sub-header');
+  const viewerEl = document.getElementById('map-viewer');
+  if (!header || !viewerEl) return;
   requestAnimationFrame(() => {
-    const hH = header.getBoundingClientRect().height;
-    const tH = (tabsBar && tabsBar.style.display !== 'none') ? tabsBar.getBoundingClientRect().height : 0;
-    viewer.style.top    = (hH + tH) + 'px';
-    viewer.style.bottom = '0';
-    viewer.style.height = '';
+    const topPx = header.getBoundingClientRect().height;
+    viewerEl.style.top    = topPx + 'px';
+    viewerEl.style.bottom = '0';
+    viewerEl.style.height = '';
   });
 }
 let _mapScale = 1, _mapTx = 0, _mapTy = 0;
@@ -2362,17 +2350,20 @@ function _mapLoadImage(url) {
 
   _mapScale = 1; _mapTx = 0; _mapTy = 0;
   _mapEngineReady = false;
-  img.style.transform = 'none';
-  img.style.width  = '100%';
-  img.style.height = 'auto';
+  img.style.transform = '';
 
   img.onload = () => {
-    // scale=1, width:100% — image naturally fills viewer width
-    // No need for clientHeight calculation
-    _mapScale = 1; _mapTx = 0; _mapTy = 0;
-    _mapApply(false);
-    _mapSizeViewer();
-    mapInitPanZoom();
+    requestAnimationFrame(() => {
+      const vw = viewer.clientWidth, vh = viewer.clientHeight;
+      const iw = img.naturalWidth  || vw;
+      const ih = img.naturalHeight || vh;
+      _mapScale = vh / (vw * (ih / iw));
+      const renderedW = vw * _mapScale;
+      _mapTx = (vw - renderedW) / 2;
+      _mapTy = 0;
+      _mapApply(false);
+      mapInitPanZoom();
+    });
   };
   img.onerror = () => showToast('地圖圖片載入失敗');
   img.src = url;
