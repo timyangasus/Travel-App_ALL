@@ -31,7 +31,7 @@ async function uploadToImgBB(file) {
   });
   const json = await res.json();
   if (!json.success) throw new Error(json.error?.message || 'Upload failed');
-  return json.data.display_url || json.data.image?.url || json.data.url;
+  return json.data.image?.url || json.data.display_url || json.data.url;
 }
 
 function showUploadStatus(msg) {
