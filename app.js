@@ -3637,7 +3637,6 @@ function runSmartImport() {
 
 
 function _parseItineraryText(text) {
-  const lines = text.split('\n');
   const events = [];
   const issues = [];
   let currentDay = 0;
@@ -3645,50 +3644,59 @@ function _parseItineraryText(text) {
   let noteLines = [];
   let daysCount = 0;
 
-  // Get trip start date from settings to map dates → day number
+  // Trip start date
   const tripDates = (typeof data !== 'undefined') ? (data?.settings?.tripDates || '') : '';
-  const dateMatch = tripDates.match(/(\d{4})\/(\d{2})\/(\d{2})/);
-  // Fallback: try to get start date from first day's banner date
+  const dateMatch = tripDates.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
   let tripStart = null;
   if (dateMatch) {
     tripStart = new Date(parseInt(dateMatch[1]), parseInt(dateMatch[2])-1, parseInt(dateMatch[3]));
   } else if (typeof data !== 'undefined' && data?.days?.length > 0) {
     const firstDate = data.days[0]?.banner?.date || '';
-    const dm = firstDate.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+    const dm = firstDate.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
     if (dm) tripStart = new Date(parseInt(dm[1]), parseInt(dm[2])-1, parseInt(dm[3]));
   }
 
   function dateToDayNum(month, day) {
     if (!tripStart) return 0;
-    const y = tripStart.getFullYear();
-    const d = new Date(y, month-1, day);
+    const d = new Date(tripStart.getFullYear(), month-1, day);
     const diff = Math.round((d - tripStart) / 86400000);
     return diff >= 0 ? diff + 1 : 0;
   }
 
   function padTime(t) {
-    const parts = t.split(':');
-    return parts[0].padStart(2,'0') + ':' + parts[1];
+    const p = t.replace(/[^\d:]/g, '').split(':');
+    return p[0].padStart(2,'0') + ':' + (p[1]||'00');
   }
 
   function pushCurrentEvent() {
     if (!currentEvent) return;
-    if (noteLines.length > 0) {
-      const extra = noteLines.join(' ').trim();
-      if (extra) currentEvent.note = (currentEvent.note ? currentEvent.note + ' ' : '') + extra;
-    }
+    const extra = noteLines.join(' ').trim();
+    if (extra) currentEvent.note = (currentEvent.note ? currentEvent.note + ' ' : '') + extra;
     events.push(currentEvent);
     currentEvent = null;
     noteLines = [];
   }
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line || line === '\u2015' || line === '---' || line === '\u2014' || line === '\u22ef') continue;
+  // Normalize: full-width → half-width, collapse spaces, strip emoji
+  function normalize(s) {
+    return s
+      .replace(/[\uFF10-\uFF19]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/\uFF1A/g, ':')
+      .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{1F900}-\u{1F9FF}\u{FE00}-\u{FEFF}]/gu, '')
+      .replace(/[ \t\u3000]+/g, ' ')
+      .trim();
+  }
 
-    // Day header patterns:
-    // 1. Day 1 | Day1
-    const dayNumMatch = line.match(/[Dd]ay\s*(\d+)|\u7b2c(\d+)\u5929/);
+  const rawLines = text.split('\n');
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const raw = rawLines[i];
+    const line = normalize(raw);
+    const isIndented = /^\s{2,}|^\t/.test(raw);
+    if (!line) continue;
+
+    // Day N / 第N天
+    const dayNumMatch = line.match(/[Dd]ay\s*(\d+)|第\s*(\d+)\s*天/);
     if (dayNumMatch) {
       pushCurrentEvent();
       currentDay = parseInt(dayNumMatch[1] || dayNumMatch[2]);
@@ -3696,109 +3704,71 @@ function _parseItineraryText(text) {
       continue;
     }
 
-    // 2. Date format: 5/7 or 11/5 or 5/7（週四） — map to day number via trip start
-    const dateHeaderMatch = line.match(/^[^\d]*(\d{1,2})\/(\d{1,2})[^:：\d]/);
-    if (dateHeaderMatch && tripStart) {
-      const dayNum = dateToDayNum(parseInt(dateHeaderMatch[1]), parseInt(dateHeaderMatch[2]));
-      if (dayNum > 0) {
-        pushCurrentEvent();
-        currentDay = dayNum;
-        if (currentDay > daysCount) daysCount = currentDay;
-        continue;
-      }
-    }
-    // Date without trip start: just count sequentially
-    if (dateHeaderMatch && !tripStart) {
-      // check if line looks like a day header (has weekday or no time)
-      const hasWeekday = /[週一二三四五六日]|Mon|Tue|Wed|Thu|Fri|Sat|Sun/.test(line);
-      if (hasWeekday) {
-        pushCurrentEvent();
-        currentDay++;
-        if (currentDay > daysCount) daysCount = currentDay;
-        continue;
+    // Date header: 7/18 or 07/18 with weekday or long title
+    const dateHdrM = line.match(/(\d{1,2})\/(\d{1,2})/);
+    if (dateHdrM) {
+      const hasWD = /[\u9031\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u65e5]|Mon|Tue|Wed|Thu|Fri|Sat|Sun/i.test(line);
+      const notTime = !/^\d{1,2}:\d{2}/.test(line.trim());
+      if (hasWD || (notTime && line.length > 8)) {
+        if (tripStart) {
+          const dn = dateToDayNum(parseInt(dateHdrM[1]), parseInt(dateHdrM[2]));
+          if (dn > 0) {
+            pushCurrentEvent(); currentDay = dn;
+            if (currentDay > daysCount) daysCount = currentDay;
+            continue;
+          }
+        }
+        if (hasWD) {
+          pushCurrentEvent(); currentDay++;
+          if (currentDay > daysCount) daysCount = currentDay;
+          continue;
+        }
       }
     }
 
-    // Bullet time: * 15:00 Title or - 15:00 Title or * 14:30 - 16:30 Title
-    const bulletTimeMatch = line.match(/^[-*]\s+(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})\s+(.+)$/) ||
-                            line.match(/^[-*]\s+(\d{1,2}:\d{2})\s+(.+)$/);
-    if (bulletTimeMatch) {
+    // Strip bullet/dash prefix
+    const db = line.replace(/^[-*\u2022\u00b7\u25cf\u25e6\u2013\u2014]+\s*/, '').replace(/^\d+[.)\u3001]\s*/, '').trim();
+
+    // Time range: 14:30 - 16:30 Title
+    const trm = db.match(/^(\d{1,2}:\d{2})\s*[-\u2013\u2014~\uff5e\u5230\u81f3]\s*(\d{1,2}:\d{2})\s*[|\uff5c:\u3000\s]\s*(.+)$/) ||
+                db.match(/^(\d{1,2}:\d{2})\s*[-\u2013\u2014~\uff5e\u5230\u81f3]\s*(\d{1,2}:\d{2})\s+(.+)$/);
+    if (trm) {
       pushCurrentEvent();
-      let time, title, note = '';
-      if (bulletTimeMatch[3]) {
-        time = padTime(bulletTimeMatch[1]);
-        const endTime = padTime(bulletTimeMatch[2]);
-        title = bulletTimeMatch[3].trim().replace(/。$/, '');
-        note = time + '–' + endTime + ' ' + title;
-      } else {
-        time = padTime(bulletTimeMatch[1]);
-        title = bulletTimeMatch[2].trim().replace(/。$/, '');
-      }
-      currentEvent = { day: currentDay||1, time, title, note, addr: '', station: '', line: '' };
-      noteLines = [];
-      continue;
+      const time = padTime(trm[1]), endTime = padTime(trm[2]);
+      const title = trm[3].trim().replace(/[\u3002.\u3001,]$/, '');
+      currentEvent = { day: currentDay||1, time, title, note: time+'\u2013'+endTime+' '+title, addr:'', station:'', line:'' };
+      noteLines = []; continue;
     }
 
-    // Indented sub-bullet: treat as note for current event
-    const indentedBullet = lines[i].match(/^\s{2,}[-*]\s+(.+)$/);
-    if (indentedBullet) {
-      if (currentEvent) noteLines.push(indentedBullet[1].trim().replace(/。$/, ''));
-      continue;
-    }
-
-    if (timeRangeMatch) {
+    // Single time: 15:00 Title
+    const tsm = db.match(/^(\d{1,2}:\d{2})\s*[|\uff5c:\uff1a]\s*(.+)$/) ||
+                db.match(/^(\d{1,2}:\d{2})\s+(.+)$/);
+    if (tsm) {
       pushCurrentEvent();
-      const time = padTime(timeRangeMatch[1]);
-      const endTime = padTime(timeRangeMatch[2]);
-      const title = timeRangeMatch[3].trim();
-      const sh = parseInt(timeRangeMatch[1].split(':')[0]);
-      const eh = parseInt(timeRangeMatch[2].split(':')[0]);
-      if (eh < sh && eh < 6) {
-        issues.push('\u26a0\ufe0f Day ' + (currentDay||1) + ' \u5075\u6e2c\u5230\u8de8\u591c\u884c\u7a0b\uff08' + time + '\u2013' + endTime + '\uff09\uff0c\u5df2\u653e\u5165 Day ' + (currentDay||1) + '\uff0c\u8acb\u81ea\u884c\u78ba\u8a8d');
-      }
-      currentEvent = { day: currentDay||1, time, title, note: time + '\u2013' + endTime + ' ' + title, addr: '', station: '', line: '' };
-      noteLines = [];
+      const time = padTime(tsm[1]);
+      const title = tsm[2].trim().replace(/[\u3002.\u3001,]$/, '');
+      currentEvent = { day: currentDay||1, time, title, note:'', addr:'', station:'', line:'' };
+      noteLines = []; continue;
+    }
+
+    // Indented sub-bullet or 攻略/備註 line → note
+    if ((isIndented || /^[\u653b\u7565\u5099\u8a3b\u8aac\u660e\u6ce8\u610f][\uff1a:]/.test(db)) && currentEvent) {
+      const noteLine = db.replace(/^[\u653b\u7565\u5099\u8a3b\u8aac\u660e\u6ce8\u610f]+[\uff1a:]\s*/, '').trim().replace(/[\u3002.]$/, '');
+      if (noteLine) noteLines.push(noteLine);
       continue;
     }
 
-    // Single time: 09:00｜Title or 09:00 | Title
-    const timeSingleMatch = line.match(/^(\d{1,2}:\d{2})\s*[|\uff5c]\s*(.+)$/);
-    if (timeSingleMatch) {
-      pushCurrentEvent();
-      const time = padTime(timeSingleMatch[1]);
-      const title = timeSingleMatch[2].trim();
-      currentEvent = { day: currentDay||1, time, title, note: '', addr: '', station: '', line: '' };
-      noteLines = [];
+    // Label fields
+    if (/^\u5730\u5740[\uff1a:]/.test(line)) { if (currentEvent) currentEvent.addr = db.replace(/^\u5730\u5740[\uff1a:]/,'').trim(); continue; }
+    if (/^\u8aac\u660e[\uff1a:]/.test(line)) { if (currentEvent) currentEvent.note = (currentEvent.note?currentEvent.note+' ':'')+db.replace(/^\u8aac\u660e[\uff1a:]/,'').trim(); continue; }
+    if (/^\u6700\u8fd1\u7ad9[\uff1a:]/.test(line)) {
+      const v = db.replace(/^\u6700\u8fd1\u7ad9[\uff1a:]/,'').trim().split(/[|\uff5c]/);
+      if (currentEvent) { currentEvent.station=(v[0]||'').trim(); currentEvent.line=(v[1]||'').trim(); }
       continue;
     }
 
-    // Labels
-    if (/^\u8aac\u660e[:\uff1a]/.test(line)) {
-      const val = line.replace(/^\u8aac\u660e[:\uff1a]/, '').trim();
-      if (currentEvent) currentEvent.note = (currentEvent.note ? currentEvent.note + ' ' : '') + val;
-      continue;
-    }
-    if (/^\u5730\u5740[:\uff1a]/.test(line)) {
-      if (currentEvent) currentEvent.addr = line.replace(/^\u5730\u5740[:\uff1a]/, '').trim();
-      continue;
-    }
-    if (/^\u6700\u8fd1\u7ad9[:\uff1a]/.test(line)) {
-      const val = line.replace(/^\u6700\u8fd1\u7ad9[:\uff1a]/, '').trim();
-      const parts = val.split(/[\uff5c|]/);
-      if (currentEvent) {
-        currentEvent.station = (parts[0]||'').trim();
-        currentEvent.line = (parts[1]||'').trim().replace(/\uff08[^\uff09]*\uff09/g,'').replace(/\([^)]*\)/g,'').trim();
-      }
-      continue;
-    }
-    if (/^\u4e3b\u984c[:\uff1a]/.test(line)) {
-      const val = line.replace(/^\u4e3b\u984c[:\uff1a]/, '').trim();
-      if (currentEvent) currentEvent.note = (currentEvent.note ? currentEvent.note + ' ' : '') + '\u4e3b\u984c\uff1a' + val;
-      continue;
-    }
-
-    // Skip section headers like 行程、注意事項、行程順序
-    if (/^\u884c\u7a0b$|^\u6ce8\u610f\u4e8b\u9805$/.test(line)) continue;
+    // Skip pure section headers
+    if (/^(\u884c\u7a0b|\u6ce8\u610f\u4e8b\u9805|\u898f\u5283|\u5efa\u8b70|\u884c\u7a0b\u9806\u5e8f)$/.test(line)) continue;
 
     if (currentEvent) noteLines.push(line);
   }
@@ -3808,7 +3778,6 @@ function _parseItineraryText(text) {
   if (daysCount === 0 && events.length > 0) daysCount = 1;
   return { days_count: daysCount, events, issues, _noDayDetected: noDayDetected };
 }
-
 
 function _applySmartImport(result) {
   const reports = [];
