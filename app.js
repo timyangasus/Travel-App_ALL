@@ -3366,7 +3366,7 @@ function renderFlightCards() {
         <div class="fc2-tear-line"></div>
       </div>` : '';
     return `
-    <div class="fc2" onclick="if(!event.target.closest('.fc2-url-row'))openFlightSheet(${f.id})">
+    <div class="fc2" onclick="openFlightSheet(${f.id})">
       <div class="fc2-head">
         <div>
           <div class="fc2-pnr-label">訂位代號</div>
@@ -3383,7 +3383,7 @@ function renderFlightCards() {
         ${tear}
         ${ibSeg}
       </div>
-      ${f.url ? `<div class="fc2-url-row" onclick="window.open(${JSON.stringify(f.url)},'_blank')">${esc(f.url)}</div>` : ''}
+      ${f.url ? `<div class="fc2-url-row" onclick="event.stopPropagation();window.open('${esc(f.url)}','_blank')">${esc(f.url)}</div>` : ''}
     </div>`;
   }).join('');
 }
