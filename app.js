@@ -1070,8 +1070,10 @@ function renderDayTabs() {
     b.onclick = () => {
       currentDay = i;
       renderItinerary();
-      const screen = document.getElementById('screen-itinerary');
-      if (screen) screen.scrollTop = 0;
+      setTimeout(() => {
+        const screen = document.getElementById('screen-itinerary');
+        if (screen) screen.scrollTop = 0;
+      }, 0);
     };
 
     // Long-press to delete
@@ -2044,11 +2046,12 @@ function renderMapSub() {
   tabsBar.style.display  = 'block';
 
   _mapActiveIdx = Math.min(_mapActiveIdx, maps.length - 1);
+  _mapEngineReady = false; // reset engine so pan/zoom re-inits
   _renderMapTabs();
   setTimeout(() => {
     _mapSizeViewerSync();
     _mapLoadImage(maps[_mapActiveIdx].url);
-  }, 50);
+  }, 100);
 }
 
 function _renderMapTabs() {
