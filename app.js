@@ -1876,7 +1876,7 @@ function openInfoSub(name) {
   if (name === 'ticket')    renderTicketCards();
   if (name === 'notes')     renderNotes();
   if (name === 'photo')     renderPhotoPage();
-  if (name === 'map')       renderMapSub();
+  if (name === 'map')       setTimeout(renderMapSub, 80);
 }
 
 function closeInfoSub(name) {
@@ -2039,15 +2039,17 @@ function renderMapSub() {
   }
 
   emptyEl.style.display  = 'none';
-  viewerEl.style.display = 'block';
   tabsBar.style.display  = 'block';
+  viewerEl.style.display = 'block';
 
   _mapActiveIdx = Math.min(_mapActiveIdx, maps.length - 1);
   _renderMapTabs();
+
+  // Wait for tabs bar to reflow, then size viewer and load image
   setTimeout(() => {
     _mapSizeViewerSync();
     _mapLoadImage(maps[_mapActiveIdx].url);
-  }, 50);
+  }, 120);
 }
 
 function _renderMapTabs() {
