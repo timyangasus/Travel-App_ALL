@@ -1071,8 +1071,8 @@ function renderDayTabs() {
       currentDay = i;
       renderItinerary();
       requestAnimationFrame(() => {
-        const screen = document.getElementById('screen-itinerary');
-        if (screen) screen.scrollTop = 0;
+        const timeline = document.getElementById('timeline-section');
+        if (timeline) timeline.scrollTop = 0;
       });
     };
 
@@ -2279,14 +2279,10 @@ function _mapLoadImage(url) {
     const iw = img.naturalWidth  || vw;
     const ih = img.naturalHeight || vh;
 
-    // Scale to fit height, center horizontally
-    const scaleH = vh / ih;
-    const scaleW = vw / iw;
-    _mapScale = Math.min(scaleH, scaleW); // fit entire image
-    const renderedW = iw * _mapScale;
-    const renderedH = ih * _mapScale;
-    _mapTx = (vw - renderedW) / 2;
-    _mapTy = (vh - renderedH) / 2;
+    // Scale to fit width, let user scroll down for rest
+    _mapScale = vw / iw;
+    _mapTx = 0;
+    _mapTy = 0;
 
     // Set img to natural size, use transform for scale/position
     img.style.width  = iw + 'px';
