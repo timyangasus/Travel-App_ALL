@@ -1004,28 +1004,26 @@ let _itinSwipeInited = false;
 function initItinerarySwipe() {
   if (_itinSwipeInited) return;
   _itinSwipeInited = true;
-  const screen = document.getElementById('screen-itinerary');
-  if (!screen) return;
+  // 只在 banner 區掛 swipe，避免與 timeline-section 的上下捲動衝突
+  const banner = document.getElementById('banner-area');
+  if (!banner) return;
   let startX = 0, startY = 0;
-  screen.addEventListener('touchstart', e => {
+  banner.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
   }, { passive: true });
-  screen.addEventListener('touchend', e => {
+  banner.addEventListener('touchend', e => {
     if (!data) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
-    // 嚴格條件：橫向移動 > 80px 且橫向是主要方向（橫>縱2倍）
-    if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
     const total = data.days.length;
-    if (dx < 0) {
-      currentDay = (currentDay + 1) % total;
-    } else {
-      currentDay = (currentDay - 1 + total) % total;
-    }
+    currentDay = dx < 0 ? (currentDay + 1) % total : (currentDay - 1 + total) % total;
     renderItinerary();
-    const tl = document.getElementById('timeline-section');
-    if (tl) tl.scrollTop = 0;
+    requestAnimationFrame(() => {
+      const tl = document.getElementById('timeline-section');
+      if (tl) tl.scrollTop = 0;
+    });
   }, { passive: true });
 }
 
@@ -1100,8 +1098,10 @@ function renderDayTabs() {
     b.onclick = () => {
       currentDay = i;
       renderItinerary();
-      const tl = document.getElementById('timeline-section');
-      if (tl) tl.scrollTop = 0;
+      requestAnimationFrame(() => {
+        const tl = document.getElementById('timeline-section');
+        if (tl) tl.scrollTop = 0;
+      });
     };
 
     // Long-press to delete
