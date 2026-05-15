@@ -1006,26 +1006,27 @@ function initItinerarySwipe() {
   _itinSwipeInited = true;
   const screen = document.getElementById('screen-itinerary');
   if (!screen) return;
-  let startX = 0, startY = 0, maxDy = 0, cancelled = false;
+  let startX = 0, startY = 0, maxDy = 0, cancelled = false, processing = false;
 
   screen.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     maxDy = 0;
     cancelled = false;
+    processing = false;
   }, { passive: true });
 
   screen.addEventListener('touchmove', e => {
     const dy = Math.abs(e.touches[0].clientY - startY);
     if (dy > maxDy) maxDy = dy;
-    // 有明顯垂直移動就取消
     if (maxDy > 10) cancelled = true;
   }, { passive: true });
 
   screen.addEventListener('touchend', e => {
-    if (!data || cancelled) return;
+    if (!data || cancelled || processing) return;
     const dx = e.changedTouches[0].clientX - startX;
     if (Math.abs(dx) < 60) return;
+    processing = true;
     const total = data.days.length;
     currentDay = dx < 0 ? (currentDay + 1) % total : (currentDay - 1 + total) % total;
     renderItinerary();
