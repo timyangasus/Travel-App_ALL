@@ -3451,8 +3451,8 @@ function renderHotelCards() {
         </div>
         <div class="hotel2-info">
           <div class="hotel2-info-top">
-            <span class="hotel2-dates">${esc(h.dates || '日期未設定')}</span>
             ${nights > 0 ? `<span class="hotel2-nights">${nights} 晚</span>` : ''}
+            <span class="hotel2-dates">${esc(h.dates || '日期未設定')}</span>
           </div>
           <div class="hotel2-name">${esc(h.name || '未命名')}</div>
           ${h.ref ? `<div class="hotel2-ref"><div class="hotel2-ref-label">訂單編號</div><div class="hotel2-ref-val">${esc(h.ref)}</div></div>` : ''}

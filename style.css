@@ -2184,13 +2184,14 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .hotel2-info-top {
   display: flex;
-  align-items: center;
-  gap: 5px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   margin-bottom: 4px;
 }
-.hotel2-dates { font-size: 14px; font-weight: 700; color: #1A1A1A; font-family: var(--mono); white-space: nowrap; }
+.hotel2-dates { font-size: 18px; font-weight: 700; color: #1A1A1A; font-family: var(--mono); white-space: nowrap; }
 .hotel2-nights {
-  font-size: 13px; font-weight: 700;
+  font-size: 15px; font-weight: 700;
   background: #F0F0F0; color: #333;
   padding: 1px 6px; font-family: var(--mono);
   white-space: nowrap; flex-shrink: 0;
@@ -2205,17 +2206,17 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .hotel2-del:active { color: #E53935; }
 .hotel2-del svg { display: none; }
-.hotel2-name { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 10px; font-family: var(--mono); color: #D4AF37; line-height: 1.3; }
+.hotel2-name { font-size: 21px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 10px; font-family: var(--mono); color: #D4AF37; line-height: 1.3; }
 .hotel2-addr {
-  font-size: 8px; color: #555; font-family: var(--mono);
+  font-size: 10px; color: #555; font-family: var(--mono);
   margin-bottom: 10px; line-height: 1.6;
 }
 .hotel2-ref { margin-bottom: 10px; }
 .hotel2-ref-label { font-size: 9px; color: var(--text-tertiary); font-family: var(--mono); letter-spacing: 0.06em; margin-bottom: 1px; }
-.hotel2-ref-val { font-size: 15px; font-weight: 700; font-family: var(--mono); color: var(--text-primary); }
+.hotel2-ref-val { font-size: 16px; font-weight: 700; font-family: var(--mono); color: var(--text-primary); }
 .hotel2-price-row { display: flex; align-items: center; border-top: 0.5px solid var(--border-thin); padding-top: 8px; margin-top: auto; }
 .hotel2-price-label { font-size: 11px; color: var(--text-tertiary); font-family: var(--mono); }
-.hotel2-price-val { font-size: 21px; font-weight: 700; color: #D4AF37; font-family: var(--mono); letter-spacing: -0.5px; margin-left: auto; }
+.hotel2-price-val { font-size: 24px; font-weight: 700; color: #D4AF37; font-family: var(--mono); letter-spacing: -0.5px; margin-left: auto; }
 /* Sheet price+breakfast layout */
 .hotel-price-breakfast-row { flex-direction: row !important; gap: 14px; align-items: flex-end; }
 .hotel-price-col { flex: 1; min-width: 0; }
