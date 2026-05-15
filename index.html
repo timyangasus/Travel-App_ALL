@@ -86,18 +86,11 @@
         <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z"/></svg>
       </button>
       <div class="screen-title" style="flex:1;font-family:var(--mono)">地圖</div>
-      <!-- Dropdown selector (多張地圖時顯示) -->
-      <div id="map-selector-wrap" style="display:none;position:relative;margin-right:6px;align-self:center;margin-top:8px">
-        <button onclick="mapToggleDropdown()" style="display:flex;align-items:center;gap:8px;background:none;border:1px solid #DDDDDD;border-radius:0;padding:7px 14px;font-family:var(--mono);font-size:13px;color:#1A1A1A;cursor:pointer;min-width:130px;justify-content:space-between;-webkit-tap-highlight-color:transparent">
-          <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
-            <span id="map-current-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">地圖</span>
-          </div>
-          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#888" style="flex-shrink:0"><path d="M480-360 280-560h400L480-360Z"/></svg>
-        </button>
-        <div id="map-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;background:#fff;border:0.5px solid #E0E0E0;border-radius:0;box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:200;min-width:160px;overflow:hidden"></div>
-      </div>
-      <button class="sub-header-action" onclick="mapAddNew()" style="padding:4px">
-        <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 -960 960 960" width="30px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+      <!-- 有地圖時顯示 refresh，無地圖時顯示 + -->
+      <button id="map-action-btn" class="sub-header-action" onclick="onMapActionBtn()" style="padding:4px">
+        <!-- icon swapped by JS -->
+        <svg id="map-action-icon-add" xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 -960 960 960" width="30px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+        <svg id="map-action-icon-refresh" xmlns="http://www.w3.org/2000/svg" height="26px" viewBox="0 -960 960 960" width="26px" style="display:none"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 108-114 174t-196 66Z"/></svg>
       </button>
     </div>
 
@@ -105,36 +98,18 @@
     <div id="map-empty-state" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px 32px;text-align:center">
       <svg xmlns="http://www.w3.org/2000/svg" height="64px" viewBox="0 -960 960 960" width="64px" fill="#D0D0D0"><path d="m600-176-240-84-150 58q-14 5-26-3t-12-23v-468q0-10 4.5-18.5T190-726l170-58 240 84 150-58q14-5 26 1.5t12 20.5v476q0 11-6 19t-16 11l-166 54Zm-14-34v-468l-212-74v468l212 74Zm28 0 146-48v-474l-146 54v468Zm-414-18 146-56v-468l-146 50v474Zm414-450v468-468Zm-268-74v468-468Z"/></svg>
       <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:#AAAAAA">尚未新增地圖</div>
-      <div style="font-size:13px;color:#CCCCCC;font-family:var(--mono);line-height:1.6">點右上角 ＋ 新增地圖</div>
+      <div style="font-size:13px;color:#CCCCCC;font-family:var(--mono);line-height:1.6">點右上角 ＋ 貼上地圖圖片網址</div>
     </div>
 
-    <!-- Map Viewer -->
+    <!-- Map Viewer (hidden until map loaded) -->
     <div id="map-viewer" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;background:#F0F0F0;touch-action:none">
       <img id="map-img" src="" alt="map"
         style="position:absolute;top:0;left:0;width:100%;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;display:block"/>
+      <!-- Reset button -->
       <button id="map-reset-btn" onclick="mapResetView()"
         style="position:absolute;bottom:20px;right:16px;z-index:10;width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.95);border:1px solid rgba(0,0,0,0.10);box-shadow:0 2px 8px rgba(0,0,0,0.12);cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent">
         <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px" fill="#555"><path d="M200-120q-33 0-56.5-23.5T120-200v-160h80v160h160v80H200Zm400 0v-80h160v-160h80v160q0 33-23.5 56.5T760-120H600ZM120-600v-160q0-33 23.5-56.5T200-840h160v80H200v160h-80Zm640 0v-160H600v-80h160q33 0 56.5 23.5T840-760v160h-80Z"/></svg>
       </button>
-    </div>
-  </div>
-
-  <!-- ═══ MAP NAME MODAL ═══ -->
-  <div class="modal-overlay" id="modal-map-name">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-title" id="modal-map-name-title">新增地圖</div>
-      <div class="modal-body" style="padding:0 20px 20px">
-        <div class="ff-label">地圖名稱</div>
-        <input class="ff-input" id="map-name-input" placeholder="" style="font-size:18px;font-weight:700">
-        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
-          <div class="modal-btn-row" style="padding:0">
-            <button class="modal-btn modal-btn-cancel" onclick="closeModal('modal-map-name')">取消</button>
-            <button class="modal-btn modal-btn-save" onclick="mapConfirmName()">完成</button>
-          </div>
-          <button id="map-delete-btn" onclick="mapDeleteCurrent()" style="display:none;width:100%;padding:14px;background:none;border:1px solid #E53935;color:#E53935;font-family:var(--mono);font-size:15px;cursor:pointer;box-sizing:border-box">刪除此地圖</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -162,11 +137,11 @@
       </div>
       <div style="padding:0 42px 6px;margin-top:-20px">
         <div class="expense-total-card">
-          <div style="display:flex;align-items:flex-end;justify-content:space-between">
+          <div class="expense-total-meta">
             <span class="expense-total-label">當日合計</span>
-            <div class="expense-total-amount" id="expense-total">0</div>
           </div>
-          <div class="expense-trip-total-row" style="margin-top:12px;justify-content:space-between">
+          <div class="expense-total-amount" id="expense-total">0</div>
+          <div class="expense-trip-total-row" style="margin-top:22px">
             <span class="expense-trip-label">旅行總計</span>
             <span class="expense-trip-amount" id="expense-trip-total">0</span>
           </div>
@@ -260,7 +235,7 @@
 
   <!-- ═══ FLIGHT BOTTOM SHEET ═══ -->
   <div class="modal-overlay" id="modal-flight-sheet">
-    <div class="modal-sheet" style="max-height:75vh;overflow-y:auto">
+    <div class="modal-sheet" style="max-height:92vh;overflow-y:auto">
       <div class="modal-handle"></div>
       <div class="modal-title" id="flight-sheet-title">新增機票</div>
       <div class="modal-body" style="padding:0 20px">
@@ -664,7 +639,7 @@
       </div>
       <div style="flex:1;overflow-y:auto;padding:0 20px">
         <textarea id="smart-import-text"
-          placeholder="貼入行程文字…"
+          placeholder="貼入行程文字…&#10;&#10;例：&#10;Day 1｜2026/11/05（三）&#10;09:00 - 11:00 抵達機場&#10;說明：通關後搭車前往飯店&#10;最近站：關西機場｜JR 關空快速"
           style="width:100%;box-sizing:border-box;min-height:220px;resize:vertical;padding:14px;border:1.5px solid #EBEBEB;border-radius:0;font-size:16px;font-family:var(--mono);outline:none;line-height:1.6"></textarea>
         <div style="text-align:right;margin-top:6px;margin-bottom:8px">
           <span id="smart-import-count" style="font-family:var(--mono);font-size:12px;color:#AAAAAA">0 / 3000</span>
@@ -1142,7 +1117,7 @@
 <!-- ═══ TRIP CURRENCY SHEET ═══ -->
 <!-- ═══ CURRENCY SHEET (shared) ═══ -->
 <div class="modal-overlay" id="modal-currency-sheet">
-  <div class="modal-sheet" style="max-height:65vh;display:flex;flex-direction:column">
+  <div class="modal-sheet" style="max-height:85vh;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 10px;flex-shrink:0">
       <span class="modal-title" style="padding:0">選擇幣別</span>
       <button onclick="closeModal('modal-currency-sheet')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
