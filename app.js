@@ -1006,26 +1006,19 @@ function initItinerarySwipe() {
   _itinSwipeInited = true;
   const screen = document.getElementById('screen-itinerary');
   if (!screen) return;
-  let startX = 0, startY = 0, fromBanner = false;
+  let startX = 0, startY = 0;
   screen.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
-    // 只允許從 banner 或 day-tabs 區域發起的滑動
-    const tl = document.getElementById('timeline-section');
-    fromBanner = tl ? !tl.contains(e.target) : true;
   }, { passive: true });
   screen.addEventListener('touchend', e => {
-    if (!data || !fromBanner) return;
+    if (!data) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return;
     const total = data.days.length;
     currentDay = dx < 0 ? (currentDay + 1) % total : (currentDay - 1 + total) % total;
     renderItinerary();
-    requestAnimationFrame(() => {
-      const tl = document.getElementById('timeline-section');
-      if (tl) tl.scrollTop = 0;
-    });
   }, { passive: true });
 }
 
@@ -1100,10 +1093,6 @@ function renderDayTabs() {
     b.onclick = () => {
       currentDay = i;
       renderItinerary();
-      requestAnimationFrame(() => {
-        const tl = document.getElementById('timeline-section');
-        if (tl) tl.scrollTop = 0;
-      });
     };
 
     // Long-press to delete
