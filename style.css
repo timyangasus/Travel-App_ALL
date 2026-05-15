@@ -1844,16 +1844,15 @@ canvas { display: block; width: 100%; height: 100%; }
   line-height: 1;
 }
 .fc2-del {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   background: none;
   border: none;
   font-size: 18px;
   color: #CCCCCC;
   cursor: pointer;
-  padding: 4px;
+  padding: 0;
+  flex-shrink: 0;
   line-height: 1;
+  align-self: flex-start;
   transition: color 0.15s;
 }
 .fc2-del:active { color: #E53935; }
