@@ -997,39 +997,6 @@ function renderItinerary() {
   renderDayTabs();
   renderBanner();
   renderTimeline();
-  initItinerarySwipe();
-}
-
-let _itinSwipeInited = false;
-function initItinerarySwipe() {
-  if (_itinSwipeInited) return;
-  _itinSwipeInited = true;
-  const screen = document.getElementById('screen-itinerary');
-  if (!screen) return;
-  let startX = 0, startY = 0, maxDy = 0, cancelled = false;
-
-  screen.addEventListener('touchstart', e => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    maxDy = 0;
-    cancelled = false;
-  }, { passive: true });
-
-  screen.addEventListener('touchmove', e => {
-    const dy = Math.abs(e.touches[0].clientY - startY);
-    if (dy > maxDy) maxDy = dy;
-    // 有明顯垂直移動就取消
-    if (maxDy > 10) cancelled = true;
-  }, { passive: true });
-
-  screen.addEventListener('touchend', e => {
-    if (!data || cancelled) return;
-    const dx = e.changedTouches[0].clientX - startX;
-    if (Math.abs(dx) < 60) return;
-    const total = data.days.length;
-    currentDay = dx < 0 ? (currentDay + 1) % total : (currentDay - 1 + total) % total;
-    renderItinerary();
-  }, { passive: true });
 }
 
 /* ─── Custom Confirm Dialog ─── */
@@ -1103,6 +1070,8 @@ function renderDayTabs() {
     b.onclick = () => {
       currentDay = i;
       renderItinerary();
+      const tl = document.getElementById('timeline-section');
+      if (tl) tl.scrollTop = 0;
     };
 
     // Long-press to delete
@@ -3482,8 +3451,8 @@ function renderHotelCards() {
         </div>
         <div class="hotel2-info">
           <div class="hotel2-info-top">
-            ${nights > 0 ? `<span class="hotel2-nights">${nights} 晚</span>` : ''}
             <span class="hotel2-dates">${esc(h.dates || '日期未設定')}</span>
+            ${nights > 0 ? `<span class="hotel2-nights">${nights} 晚</span>` : ''}
           </div>
           <div class="hotel2-name">${esc(h.name || '未命名')}</div>
           ${h.ref ? `<div class="hotel2-ref"><div class="hotel2-ref-label">訂單編號</div><div class="hotel2-ref-val">${esc(h.ref)}</div></div>` : ''}
