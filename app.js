@@ -3430,40 +3430,54 @@ function renderHotelCards() {
     el.innerHTML = `<div class="list-empty"></div>`;
     return;
   }
-  // Sort by checkin date ascending
   const sorted = [...data.hotels].sort((a, b) => {
     const pa = (a.checkin || a.dates || '').replace(/[^\d]/g, '');
     const pb = (b.checkin || b.dates || '').replace(/[^\d]/g, '');
-    if (!pa) return 1;
-    if (!pb) return -1;
+    if (!pa) return 1; if (!pb) return -1;
     return pa.localeCompare(pb);
   });
   el.innerHTML = sorted.map(h => {
     const nights = h.nights || 0;
     const priceDisplay = h.price ? `${sym} ${parseInt(h.price).toLocaleString()}` : '';
+    const coverBg = h.img
+      ? `background-image:url('${h.img}');background-size:cover;background-position:center`
+      : 'background:#F0F0F0';
     return `
     <div class="hotel-card2" onclick="openHotelSheet(${h.id})">
-      <div class="hotel2-header">
-        <div class="hotel2-dates">${esc(h.dates || '日期未設定')}</div>
-        <div class="hotel2-right">
-          ${nights > 0 ? `<span class="hotel2-nights">${nights} 晚</span>` : ''}
-          <button class="hotel2-del" onclick="event.stopPropagation();deleteHotelCard(${h.id})">
-            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-          </button>
+      <button class="hotel2-del" onclick="event.stopPropagation();deleteHotelCard(${h.id})">×</button>
+      <div class="hotel2-body">
+        <div class="hotel2-cover" style="${coverBg}" onclick="event.stopPropagation();hotelPickCover(${h.id})">
+          ${!h.img ? `<svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px" fill="#CCCCCC"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/></svg>` : ''}
+        </div>
+        <div class="hotel2-info">
+          <div class="hotel2-info-top">
+            <span class="hotel2-dates">${esc(h.dates || '日期未設定')}</span>
+            ${nights > 0 ? `<span class="hotel2-nights">${nights} 晚</span>` : ''}
+          </div>
+          <div class="hotel2-name">${esc(h.name || '未命名')}</div>
+          ${h.ref ? `<div class="hotel2-ref"><div class="hotel2-ref-label">訂單編號</div><div class="hotel2-ref-val">${esc(h.ref)}</div></div>` : ''}
+          ${h.addr ? `<div class="hotel2-addr" onclick="event.stopPropagation();window.open('https://maps.google.com/?q=${encodeURIComponent(h.addr)}','_blank')">${esc(h.addr)}</div>` : ''}
+          ${priceDisplay ? `<div class="hotel2-price-row"><span class="hotel2-price-label">總價</span><span class="hotel2-price-val">${priceDisplay}</span></div>` : ''}
         </div>
       </div>
-      <div class="hotel2-name">${esc(h.name || '未命名')}</div>
-      ${h.ref ? `<div class="hotel2-ref"><span class="hotel2-ref-label">訂單編號</span><span class="hotel2-ref-val">${esc(h.ref)}</span></div>` : ''}
-      ${h.addr ? `<div class="hotel2-addr" onclick="event.stopPropagation();window.open('https://maps.google.com/?q=${encodeURIComponent(h.addr)}','_blank')">
-        <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px"><path d="M480-480q33 0 56.5-23.5T560-560q0-33-23.5-56.5T480-640q-33 0-56.5 23.5T400-560q0 33 23.5 56.5T480-480Zm0 294q122-112 181-203.5T720-560q0-109-69.5-184.5T480-820q-101 0-170.5 75.5T240-560q0 71 59 162.5T480-186Zm0 106Q319-217 239.5-334.5T160-560q0-150 96.5-245T480-900q127 0 223.5 95T800-560q0 112-79.5 229.5T480-80Zm0-480Z"/></svg>
-        ${esc(h.addr)}</div>` : ''}
-      ${h.breakfast ? `<div class="hotel2-tags"><span class="hotel2-tag-breakfast">含早餐</span></div>` : ''}
-      ${priceDisplay ? `<div class="hotel2-price-row">
-        <span class="hotel2-price-label">總價</span>
-        <span class="hotel2-price-val">${priceDisplay}</span>
-      </div>` : ''}
     </div>`;
   }).join('');
+}
+
+function hotelPickCover(id) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = async () => {
+    const file = inp.files[0]; if (!file) return;
+    showUploadStatus('上傳中...');
+    try {
+      const url = await uploadToImgBB(file);
+      const h = data.hotels.find(h => h.id === id);
+      if (h) { h.img = url; save(); renderHotelCards(); }
+    } catch(e) { showToast('上傳失敗'); }
+    finally { showUploadStatus(''); }
+  };
+  inp.click();
 }
 
 
