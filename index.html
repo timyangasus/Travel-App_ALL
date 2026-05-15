@@ -87,13 +87,15 @@
       </button>
       <div class="screen-title" style="flex:1;font-family:var(--mono)">地圖</div>
       <!-- Dropdown selector (多張地圖時顯示) -->
-      <div id="map-selector-wrap" style="display:none;position:relative;margin-right:8px">
-        <button onclick="mapToggleDropdown()" style="display:flex;align-items:center;gap:6px;background:none;border:1px solid #DDDDDD;border-radius:8px;padding:6px 10px;font-family:var(--mono);font-size:13px;color:#1A1A1A;cursor:pointer">
-          <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#888"><path d="m600-176-240-84-150 58q-14 5-26-3t-12-23v-468q0-10 4.5-18.5T190-726l170-58 240 84 150-58q14-5 26 1.5t12 20.5v476q0 11-6 19t-16 11l-166 54Z"/></svg>
-          <span id="map-current-name">地圖</span>
-          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#888"><path d="M480-360 280-560h400L480-360Z"/></svg>
+      <div id="map-selector-wrap" style="display:none;position:relative;margin-right:6px;align-self:center">
+        <button onclick="mapToggleDropdown()" style="display:flex;align-items:center;gap:8px;background:none;border:1px solid #DDDDDD;border-radius:8px;padding:7px 14px;font-family:var(--mono);font-size:13px;color:#1A1A1A;cursor:pointer;min-width:130px;justify-content:space-between;-webkit-tap-highlight-color:transparent">
+          <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#888" style="flex-shrink:0"><path d="m600-176-240-84-150 58q-14 5-26-3t-12-23v-468q0-10 4.5-18.5T190-726l170-58 240 84 150-58q14-5 26 1.5t12 20.5v476q0 11-6 19t-16 11l-166 54Z"/></svg>
+            <span id="map-current-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">地圖</span>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#888" style="flex-shrink:0"><path d="M480-360 280-560h400L480-360Z"/></svg>
         </button>
-        <div id="map-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;background:#fff;border:0.5px solid #E0E0E0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:100;min-width:140px;overflow:hidden"></div>
+        <div id="map-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;background:#fff;border:0.5px solid #E0E0E0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:200;min-width:160px;overflow:hidden"></div>
       </div>
       <button class="sub-header-action" onclick="mapAddNew()" style="padding:4px">
         <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 -960 960 960" width="30px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>

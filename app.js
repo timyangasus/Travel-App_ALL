@@ -2024,7 +2024,7 @@ function renderMapSub() {
   _mapIdx = Math.min(_mapIdx, maps.length - 1);
 
   // Selector: show only when >1 map
-  if (selWrap) selWrap.style.display = maps.length > 1 ? 'flex' : 'none';
+  if (selWrap) selWrap.style.display = maps.length >= 1 ? 'flex' : 'none';
   _mapUpdateSel();
 
   // Size viewer then show image
