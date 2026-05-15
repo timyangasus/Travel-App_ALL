@@ -2197,7 +2197,12 @@ function mapResetView() {
 }
 
 function _mapZoomAt(px, py, factor) {
-  const minS = 0.1;
+  const img = document.getElementById('map-img');
+  const viewer = document.getElementById('map-viewer');
+  if (!img || !viewer || !img.naturalWidth) return;
+  const vw = viewer.clientWidth || window.innerWidth;
+  const vh = viewer.clientHeight || (window.innerHeight - 140);
+  const minS = vh / (vw * (img.naturalHeight / img.naturalWidth)); // fit-height scale
   const newS = _mapClamp(_mapScale * factor, minS, MAP_MAX_SCALE);
   _mapTx = px - (px - _mapTx) * (newS / _mapScale);
   _mapTy = py - (py - _mapTy) * (newS / _mapScale);
