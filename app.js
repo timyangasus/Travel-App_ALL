@@ -2057,23 +2057,21 @@ function _mapShow(url) {
   _mapEngineReady = false;
 
   function render() {
-    const vw = window.innerWidth;
-    const headerH = document.getElementById('map-sub-header')?.offsetHeight || 56;
-    const tabBarEl = document.getElementById('tab-bar') || document.querySelector('nav') || document.querySelector('.tab-bar');
-    const tabBarH = tabBarEl?.offsetHeight || 83;
-    const vh = window.innerHeight - headerH - tabBarH;
+    const vw = viewer.clientWidth  || window.innerWidth;
+    const vh = viewer.clientHeight || (window.innerHeight - 140);
     const iw = img.naturalWidth;
     const ih = img.naturalHeight;
-    if (!iw || !ih) return;
-    // fit height — image fills full viewer height, may overflow horizontally
-    _mapScale = vh / ih;
-    _mapTx = (vw - iw * _mapScale) / 2;
+    if (!iw || !ih || !vh) return;
+    // 照舊版：fit height，寬度置中
+    _mapScale = vh / (vw * (ih / iw));
+    const renderedW = vw * _mapScale;
+    _mapTx = (vw - renderedW) / 2;
     _mapTy = 0;
-    img.style.position       = 'absolute';
-    img.style.top            = '0';
-    img.style.left           = '0';
-    img.style.width          = iw + 'px';
-    img.style.height         = ih + 'px';
+    img.style.position        = 'absolute';
+    img.style.top             = '0';
+    img.style.left            = '0';
+    img.style.width           = '100%';
+    img.style.height          = 'auto';
     img.style.transformOrigin = '0 0';
     _mapApply(false);
     _mapInitEngine();
@@ -2160,20 +2158,20 @@ function onMapActionBtn() { mapAddNew(); }
 function _mapClamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
 function _mapVWH() {
-  const headerH = document.getElementById('map-sub-header')?.offsetHeight || 56;
-  const tabBarEl = document.getElementById('tab-bar') || document.querySelector('nav') || document.querySelector('.tab-bar');
-  const tabBarH = tabBarEl?.offsetHeight || 83;
-  return { vw: window.innerWidth, vh: window.innerHeight - headerH - tabBarH };
+  const viewer = document.getElementById('map-viewer');
+  const vw = viewer?.clientWidth  || window.innerWidth;
+  const vh = viewer?.clientHeight || (window.innerHeight - 140);
+  return { vw, vh };
 }
 
 function _mapConstrain() {
   const img = document.getElementById('map-img');
   if (!img || !img.naturalWidth) return;
   const { vw, vh } = _mapVWH();
-  const rw = img.naturalWidth  * _mapScale;
-  const rh = img.naturalHeight * _mapScale;
-  _mapTx = rw <= vw ? (vw - rw) / 2 : _mapClamp(_mapTx, vw - rw, 0);
-  _mapTy = rh <= vh ? (vh - rh) / 2 : _mapClamp(_mapTy, vh - rh, 0);
+  const renderedW = vw * _mapScale;
+  const renderedH = vw * (img.naturalHeight / img.naturalWidth) * _mapScale;
+  _mapTx = renderedW <= vw ? (vw - renderedW) / 2 : _mapClamp(_mapTx, vw - renderedW, 0);
+  _mapTy = renderedH <= vh ? (vh - renderedH) / 2 : _mapClamp(_mapTy, vh - renderedH, 0);
 }
 
 function _mapApply(smooth) {
@@ -2188,8 +2186,9 @@ function mapResetView() {
   const img = document.getElementById('map-img');
   if (!img || !img.naturalWidth) return;
   const { vw, vh } = _mapVWH();
-  _mapScale = vh / img.naturalHeight;
-  _mapTx = (vw - img.naturalWidth  * _mapScale) / 2;
+  _mapScale = vh / (vw * (img.naturalHeight / img.naturalWidth));
+  const renderedW = vw * _mapScale;
+  _mapTx = (vw - renderedW) / 2;
   _mapTy = 0;
   _mapApply(true);
 }
