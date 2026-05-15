@@ -2043,7 +2043,7 @@ function _mapSizeViewer(cb) {
   // rAF ensures header has rendered height
   requestAnimationFrame(function() {
     const h = header.getBoundingClientRect().height;
-    viewer.style.top    = (h + 30) + 'px';
+    viewer.style.top    = (h + 15) + 'px';
     viewer.style.bottom = '0px';
     viewer.style.left   = '0px';
     viewer.style.right  = '0px';
