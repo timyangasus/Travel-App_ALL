@@ -997,35 +997,6 @@ function renderItinerary() {
   renderDayTabs();
   renderBanner();
   renderTimeline();
-  initItinerarySwipe();
-}
-
-let _itinSwipeInited = false;
-function initItinerarySwipe() {
-  if (_itinSwipeInited) return;
-  _itinSwipeInited = true;
-  const screen = document.getElementById('screen-itinerary');
-  if (!screen) return;
-  let startX = 0, startY = 0;
-  screen.addEventListener('touchstart', e => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive: true });
-  screen.addEventListener('touchend', e => {
-    if (!data) return;
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
-    const total = data.days.length;
-    if (dx < 0) {
-      currentDay = (currentDay + 1) % total;
-    } else {
-      currentDay = (currentDay - 1 + total) % total;
-    }
-    renderItinerary();
-    const tl = document.getElementById('timeline-section');
-    if (tl) tl.scrollTop = 0;
-  }, { passive: true });
 }
 
 /* ─── Custom Confirm Dialog ─── */
