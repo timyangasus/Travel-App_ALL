@@ -1745,6 +1745,8 @@ function initExpenseSwipe() {
     }
     renderExpenseDayTabs();
     renderExpenseList();
+    const list = document.getElementById('expense-list');
+    if (list) list.scrollTop = 0;
   }, { passive: true });
 }
 
@@ -1766,12 +1768,11 @@ function renderExpenseDayTabs() {
 
 function switchExpDay(i) {
   const total = data.days.length;
-  expenseDay = ((i % total) + total) % total; // circular
+  expenseDay = ((i % total) + total) % total;
   renderExpenseDayTabs();
   renderExpenseList();
-  // Reset scroll to top when switching days
-  const screen = document.getElementById('screen-expense');
-  if (screen) screen.scrollTop = 0;
+  const list = document.getElementById('expense-list');
+  if (list) list.scrollTop = 0;
 }
 
 function renderExpenseList() {
