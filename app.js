@@ -997,6 +997,36 @@ function renderItinerary() {
   renderDayTabs();
   renderBanner();
   renderTimeline();
+  initItinerarySwipe();
+}
+
+let _itinSwipeInited = false;
+function initItinerarySwipe() {
+  if (_itinSwipeInited) return;
+  _itinSwipeInited = true;
+  const screen = document.getElementById('screen-itinerary');
+  if (!screen) return;
+  let startX = 0, startY = 0;
+  screen.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  screen.addEventListener('touchend', e => {
+    if (!data) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    // 嚴格條件：橫向移動 > 80px 且橫向是主要方向（橫>縱2倍）
+    if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    const total = data.days.length;
+    if (dx < 0) {
+      currentDay = (currentDay + 1) % total;
+    } else {
+      currentDay = (currentDay - 1 + total) % total;
+    }
+    renderItinerary();
+    const tl = document.getElementById('timeline-section');
+    if (tl) tl.scrollTop = 0;
+  }, { passive: true });
 }
 
 /* ─── Custom Confirm Dialog ─── */
@@ -3451,8 +3481,8 @@ function renderHotelCards() {
         </div>
         <div class="hotel2-info">
           <div class="hotel2-info-top">
-            <span class="hotel2-dates">${esc(h.dates || '日期未設定')}</span>
             ${nights > 0 ? `<span class="hotel2-nights">${nights} 晚</span>` : ''}
+            <span class="hotel2-dates">${esc(h.dates || '日期未設定')}</span>
           </div>
           <div class="hotel2-name">${esc(h.name || '未命名')}</div>
           ${h.ref ? `<div class="hotel2-ref"><div class="hotel2-ref-label">訂單編號</div><div class="hotel2-ref-val">${esc(h.ref)}</div></div>` : ''}
