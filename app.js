@@ -2023,8 +2023,11 @@ function renderMapSub() {
   viewer.style.display = 'block';
   _mapIdx = Math.min(_mapIdx, maps.length - 1);
 
-  // Selector: show only when >1 map
-  if (selWrap) selWrap.style.display = maps.length >= 1 ? 'flex' : 'none';
+  // 永遠顯示選單（有地圖時）
+  if (selWrap) {
+    selWrap.style.cssText = selWrap.style.cssText.replace('display:none','');
+    selWrap.style.display = 'flex';
+  }
   _mapUpdateSel();
 
   // Size viewer then show image
@@ -2040,7 +2043,7 @@ function _mapSizeViewer(cb) {
   // rAF ensures header has rendered height
   requestAnimationFrame(function() {
     const h = header.getBoundingClientRect().height;
-    viewer.style.top    = h + 'px';
+    viewer.style.top    = (h + 30) + 'px';
     viewer.style.bottom = '0px';
     viewer.style.left   = '0px';
     viewer.style.right  = '0px';
