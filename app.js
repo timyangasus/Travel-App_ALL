@@ -31,7 +31,7 @@ async function uploadToImgBB(file) {
   });
   const json = await res.json();
   if (!json.success) throw new Error(json.error?.message || 'Upload failed');
-  return json.data.display_url || json.data.image?.url || json.data.url;
+  return json.data.image?.url || json.data.display_url || json.data.url;
 }
 
 function showUploadStatus(msg) {
@@ -1006,21 +1006,25 @@ function initItinerarySwipe() {
   _itinSwipeInited = true;
   const screen = document.getElementById('screen-itinerary');
   if (!screen) return;
-  let startX = 0, startY = 0, inTimeline = false;
+  let startX = 0, startY = 0;
   screen.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
-    const tl = document.getElementById('timeline-section');
-    inTimeline = tl ? tl.contains(e.target) : false;
   }, { passive: true });
   screen.addEventListener('touchend', e => {
-    if (!data || inTimeline) return;
+    if (!data) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return;
+    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
     const total = data.days.length;
-    currentDay = dx < 0 ? (currentDay + 1) % total : (currentDay - 1 + total) % total;
+    if (dx < 0) {
+      currentDay = (currentDay + 1) % total;
+    } else {
+      currentDay = (currentDay - 1 + total) % total;
+    }
     renderItinerary();
+    const tl = document.getElementById('timeline-section');
+    if (tl) tl.scrollTop = 0;
   }, { passive: true });
 }
 
@@ -1770,6 +1774,8 @@ function initExpenseSwipe() {
     }
     renderExpenseDayTabs();
     renderExpenseList();
+    const list = document.getElementById('expense-list');
+    if (list) list.scrollTop = 0;
   }, { passive: true });
 }
 
@@ -1791,12 +1797,11 @@ function renderExpenseDayTabs() {
 
 function switchExpDay(i) {
   const total = data.days.length;
-  expenseDay = ((i % total) + total) % total; // circular
+  expenseDay = ((i % total) + total) % total;
   renderExpenseDayTabs();
   renderExpenseList();
-  // Reset scroll to top when switching days
-  const screen = document.getElementById('screen-expense');
-  if (screen) screen.scrollTop = 0;
+  const list = document.getElementById('expense-list');
+  if (list) list.scrollTop = 0;
 }
 
 function renderExpenseList() {
@@ -2014,164 +2019,237 @@ function openPhotoLightbox(url) {
 }
 
 /* ═══════════════════════════════════════
-   MAP MODULE
+   MAP MODULE — clean rewrite
 ═══════════════════════════════════════ */
 
-/* ─── Render / state ─── */
-function renderMapSub() {
-  const maps = data.maps || [];
-  const hasMap = maps.length > 0;
+let _mapIdx = 0;
+let _mapScale = 1, _mapTx = 0, _mapTy = 0;
+let _mapDragging = false, _mapLastX = 0, _mapLastY = 0;
+let _mapPinchDist = null, _mapPinchMidX = 0, _mapPinchMidY = 0;
+let _mapEngineReady = false;
+const MAP_MAX_SCALE = 8;
 
-  const emptyEl     = document.getElementById('map-empty-state');
-  const viewerEl    = document.getElementById('map-viewer');
-  const iconAdd     = document.getElementById('map-action-icon-add');
-  const iconRefresh = document.getElementById('map-action-icon-refresh');
-
-  if (hasMap) {
-    emptyEl.style.display     = 'none';
-    viewerEl.style.display    = 'block';
-    iconAdd.style.display     = 'none';
-    iconRefresh.style.display = '';
-    // Position viewer: top = below header, bottom = above tab bar
-    _mapSizeViewer();
-    const m = maps[maps.length - 1];
-    _mapLoadImage(m.url);
-  } else {
-    emptyEl.style.display     = 'flex';
-    viewerEl.style.display    = 'none';
-    iconAdd.style.display     = '';
-    iconRefresh.style.display = 'none';
-  }
+// ── Data helpers ──────────────────────────
+function _mapList() {
+  if (!data.maps) data.maps = [];
+  return data.maps;
 }
 
-function _mapSizeViewer() {
-  const header   = document.getElementById('map-sub-header');
-  const viewerEl = document.getElementById('map-viewer');
-  if (!header || !viewerEl) return;
-  requestAnimationFrame(() => {
-    const topPx = header.getBoundingClientRect().height + 15; // 15px gap below header
-    viewerEl.style.top    = topPx + 'px';
-    viewerEl.style.bottom = '0';
-    viewerEl.style.height = '';
+// ── Render ────────────────────────────────
+function renderMapSub() {
+  const maps = _mapList();
+  const empty  = document.getElementById('map-empty-state');
+  const viewer = document.getElementById('map-viewer');
+  const selWrap = document.getElementById('map-selector-wrap');
+
+  if (!maps.length) {
+    empty.style.display  = 'flex';
+    viewer.style.display = 'none';
+    if (selWrap) selWrap.style.display = 'none';
+    return;
+  }
+
+  empty.style.display  = 'none';
+  viewer.style.display = 'block';
+  _mapIdx = Math.min(_mapIdx, maps.length - 1);
+
+  // 永遠顯示選單（有地圖時）
+  if (selWrap) {
+    selWrap.style.cssText = selWrap.style.cssText.replace('display:none','');
+    selWrap.style.display = 'flex';
+  }
+  _mapUpdateSel();
+
+  // Size viewer then show image
+  _mapSizeViewer(function() {
+    _mapShow(maps[_mapIdx].url);
   });
 }
 
-function onMapActionBtn() {
+function _mapSizeViewer(cb) {
+  const header = document.getElementById('map-sub-header');
+  const viewer = document.getElementById('map-viewer');
+  if (!header || !viewer) return;
+  // rAF ensures header has rendered height
+  requestAnimationFrame(function() {
+    const h = header.getBoundingClientRect().height;
+    viewer.style.top    = (h + 15) + 'px';
+    viewer.style.bottom = '0px';
+    viewer.style.left   = '0px';
+    viewer.style.right  = '0px';
+    if (cb) cb();
+  });
+}
+
+function _mapShow(url) {
+  const img    = document.getElementById('map-img');
+  const viewer = document.getElementById('map-viewer');
+  if (!img || !url) return;
+
+  _mapScale = 1; _mapTx = 0; _mapTy = 0;
+  _mapEngineReady = false;
+
+  function render() {
+    const vw = viewer.clientWidth  || window.innerWidth;
+    const vh = viewer.clientHeight || (window.innerHeight - 140);
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    if (!iw || !ih || !vh) return;
+    // 照舊版：fit height，寬度置中
+    _mapScale = vh / (vw * (ih / iw));
+    const renderedW = vw * _mapScale;
+    _mapTx = (vw - renderedW) / 2;
+    _mapTy = 0;
+    img.style.position        = 'absolute';
+    img.style.top             = '0';
+    img.style.left            = '0';
+    img.style.width           = '100%';
+    img.style.height          = 'auto';
+    img.style.transformOrigin = '0 0';
+    _mapApply(false);
+    _mapInitEngine();
+  }
+
+  img.src = url;
+  // decode() works for both cached and fresh images, always resolves
+  img.decode().then(function() {
+    requestAnimationFrame(render);
+  }).catch(function() {
+    // fallback
+    if (img.naturalWidth) requestAnimationFrame(render);
+    else showToast('地圖載入失敗');
+  });
+}
+
+// ── Selector dropdown ─────────────────────
+function _mapUpdateSel() {
+  const maps = _mapList();
+  const nameEl = document.getElementById('map-current-name');
+  if (nameEl) nameEl.textContent = maps[_mapIdx]?.name || '地圖';
+  const dd = document.getElementById('map-dropdown');
+  if (!dd) return;
+  dd.innerHTML = maps.map((m, i) => {
+    const active = i === _mapIdx;
+    return '<div onclick="mapSelPick(' + i + ')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-family:var(--mono);font-size:14px;color:' + (active ? '#D4AF37' : '#1A1A1A') + ';font-weight:' + (active ? 700 : 400) + ';cursor:pointer;border-bottom:0.5px solid #F0F0F0">' +
+      '<span>' + esc(m.name) + '</span>' +
+      '<button onclick="event.stopPropagation();mapSelDel(' + i + ')" style="background:none;border:none;color:#CCC;font-size:18px;cursor:pointer;line-height:1;padding:0 0 0 12px">×</button>' +
+      '</div>';
+  }).join('');
+}
+
+function mapToggleDropdown() {
+  const dd = document.getElementById('map-dropdown');
+  if (!dd) return;
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+function mapSelPick(idx) {
+  document.getElementById('map-dropdown').style.display = 'none';
+  _mapIdx = idx;
+  _mapUpdateSel();
+  const maps = _mapList();
+  if (maps[idx]) _mapSizeViewer(function() { _mapShow(maps[idx].url); });
+}
+
+function mapSelDel(idx) {
+  document.getElementById('map-dropdown').style.display = 'none';
+  _mapList().splice(idx, 1);
+  _mapIdx = Math.max(0, Math.min(_mapIdx, _mapList().length - 1));
+  save();
+  renderMapSub();
+}
+
+// ── Add map ───────────────────────────────
+function mapAddNew() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
-  input.onchange = async () => {
+  input.onchange = async function() {
     const file = input.files[0];
     if (!file) return;
-    showUploadStatus('上傳地圖中…');
+    // Ask for name
+    const name = prompt('地圖名稱', file.name.replace(/\.[^.]+$/, '') || '地圖') || '地圖';
+    showUploadStatus('上傳中…');
     try {
       const url = await uploadToImgBB(file);
-      if (!data.maps) data.maps = [];
-      data.maps = [{ name: file.name || '地圖', url }];
+      _mapList().push({ id: Date.now(), name, url });
+      _mapIdx = _mapList().length - 1;
       save();
       showUploadStatus('');
       renderMapSub();
     } catch(e) {
       showUploadStatus('');
-      showToast('上傳失敗，請再試一次');
+      showToast('上傳失敗');
     }
   };
   input.click();
 }
 
-/* ─── Pan / Zoom Engine (曼谷地圖寫法) ─── */
-let _mapScale = 1, _mapTx = 0, _mapTy = 0;
-let _mapDragging = false;
-let _mapLastX = 0, _mapLastY = 0;
-let _mapPinchDist = null;
-let _mapPinchMidX = 0, _mapPinchMidY = 0;
-let _mapEngineReady = false;
-const MAP_MAX_SCALE = 8;
+function onMapActionBtn() { mapAddNew(); }
 
-function _mapGetMinScale() {
+// ── Pan / Zoom ────────────────────────────
+function _mapClamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+function _mapVWH() {
   const viewer = document.getElementById('map-viewer');
-  const img    = document.getElementById('map-img');
-  if (!viewer || !img || !img.naturalWidth) return 1;
-  const vw = viewer.clientWidth;
-  const vh = viewer.clientHeight;
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
-  // Min scale = fit height exactly — cannot zoom out further
-  return vh / (vw * (ih / iw));
+  const vw = viewer?.clientWidth  || window.innerWidth;
+  const vh = viewer?.clientHeight || (window.innerHeight - 140);
+  return { vw, vh };
 }
 
-function _mapClamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
-
 function _mapConstrain() {
-  const viewer = document.getElementById('map-viewer');
-  const img    = document.getElementById('map-img');
-  if (!viewer || !img) return;
-  const vw = viewer.clientWidth, vh = viewer.clientHeight;
-  const iw = img.naturalWidth || vw, ih = img.naturalHeight || vh;
+  const img = document.getElementById('map-img');
+  if (!img || !img.naturalWidth) return;
+  const { vw, vh } = _mapVWH();
   const renderedW = vw * _mapScale;
-  const renderedH = vw * (ih / iw) * _mapScale;
-  // Allow free pan when image smaller than viewport
-  if (renderedW <= vw) _mapTx = (vw - renderedW) / 2;
-  else _mapTx = _mapClamp(_mapTx, vw - renderedW, 0);
-  if (renderedH <= vh) _mapTy = (vh - renderedH) / 2;
-  else _mapTy = _mapClamp(_mapTy, vh - renderedH, 0);
+  const renderedH = vw * (img.naturalHeight / img.naturalWidth) * _mapScale;
+  _mapTx = renderedW <= vw ? (vw - renderedW) / 2 : _mapClamp(_mapTx, vw - renderedW, 0);
+  _mapTy = renderedH <= vh ? (vh - renderedH) / 2 : _mapClamp(_mapTy, vh - renderedH, 0);
 }
 
 function _mapApply(smooth) {
   const img = document.getElementById('map-img');
   if (!img) return;
-  img.style.transition = smooth ? 'transform 0.18s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none';
-  img.style.transform  = `translate(${_mapTx}px,${_mapTy}px) scale(${_mapScale})`;
+  img.style.transition      = smooth ? 'transform 0.18s ease' : 'none';
+  img.style.transform       = 'translate(' + _mapTx + 'px,' + _mapTy + 'px) scale(' + _mapScale + ')';
+  img.style.transformOrigin = '0 0';
 }
 
 function mapResetView() {
-  const viewer = document.getElementById('map-viewer');
-  const img    = document.getElementById('map-img');
-  if (!viewer || !img) return;
-  _mapSizeViewer();
-  requestAnimationFrame(() => {
-    const vw = viewer.clientWidth;
-    const vh = viewer.clientHeight;
-    const iw = img.naturalWidth  || vw;
-    const ih = img.naturalHeight || vh;
-    _mapScale = vh / (vw * (ih / iw));
-    const renderedW = vw * _mapScale;
-    _mapTx = (vw - renderedW) / 2;
-    _mapTy = 0;
-    _mapApply(true);
-  });
+  const img = document.getElementById('map-img');
+  if (!img || !img.naturalWidth) return;
+  const { vw, vh } = _mapVWH();
+  _mapScale = vh / (vw * (img.naturalHeight / img.naturalWidth));
+  const renderedW = vw * _mapScale;
+  _mapTx = (vw - renderedW) / 2;
+  _mapTy = 0;
+  _mapApply(true);
 }
 
 function _mapZoomAt(px, py, factor) {
-  const min = _mapGetMinScale();
-  const newScale = _mapClamp(_mapScale * factor, min, MAP_MAX_SCALE);
-  _mapTx = px - (px - _mapTx) * (newScale / _mapScale);
-  _mapTy = py - (py - _mapTy) * (newScale / _mapScale);
-  _mapScale = newScale;
+  const img = document.getElementById('map-img');
+  const viewer = document.getElementById('map-viewer');
+  if (!img || !viewer || !img.naturalWidth) return;
+  const vw = viewer.clientWidth || window.innerWidth;
+  const vh = viewer.clientHeight || (window.innerHeight - 140);
+  const minS = vh / (vw * (img.naturalHeight / img.naturalWidth)); // fit-height scale
+  const newS = _mapClamp(_mapScale * factor, minS, MAP_MAX_SCALE);
+  _mapTx = px - (px - _mapTx) * (newS / _mapScale);
+  _mapTy = py - (py - _mapTy) * (newS / _mapScale);
+  _mapScale = newS;
   _mapConstrain();
   _mapApply(false);
 }
 
-function _mapDist(t1, t2) {
-  return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-}
+function _mapDist(a, b) { return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY); }
+function _mapMid(a, b, r) { return { x: (a.clientX + b.clientX)/2 - r.left, y: (a.clientY + b.clientY)/2 - r.top }; }
 
-function _mapMid(t1, t2, rect) {
-  return {
-    x: (t1.clientX + t2.clientX) / 2 - rect.left,
-    y: (t1.clientY + t2.clientY) / 2 - rect.top
-  };
-}
-
-function mapInitPanZoom() {
+function _mapInitEngine() {
   const viewer = document.getElementById('map-viewer');
-  const img    = document.getElementById('map-img');
-  if (!viewer || !img || _mapEngineReady) return;
+  if (!viewer || _mapEngineReady) return;
   _mapEngineReady = true;
 
-  // Touch events
-  viewer.addEventListener('touchstart', e => {
-    img.style.transition = 'none';
+  viewer.addEventListener('touchstart', function(e) {
     if (e.touches.length === 1) {
       _mapDragging = true;
       _mapLastX = e.touches[0].clientX;
@@ -2180,98 +2258,34 @@ function mapInitPanZoom() {
     } else if (e.touches.length === 2) {
       _mapDragging = false;
       _mapPinchDist = _mapDist(e.touches[0], e.touches[1]);
-      const rect = viewer.getBoundingClientRect();
-      const mid  = _mapMid(e.touches[0], e.touches[1], rect);
-      _mapPinchMidX = mid.x;
-      _mapPinchMidY = mid.y;
+      const mid = _mapMid(e.touches[0], e.touches[1], viewer.getBoundingClientRect());
+      _mapPinchMidX = mid.x; _mapPinchMidY = mid.y;
     }
   }, { passive: true });
 
-  viewer.addEventListener('touchmove', e => {
+  viewer.addEventListener('touchmove', function(e) {
     e.preventDefault();
-    if (e.touches.length === 1 && _mapDragging && _mapPinchDist === null) {
+    if (e.touches.length === 1 && _mapDragging && !_mapPinchDist) {
       _mapTx += e.touches[0].clientX - _mapLastX;
       _mapTy += e.touches[0].clientY - _mapLastY;
       _mapLastX = e.touches[0].clientX;
       _mapLastY = e.touches[0].clientY;
-      _mapConstrain();
-      _mapApply(false);
-    } else if (e.touches.length === 2 && _mapPinchDist !== null) {
-      const newDist = _mapDist(e.touches[0], e.touches[1]);
-      const rect = viewer.getBoundingClientRect();
-      const mid  = _mapMid(e.touches[0], e.touches[1], rect);
-      // pan from mid delta
+      _mapConstrain(); _mapApply(false);
+    } else if (e.touches.length === 2 && _mapPinchDist) {
+      const d = _mapDist(e.touches[0], e.touches[1]);
+      const mid = _mapMid(e.touches[0], e.touches[1], viewer.getBoundingClientRect());
       _mapTx += mid.x - _mapPinchMidX;
       _mapTy += mid.y - _mapPinchMidY;
-      _mapPinchMidX = mid.x;
-      _mapPinchMidY = mid.y;
-      // zoom
-      _mapZoomAt(mid.x, mid.y, newDist / _mapPinchDist);
-      _mapPinchDist = newDist;
+      _mapPinchMidX = mid.x; _mapPinchMidY = mid.y;
+      _mapZoomAt(mid.x, mid.y, d / _mapPinchDist);
+      _mapPinchDist = d;
     }
   }, { passive: false });
 
-  viewer.addEventListener('touchend', e => {
+  viewer.addEventListener('touchend', function(e) {
     if (e.touches.length < 2) _mapPinchDist = null;
     if (e.touches.length === 0) _mapDragging = false;
   }, { passive: true });
-
-  // Mouse drag (desktop)
-  viewer.addEventListener('mousedown', e => {
-    _mapDragging = true;
-    _mapLastX = e.clientX;
-    _mapLastY = e.clientY;
-    img.style.transition = 'none';
-    e.preventDefault();
-  });
-  window.addEventListener('mousemove', e => {
-    if (!_mapDragging) return;
-    _mapTx += e.clientX - _mapLastX;
-    _mapTy += e.clientY - _mapLastY;
-    _mapLastX = e.clientX;
-    _mapLastY = e.clientY;
-    _mapConstrain();
-    _mapApply(false);
-  });
-  window.addEventListener('mouseup', () => { _mapDragging = false; });
-
-  // Wheel zoom (desktop)
-  viewer.addEventListener('wheel', e => {
-    e.preventDefault();
-    const rect = viewer.getBoundingClientRect();
-    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-    _mapZoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
-  }, { passive: false });
-}
-
-function _mapLoadImage(url) {
-  const img    = document.getElementById('map-img');
-  const viewer = document.getElementById('map-viewer');
-  if (!img) return;
-
-  // Reset pan/zoom state and engine flag for new image
-  _mapScale = 1; _mapTx = 0; _mapTy = 0;
-  _mapEngineReady = false;
-  img.style.transform = '';
-
-  img.onload = () => {
-    // rAF ensures viewer has its final dimensions after layout
-    requestAnimationFrame(() => {
-      const vw = viewer.clientWidth, vh = viewer.clientHeight;
-      const iw = img.naturalWidth  || vw;
-      const ih = img.naturalHeight || vh;
-      // Always fit height — image fills viewer top to bottom, no gap
-      _mapScale = vh / (vw * (ih / iw));
-      const renderedW = vw * _mapScale;
-      // Centre horizontally
-      _mapTx = (vw - renderedW) / 2;
-      _mapTy = 0;
-      _mapApply(false);
-      mapInitPanZoom();
-    });
-  };
-  img.onerror = () => showToast('地圖圖片載入失敗');
-  img.src = url;
 }
 
 /* ─── Checklist ─── */
@@ -3308,7 +3322,7 @@ function renderFlightCards() {
         ${tear}
         ${ibSeg}
       </div>
-      ${f.url ? `<div class="fc2-url-row" onclick="event.stopPropagation();window.open(${JSON.stringify(f.url)},'_blank')">${esc(f.url)}</div>` : ''}
+      ${f.url ? `<div class="fc2-url-row" onclick="event.stopPropagation();window.open('${esc(f.url)}','_blank')">${esc(f.url)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -3445,40 +3459,54 @@ function renderHotelCards() {
     el.innerHTML = `<div class="list-empty"></div>`;
     return;
   }
-  // Sort by checkin date ascending
   const sorted = [...data.hotels].sort((a, b) => {
     const pa = (a.checkin || a.dates || '').replace(/[^\d]/g, '');
     const pb = (b.checkin || b.dates || '').replace(/[^\d]/g, '');
-    if (!pa) return 1;
-    if (!pb) return -1;
+    if (!pa) return 1; if (!pb) return -1;
     return pa.localeCompare(pb);
   });
   el.innerHTML = sorted.map(h => {
     const nights = h.nights || 0;
     const priceDisplay = h.price ? `${sym} ${parseInt(h.price).toLocaleString()}` : '';
+    const coverBg = h.img
+      ? `background-image:url('${h.img}');background-size:cover;background-position:center`
+      : 'background:#F0F0F0';
     return `
     <div class="hotel-card2" onclick="openHotelSheet(${h.id})">
-      <div class="hotel2-header">
-        <div class="hotel2-dates">${esc(h.dates || '日期未設定')}</div>
-        <div class="hotel2-right">
-          ${nights > 0 ? `<span class="hotel2-nights">${nights} 晚</span>` : ''}
-          <button class="hotel2-del" onclick="event.stopPropagation();deleteHotelCard(${h.id})">
-            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-          </button>
+      <button class="hotel2-del" onclick="event.stopPropagation();deleteHotelCard(${h.id})">×</button>
+      <div class="hotel2-body">
+        <div class="hotel2-cover" style="${coverBg}" onclick="event.stopPropagation();hotelPickCover(${h.id})">
+          ${!h.img ? `<svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px" fill="#CCCCCC"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/></svg>` : ''}
+        </div>
+        <div class="hotel2-info">
+          <div class="hotel2-info-top">
+            ${nights > 0 ? `<span class="hotel2-nights">${nights} 晚</span>` : ''}
+            <span class="hotel2-dates">${esc(h.dates || '日期未設定')}</span>
+          </div>
+          <div class="hotel2-name">${esc(h.name || '未命名')}</div>
+          ${h.ref ? `<div class="hotel2-ref"><div class="hotel2-ref-label">訂單編號</div><div class="hotel2-ref-val">${esc(h.ref)}</div></div>` : ''}
+          ${h.addr ? `<div class="hotel2-addr" onclick="event.stopPropagation();window.open('https://maps.google.com/?q=${encodeURIComponent(h.addr)}','_blank')">${esc(h.addr)}</div>` : ''}
+          ${priceDisplay ? `<div class="hotel2-price-row"><span class="hotel2-price-label">總價</span><span class="hotel2-price-val">${priceDisplay}</span></div>` : ''}
         </div>
       </div>
-      <div class="hotel2-name">${esc(h.name || '未命名')}</div>
-      ${h.ref ? `<div class="hotel2-ref"><span class="hotel2-ref-label">訂單編號</span><span class="hotel2-ref-val">${esc(h.ref)}</span></div>` : ''}
-      ${h.addr ? `<div class="hotel2-addr" onclick="event.stopPropagation();window.open('https://maps.google.com/?q=${encodeURIComponent(h.addr)}','_blank')">
-        <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px"><path d="M480-480q33 0 56.5-23.5T560-560q0-33-23.5-56.5T480-640q-33 0-56.5 23.5T400-560q0 33 23.5 56.5T480-480Zm0 294q122-112 181-203.5T720-560q0-109-69.5-184.5T480-820q-101 0-170.5 75.5T240-560q0 71 59 162.5T480-186Zm0 106Q319-217 239.5-334.5T160-560q0-150 96.5-245T480-900q127 0 223.5 95T800-560q0 112-79.5 229.5T480-80Zm0-480Z"/></svg>
-        ${esc(h.addr)}</div>` : ''}
-      ${h.breakfast ? `<div class="hotel2-tags"><span class="hotel2-tag-breakfast">含早餐</span></div>` : ''}
-      ${priceDisplay ? `<div class="hotel2-price-row">
-        <span class="hotel2-price-label">總價</span>
-        <span class="hotel2-price-val">${priceDisplay}</span>
-      </div>` : ''}
     </div>`;
   }).join('');
+}
+
+function hotelPickCover(id) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = async () => {
+    const file = inp.files[0]; if (!file) return;
+    showUploadStatus('上傳中...');
+    try {
+      const url = await uploadToImgBB(file);
+      const h = data.hotels.find(h => h.id === id);
+      if (h) { h.img = url; save(); renderHotelCards(); }
+    } catch(e) { showToast('上傳失敗'); }
+    finally { showUploadStatus(''); }
+  };
+  inp.click();
 }
 
 
