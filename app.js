@@ -1006,13 +1006,15 @@ function initItinerarySwipe() {
   _itinSwipeInited = true;
   const screen = document.getElementById('screen-itinerary');
   if (!screen) return;
-  let startX = 0, startY = 0;
+  let startX = 0, startY = 0, inTimeline = false;
   screen.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
+    const tl = document.getElementById('timeline-section');
+    inTimeline = tl ? tl.contains(e.target) : false;
   }, { passive: true });
   screen.addEventListener('touchend', e => {
-    if (!data) return;
+    if (!data || inTimeline) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return;
@@ -1090,7 +1092,12 @@ function renderDayTabs() {
     const b = document.createElement('button');
     b.className = 'day-tab' + (i === currentDay ? ' active' : '');
     b.textContent = i + 1;
-    b.onclick = () => { currentDay = i; renderItinerary(); };
+    b.onclick = () => {
+      currentDay = i;
+      renderItinerary();
+      const tl = document.getElementById('timeline-section');
+      if (tl) tl.scrollTop = 0;
+    };
 
     // Long-press to delete
     let pressTimer = null;
