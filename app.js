@@ -1015,7 +1015,8 @@ function initItinerarySwipe() {
     if (!data) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
+    // 嚴格條件：橫向移動 > 80px 且橫向是主要方向（橫>縱2倍）
+    if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2) return;
     const total = data.days.length;
     if (dx < 0) {
       currentDay = (currentDay + 1) % total;
