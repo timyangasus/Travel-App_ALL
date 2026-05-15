@@ -1004,16 +1004,18 @@ let _itinSwipeInited = false;
 function initItinerarySwipe() {
   if (_itinSwipeInited) return;
   _itinSwipeInited = true;
-  // 只在 banner 區掛 swipe，避免與 timeline-section 的上下捲動衝突
-  const banner = document.getElementById('banner-area');
-  if (!banner) return;
-  let startX = 0, startY = 0;
-  banner.addEventListener('touchstart', e => {
+  const screen = document.getElementById('screen-itinerary');
+  if (!screen) return;
+  let startX = 0, startY = 0, fromBanner = false;
+  screen.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
+    // 只允許從 banner 或 day-tabs 區域發起的滑動
+    const tl = document.getElementById('timeline-section');
+    fromBanner = tl ? !tl.contains(e.target) : true;
   }, { passive: true });
-  banner.addEventListener('touchend', e => {
-    if (!data) return;
+  screen.addEventListener('touchend', e => {
+    if (!data || !fromBanner) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
