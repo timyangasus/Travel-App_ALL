@@ -2915,13 +2915,16 @@ function renderNotes() {
   setTimeout(() => {
     if (!Array.isArray(data.notes)) return;
     [...data.notes].reverse().forEach(n => {
-      const inner      = document.getElementById('ninner-'    + n.id);
-      const toggle     = document.getElementById('ntoggle-'   + n.id);
-      const expandedEl = document.getElementById('nexpanded-' + n.id);
+      const inner  = document.getElementById('ninner-'  + n.id);
+      const toggle = document.getElementById('ntoggle-' + n.id);
       if (!inner || !toggle) return;
-      // Show toggle only if text overflows collapsed height, or has images
       const hasImg = (n.content || '').includes('[[IMG:') || n.images?.length;
-      if (inner.scrollHeight > inner.clientHeight + 4 || hasImg) {
+      // 暫時移除 collapsed 量真實高度
+      inner.classList.remove('collapsed');
+      const fullH = inner.scrollHeight;
+      inner.classList.add('collapsed');
+      const clampH = inner.clientHeight;
+      if (fullH > clampH + 4 || hasImg) {
         toggle.style.display = 'flex';
       }
     });
