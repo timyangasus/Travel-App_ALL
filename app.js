@@ -2875,7 +2875,9 @@ function renderNotes() {
     list.innerHTML = '<div style="color:#CCCCCC;font-family:var(--mono);font-size:14px;text-align:center;padding:40px 0">尚無筆記</div>';
     return;
   }
-  list.innerHTML = [...data.notes].reverse().map(n => {
+  const sorted = [...data.notes].reverse();
+  sorted.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+  list.innerHTML = sorted.map(n => {
     const lines = (n.content || '').split('\n');
     const title = lines[0] || '';
     const body = lines.slice(1).join('\n').trim();
@@ -2900,8 +2902,15 @@ function renderNotes() {
     // Expanded view: full bodyHtml with images inline
     const expandedInner = bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})" style="display:none" id="nexpanded-${n.id}">${bodyHtml}</div>` : '';
     return `<div class="note-card" id="ncard-${n.id}">
-      <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:2px 6px">×</button>
-      <div class="note-card-title" style="padding-right:28px;margin-bottom:8px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
+      <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:4px 6px;display:flex;align-items:center">×</button>
+      <button onclick="event.stopPropagation();toggleNotePin(${n.id})" style="position:absolute;top:8px;right:38px;background:none;border:none;cursor:pointer;padding:4px 2px;line-height:1;display:flex;align-items:center">
+        <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px">
+          ${n.pinned
+            ? '<circle cx="12" cy="12" r="7" fill="#B8860B"/>'
+            : '<circle cx="12" cy="12" r="6.25" fill="none" stroke="#B8860B" stroke-width="1.5"/>'}
+        </svg>
+      </button>
+      <div class="note-card-title" style="padding-right:56px;margin-bottom:8px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
       <div class="note-card-inner collapsed" id="ninner-${n.id}">
         ${collapsedInner}
         ${expandedInner}
@@ -2914,7 +2923,7 @@ function renderNotes() {
 
   setTimeout(() => {
     if (!Array.isArray(data.notes)) return;
-    [...data.notes].reverse().forEach(n => {
+    sorted.forEach(n => {
       const inner  = document.getElementById('ninner-'  + n.id);
       const toggle = document.getElementById('ntoggle-' + n.id);
       if (!inner || !toggle) return;
@@ -2950,6 +2959,14 @@ function toggleNoteCard(id) {
       ? '<path d="M480-616 240-376l-56-56 296-296 296 296-56 56-240-240Z"/>'
       : '<path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z"/>';
   }
+}
+
+function toggleNotePin(id) {
+  const n = data.notes.find(n => n.id === id);
+  if (!n) return;
+  n.pinned = !n.pinned;
+  save();
+  renderNotes();
 }
 
 function confirmDeleteNote(id) {
