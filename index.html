@@ -642,14 +642,14 @@
       <!-- 第三區塊 -->
       <div class="set-section-label">設定</div>
       <div class="set-section">
+        <div class="set-action" onclick="exportJSON()">
+          <span class="set-action-title">匯出JASON</span>
+          <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px"><path fill="#1A1A1A" d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></svg>
+        </div>
         <div class="set-action" onclick="document.getElementById('import-json-input').click()">
           <span class="set-action-title">匯入JASON</span>
           <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px"><path fill="#1A1A1A" d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></svg>
           <input type="file" id="import-json-input" accept=".json" style="display:none" onchange="importJSON(this)">
-        </div>
-        <div class="set-action" onclick="exportJSON()">
-          <span class="set-action-title">匯出JASON</span>
-          <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px"><path fill="#1A1A1A" d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></svg>
         </div>
       </div>
     </div>

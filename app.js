@@ -2925,7 +2925,7 @@ function renderNotes() {
         toggle.style.display = 'flex';
       }
     });
-  }, 150);
+  }, 400);
 }
 
 function toggleNoteCard(id) {
