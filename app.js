@@ -992,6 +992,15 @@ function applyReorder() {
   showToast('行程順序已更新');
 }
 
+function switchDay(idx) {
+  currentDay = idx;
+  renderItinerary();
+  setTimeout(() => {
+    const tl = document.getElementById('timeline-section');
+    if (tl) tl.scrollTop = 0;
+  }, 350);
+}
+
 function renderItinerary() {
   if (!data) return;
   renderDayTabs();
@@ -1068,10 +1077,7 @@ function renderDayTabs() {
     b.className = 'day-tab' + (i === currentDay ? ' active' : '');
     b.textContent = i + 1;
     b.onclick = () => {
-      currentDay = i;
-      renderItinerary();
-      const tl = document.getElementById('timeline-section');
-      if (tl) tl.scrollTop = 0;
+      switchDay(i);
     };
 
     // Long-press to delete
@@ -4886,8 +4892,7 @@ function clearAllData() {
 
     // 循環：左滑→下一天，右滑→上一天，頭尾相連
     if (Math.abs(dx) >= THRESHOLD) {
-      currentDay = (currentDay + (dx < 0 ? 1 : -1) + data.days.length) % data.days.length;
-      renderItinerary();
+      switchDay((currentDay + (dx < 0 ? 1 : -1) + data.days.length) % data.days.length);
     }
   }
 
