@@ -2913,10 +2913,9 @@ function renderNotes() {
       const toggle     = document.getElementById('ntoggle-'   + n.id);
       const expandedEl = document.getElementById('nexpanded-' + n.id);
       if (!inner || !toggle) return;
-      // Show toggle if content overflows OR has expanded (image) content
-      const hasImg     = (n.content || '').includes('[[IMG:') || n.images?.length;
-      const hasExpanded = !!expandedEl;
-      if (inner.scrollHeight > inner.clientHeight + 4 || hasImg || hasExpanded) {
+      // Show toggle only if text overflows collapsed height, or has images
+      const hasImg = (n.content || '').includes('[[IMG:') || n.images?.length;
+      if (inner.scrollHeight > inner.clientHeight + 4 || hasImg) {
         toggle.style.display = 'flex';
       }
     });
