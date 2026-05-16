@@ -1666,7 +1666,6 @@ function toggleCatDropdown() {
 function selectCat(label) {
   _selectedCat = label;
   const labelEl = document.getElementById('exp-cat-label');
-  if (labelEl) labelEl.textContent = label;
   document.getElementById('exp-cat-dropdown')?.classList.remove('open');
 }
 
@@ -1675,7 +1674,6 @@ function openExpenseSheet() {
   initCatDropdown();
   _selectedCat = '餐飲';
   const labelEl = document.getElementById('exp-cat-label');
-  if (labelEl) labelEl.textContent = '餐飲';
   const amt = document.getElementById('exp-amount');
   const nm  = document.getElementById('exp-name');
   if (amt) amt.value = '';
@@ -2773,7 +2771,6 @@ function openExpenseSheetForEdit(id) {
   initCatDropdown();
   _selectedCat = item.cat || '其他';
   const labelEl = document.getElementById('exp-cat-label');
-  if (labelEl) labelEl.textContent = _selectedCat;
   const nameEl = document.getElementById('exp-name');
   const amtEl  = document.getElementById('exp-amount');
   if (nameEl) nameEl.value = item.name || '';
@@ -2909,19 +2906,21 @@ function renderNotes() {
     </div>`;
   }).join('');
 
-  requestAnimationFrame(() => {
+  setTimeout(() => {
     if (!Array.isArray(data.notes)) return;
     [...data.notes].reverse().forEach(n => {
-      const inner  = document.getElementById('ninner-' + n.id);
-      const toggle = document.getElementById('ntoggle-' + n.id);
+      const inner      = document.getElementById('ninner-'    + n.id);
+      const toggle     = document.getElementById('ntoggle-'   + n.id);
+      const expandedEl = document.getElementById('nexpanded-' + n.id);
       if (!inner || !toggle) return;
-      // Show toggle if content overflows 4 lines or has images
-      const hasImg = (n.content || '').includes('[[IMG:') || n.images?.length;
-      if (inner.scrollHeight > inner.clientHeight + 4 || hasImg) {
+      // Show toggle if content overflows OR has expanded (image) content
+      const hasImg     = (n.content || '').includes('[[IMG:') || n.images?.length;
+      const hasExpanded = !!expandedEl;
+      if (inner.scrollHeight > inner.clientHeight + 4 || hasImg || hasExpanded) {
         toggle.style.display = 'flex';
       }
     });
-  });
+  }, 150);
 }
 
 function toggleNoteCard(id) {
@@ -2936,6 +2935,7 @@ function toggleNoteCard(id) {
   // Show/hide views
   if (collapsedEl) collapsedEl.style.display = isExpanded ? 'none' : 'flex';
   if (expandedEl)  expandedEl.style.display  = isExpanded ? 'block' : 'none';
+  // Update label
   // Swap chevron icon
   if (icon) {
     icon.innerHTML = isExpanded
