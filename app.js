@@ -4844,7 +4844,7 @@ function exportItinerary() {
   const text = lines.join('\n');
   const ta = document.getElementById('export-itinerary-text');
   if (ta) ta.value = text;
-  openModal('modal-export-itinerary');
+  document.getElementById('modal-export-itinerary').classList.add('open');
 }
 
 function selectExportText() {
