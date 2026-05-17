@@ -659,18 +659,18 @@
     </div>
   </div>
 
-  <!-- ═══ 匯出行程文字 SHEET ═══ -->
-  <div class="modal-overlay" id="modal-export-itinerary">
-    <div class="modal-sheet" style="max-height:85vh;display:flex;flex-direction:column;transform:translateY(100%);transition:transform 0.28s ease">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 20px 12px">
-        <span style="font-size:17px;font-weight:700;color:#1A1A1A">匯出行程文字</span>
-        <button onclick="closeModal('modal-export-itinerary')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#BBBBBB;line-height:1">×</button>
-      </div>
-      <div style="padding:0 20px 8px;display:flex;justify-content:flex-end">
-        <button onclick="selectExportText()" style="background:none;border:1.5px solid #1A1A1A;color:#1A1A1A;font-size:13px;padding:6px 16px;cursor:pointer;font-family:inherit;letter-spacing:0.03em">全選</button>
-      </div>
-      <textarea id="export-itinerary-text" readonly style="flex:1;margin:0 20px 20px;padding:14px;font-size:13px;font-family:'JetBrains Mono',monospace;line-height:1.7;border:1.5px solid #EBEBEB;background:#F9F9F9;color:#1A1A1A;resize:none;outline:none;overflow-y:auto;-webkit-user-select:text;user-select:text"></textarea>
+  <!-- ═══ 匯出行程文字 ═══ -->
+  <div id="screen-export-itinerary" class="page">
+    <div class="screen-header sub-header">
+      <button class="sub-back-btn" onclick="document.getElementById('screen-export-itinerary').classList.remove('active')">
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z"/></svg>
+      </button>
+      <div class="screen-title" style="flex:1">匯出行程文字</div>
+      <button class="sub-header-action" onclick="selectExportText()">
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path fill="#B8860B" d="M360-240h240v-80H360v80ZM240-400h480v-80H240v80ZM120-560h720v-80H120v80ZM40-720v-80h880v80H40Z"/></svg>
+      </button>
     </div>
+    <textarea id="export-itinerary-text" readonly style="flex:1;margin:16px;padding:14px;font-size:13px;font-family:'JetBrains Mono',monospace;line-height:1.7;border:1.5px solid #EBEBEB;background:#F9F9F9;color:#1A1A1A;resize:none;outline:none;-webkit-user-select:text;user-select:text;border-radius:0"></textarea>
   </div>
 
   <!-- ═══ 一鍵匯入 SHEET ═══ -->
