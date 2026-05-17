@@ -4808,6 +4808,52 @@ function exportJSON() {
   showToast(`已匯出 ${(meta.trips||[]).length} 筆行程`);
 }
 
+function exportItinerary() {
+  if (!data || !Array.isArray(data.days) || data.days.length === 0) {
+    showToast('沒有行程資料');
+    return;
+  }
+  const WEEKDAYS = ['日','一','二','三','四','五','六'];
+  const lines = [];
+  data.days.forEach((day, idx) => {
+    const d = parseBannerDate(day.banner?.date);
+    const dateStr = d
+      ? `${d.getMonth()+1}/${d.getDate()} (週${WEEKDAYS[d.getDay()]})`
+      : `Day ${idx + 1}`;
+    const subtitle = (day.banner?.subtitle || '').trim();
+    lines.push(subtitle ? `${dateStr} ${subtitle}` : dateStr);
+    lines.push('');
+    const events = [...(day.events || [])].sort((a, b) =>
+      (a.time || '').localeCompare(b.time || '')
+    );
+    events.forEach(ev => {
+      const time = ev.time || '';
+      const title = (ev.title || '').trim();
+      const note = (ev.note || '').trim();
+      if (time) {
+        lines.push(`* ${time} ${title}`);
+      } else {
+        lines.push(`* ${title}`);
+      }
+      if (note) {
+        lines.push(`   * ${note}`);
+      }
+    });
+    if (idx < data.days.length - 1) lines.push('');
+  });
+  const text = lines.join('\n');
+  const ta = document.getElementById('export-itinerary-text');
+  if (ta) ta.value = text;
+  openModal('modal-export-itinerary');
+}
+
+function selectExportText() {
+  const ta = document.getElementById('export-itinerary-text');
+  if (!ta) return;
+  ta.focus();
+  ta.select();
+}
+
 function importJSON(input) {
   const file = input.files[0];
   if (!file) return;
