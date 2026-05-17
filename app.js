@@ -4805,7 +4805,6 @@ function exportJSON() {
   a.download = `travel-trace-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast(`已匯出 ${(meta.trips||[]).length} 筆行程`);
 }
 
 function exportItinerary() {
