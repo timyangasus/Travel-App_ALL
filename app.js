@@ -4844,6 +4844,7 @@ function exportItinerary() {
   const ta = document.getElementById('export-itinerary-text');
   if (ta) ta.textContent = text;
   document.getElementById('screen-export-itinerary').classList.add('active');
+  document.body.style.overflow = 'hidden';
 }
 
 function selectExportText() {
