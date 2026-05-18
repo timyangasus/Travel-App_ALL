@@ -2904,7 +2904,7 @@ function renderNotes() {
     return `<div class="note-card" id="ncard-${n.id}">
       <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:4px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:6px;display:flex;align-items:center">×</button>
       <button onclick="event.stopPropagation();toggleNotePin(${n.id})" style="position:absolute;top:8px;right:38px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
-        <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px">
+        <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 0 24 24" width="22px">
           ${n.pinned
             ? '<circle cx="12" cy="12" r="7" fill="#B8860B"/>'
             : '<circle cx="12" cy="12" r="6.25" fill="none" stroke="#B8860B" stroke-width="1.5"/>'}
