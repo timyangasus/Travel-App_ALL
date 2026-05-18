@@ -2910,7 +2910,7 @@ function renderNotes() {
             : '<circle cx="12" cy="12" r="6.25" fill="none" stroke="#B8860B" stroke-width="1.5"/>'}
         </svg>
       </button>
-      <button onclick="event.stopPropagation();copyNoteText(${n.id})" style="position:absolute;top:8px;right:72px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
+      <button onclick="event.stopPropagation();copyNoteText(${n.id})" style="position:absolute;top:11px;right:72px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
         <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px"><path fill="#B8860B" d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>
       </button>
       <div class="note-card-title" style="padding-right:108px;margin-bottom:8px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
