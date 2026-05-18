@@ -23,9 +23,31 @@ const EXPENSE_CATS = [
 ═══════════════════════════════════════ */
 const IMGBB_API_KEY = 'cfd268943c3eb02881f5526f3ddf3431';
 
+async function compressImage(file, maxSize = 1200, quality = 0.82) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else       { w = Math.round(w * maxSize / h); h = maxSize; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 async function uploadToImgBB(file) {
+  const compressed = await compressImage(file);
   const form = new FormData();
-  form.append('image', file);
+  form.append('image', compressed);
   const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
     method: 'POST', body: form
   });
@@ -2903,14 +2925,14 @@ function renderNotes() {
     const expandedInner = bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})" style="display:none" id="nexpanded-${n.id}">${bodyHtml}</div>` : '';
     return `<div class="note-card" id="ncard-${n.id}">
       <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:4px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:6px;display:flex;align-items:center">×</button>
-      <button onclick="event.stopPropagation();toggleNotePin(${n.id})" style="position:absolute;top:8px;right:38px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
+      <button onclick="event.stopPropagation();toggleNotePin(${n.id})" style="position:absolute;top:8px;right:35px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
         <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 0 24 24" width="22px">
           ${n.pinned
             ? '<circle cx="12" cy="12" r="7" fill="#B8860B"/>'
             : '<circle cx="12" cy="12" r="6.25" fill="none" stroke="#B8860B" stroke-width="1.5"/>'}
         </svg>
       </button>
-      <button onclick="event.stopPropagation();copyNoteText(${n.id})" style="position:absolute;top:11px;right:72px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
+      <button onclick="event.stopPropagation();copyNoteText(${n.id})" style="position:absolute;top:10px;right:72px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
         <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px"><path fill="#B8860B" d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>
       </button>
       <div class="note-card-title" style="padding-right:108px;margin-bottom:8px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
