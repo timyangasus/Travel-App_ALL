@@ -2902,15 +2902,18 @@ function renderNotes() {
     // Expanded view: full bodyHtml with images inline
     const expandedInner = bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})" style="display:none" id="nexpanded-${n.id}">${bodyHtml}</div>` : '';
     return `<div class="note-card" id="ncard-${n.id}">
-      <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:4px 6px;display:flex;align-items:center">×</button>
-      <button onclick="event.stopPropagation();toggleNotePin(${n.id})" style="position:absolute;top:8px;right:38px;background:none;border:none;cursor:pointer;padding:4px 2px;line-height:1;display:flex;align-items:center">
+      <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:4px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:6px;display:flex;align-items:center">×</button>
+      <button onclick="event.stopPropagation();toggleNotePin(${n.id})" style="position:absolute;top:8px;right:38px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
         <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px">
           ${n.pinned
             ? '<circle cx="12" cy="12" r="7" fill="#B8860B"/>'
             : '<circle cx="12" cy="12" r="6.25" fill="none" stroke="#B8860B" stroke-width="1.5"/>'}
         </svg>
       </button>
-      <div class="note-card-title" style="padding-right:56px;margin-bottom:8px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
+      <button onclick="event.stopPropagation();copyNoteText(${n.id})" style="position:absolute;top:8px;right:72px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
+        <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px"><path fill="#B8860B" d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>
+      </button>
+      <div class="note-card-title" style="padding-right:108px;margin-bottom:8px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
       <div class="note-card-inner collapsed" id="ninner-${n.id}">
         ${collapsedInner}
         ${expandedInner}
@@ -2958,6 +2961,25 @@ function toggleNoteCard(id) {
     icon.innerHTML = isExpanded
       ? '<path d="M480-616 240-376l-56-56 296-296 296 296-56 56-240-240Z"/>'
       : '<path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z"/>';
+  }
+}
+
+function copyNoteText(id) {
+  const n = data.notes.find(n => n.id === id);
+  if (!n) return;
+  const text = [n.title, n.content].filter(Boolean).join('\n').trim();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => showToast('已複製'))
+      .catch(() => { document.execCommand('copy'); showToast('已複製'); });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('已複製');
   }
 }
 
