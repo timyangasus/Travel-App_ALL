@@ -4842,15 +4842,18 @@ function exportItinerary() {
   });
   const text = lines.join('\n');
   const ta = document.getElementById('export-itinerary-text');
-  if (ta) ta.value = text;
+  if (ta) ta.textContent = text;
   document.getElementById('screen-export-itinerary').classList.add('active');
 }
 
 function selectExportText() {
-  const ta = document.getElementById('export-itinerary-text');
-  if (!ta) return;
-  ta.focus();
-  ta.select();
+  const el = document.getElementById('export-itinerary-text');
+  if (!el) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 function importJSON(input) {
