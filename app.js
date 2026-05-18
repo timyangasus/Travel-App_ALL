@@ -4850,11 +4850,30 @@ function exportItinerary() {
 function selectExportText() {
   const el = document.getElementById('export-itinerary-text');
   if (!el) return;
+  const text = el.textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('已複製到剪貼簿');
+    }).catch(() => {
+      _fallbackCopy(el, text);
+    });
+  } else {
+    _fallbackCopy(el, text);
+  }
+}
+
+function _fallbackCopy(el, text) {
   const range = document.createRange();
   range.selectNodeContents(el);
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
+  try {
+    document.execCommand('copy');
+    showToast('已複製到剪貼簿');
+  } catch(e) {
+    showToast('請長按手動複製');
+  }
 }
 
 function importJSON(input) {
