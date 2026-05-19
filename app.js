@@ -103,7 +103,12 @@ function loadMeta() {
 }
 
 function saveMeta() {
-  try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch(e) {}
+  try {
+    localStorage.setItem(META_KEY, JSON.stringify(meta));
+  } catch(e) {
+    showToast('⚠️ 儲存失敗！請立即匯出 JSON 備份');
+    console.error('saveMeta() failed:', e);
+  }
 }
 
 function migrateOldTrip() {
@@ -175,7 +180,13 @@ function freshTripData() {
 
 function save() {
   if (!currentTripId) return;
-  try { localStorage.setItem(TRIP_PREFIX + currentTripId, JSON.stringify(data)); } catch(e) {}
+  try {
+    localStorage.setItem(TRIP_PREFIX + currentTripId, JSON.stringify(data));
+  } catch(e) {
+    showToast('⚠️ 儲存失敗！請立即匯出 JSON 備份');
+    console.error('save() failed:', e);
+    return;
+  }
   const trip = meta.trips.find(t => t.id === currentTripId);
   if (trip) {
     if (data.settings?.tripName) trip.name = data.settings.tripName;
