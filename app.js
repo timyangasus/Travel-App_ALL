@@ -906,27 +906,6 @@ function renderReorderList() {
   list.innerHTML = _reorderOrder.map((origIdx, pos) => {
     const day = data.days[origIdx];
     const rawDate = day.banner?.date || '';
-    const dateDisplay = rawDate.replace(/\d{4}\//, '').replace(/（[^）]*）/, m => m) || '日期未設定';
-    const subtitle = day.banner?.subtitle || '';
-    const eventCount = (day.events || []).length;
-    return `<div class="reorder-row" id="rrow-${pos}">
-      <div class="reorder-row-info">
-        <div class="reorder-row-day">DAY ${pos + 1}</div>
-        <div class="reorder-row-date">${dateDisplay}</div>
-        ${subtitle ? `<div style="font-size:12px;color:#666666;font-family:var(--mono);margin-top:2px">${subtitle}</div>` : ''}
-        ${eventCount ? `<div style="font-size:11px;color:#CCCCCC;font-family:var(--mono)">${eventCount} 個行程</div>` : ''}
-      </div>
-      <div class="reorder-row-handle" data-pos="${pos}">≡</div>
-    </div>`;
-  }).join('');
-  initReorderDrag();
-}
-
-function renderReorderList() {
-  const list = document.getElementById('reorder-list');
-  list.innerHTML = _reorderOrder.map((origIdx, pos) => {
-    const day = data.days[origIdx];
-    const rawDate = day.banner?.date || '';
     const dateDisplay = rawDate.replace(/\d{4}\//, '') || '日期未設定';
     const subtitle = day.banner?.subtitle || '';
     const eventCount = (day.events || []).length;
@@ -3090,12 +3069,6 @@ function deleteCurrentNote() {
   closeModal('modal-note-sheet');
 }
 
-function saveNotes() {} // legacy no-op}
-
-function saveNotes() {
-  data.notes = document.getElementById('notes-content').value;
-  save();
-}
 
 
 
