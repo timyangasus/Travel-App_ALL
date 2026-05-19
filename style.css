@@ -1142,13 +1142,13 @@ canvas { display: block; width: 100%; height: 100%; }
 .day-tabs::-webkit-scrollbar { display: none; }
 .day-tab {
   flex-shrink: 0;
-  min-width: 40px;
-  padding: 10px 21px 12px;
+  min-width: 36px;
+  padding: 10px 14px 12px;
   background: none;
   border: none;
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-tertiary);
   position: relative;
@@ -1156,14 +1156,16 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .day-tab.active {
   color: #fff !important;
+}
+.day-tab.active::before {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px; height: 32px;
   background: #1A1A1A;
   border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  padding: 0;
-  line-height: 32px;
-  text-align: center;
+  z-index: -1;
 }
 .day-tab.active::after { display: none; }
 
