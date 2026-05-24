@@ -3089,8 +3089,11 @@ canvas { display: block; width: 100%; height: 100%; }
 
 #screen-home {
   background: #fff;
-  padding-bottom: calc(var(--tab-height) + 24px) !important;
+  padding-bottom: 0 !important;
   font-family: 'SF Mono', 'SFMono-Regular', ui-monospace, 'Courier New', monospace;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
 }
 
 #screen-home * {
@@ -3103,9 +3106,7 @@ canvas { display: block; width: 100%; height: 100%; }
   justify-content: space-between;
   padding: 20px 20px 12px;
   padding-top: calc(var(--safe-top) + 16px);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  flex-shrink: 0;
   background: #fff;
 }
 
@@ -3133,9 +3134,7 @@ canvas { display: block; width: 100%; height: 100%; }
   gap: 17px;
   padding: 0 30px 21px;
   margin-top: 26px;
-  position: sticky;
-  top: calc(var(--safe-top) + 58px);
-  z-index: 9;
+  flex-shrink: 0;
   background: #fff;
 }
 
@@ -3158,6 +3157,13 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 
 /* Trip List */
+.home-trip-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--tab-height) + 24px);
+}
+.home-trip-list-scroll::-webkit-scrollbar { display: none; }
 .home-trip-list { padding: 0; }
 
 .home-empty {
