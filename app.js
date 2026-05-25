@@ -313,9 +313,10 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   // Hide tab bar on Home, show on all other screens
   const tabBar = document.querySelector('.tab-bar');
+  const tabBarH = tabBar ? tabBar.offsetHeight : 83;
   if (tabBar) tabBar.style.display = tab === 'home' ? 'none' : '';
   const pageContainer = document.querySelector('.page-container');
-  if (pageContainer) pageContainer.style.height = '';
+  if (pageContainer) pageContainer.style.marginBottom = tab === 'home' ? -(tabBarH - 45) + 'px' : '';
   if (tab === 'home')     renderHome();
   if (tab === 'expense')  renderExpense();
   if (tab === 'info')     renderInfo();
