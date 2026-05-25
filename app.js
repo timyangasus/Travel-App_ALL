@@ -430,55 +430,11 @@ function syncMetaFromTrips() {
 }
 
 /* ─── Pull-to-refresh ─── */
-function initHomePullToRefresh() {
-  const screen = document.getElementById('screen-home');
-  const indicator = document.getElementById('home-pull-indicator');
-  const icon = document.getElementById('home-pull-icon');
-  if (!screen || !indicator) return;
-
-  let startY = 0, pulling = false, triggered = false;
-  const THRESHOLD = 70;
-
-  screen.addEventListener('touchstart', e => {
-    if (screen.scrollTop === 0) {
-      startY = e.touches[0].clientY;
-      pulling = true;
-      triggered = false;
-    }
-  }, { passive: true });
-
-  screen.addEventListener('touchmove', e => {
-    if (!pulling) return;
-    const dy = e.touches[0].clientY - startY;
-    if (dy <= 0) { pulling = false; return; }
-    const clamped = Math.min(dy, THRESHOLD * 1.5);
-    indicator.style.height = Math.min(clamped * 0.6, 44) + 'px';
-    indicator.style.opacity = Math.min(dy / THRESHOLD, 1);
-    icon.style.transform = `rotate(${Math.min(dy / THRESHOLD, 1) * 360}deg)`;
-    if (dy >= THRESHOLD && !triggered) triggered = true;
-  }, { passive: true });
-
-  screen.addEventListener('touchend', () => {
-    if (!pulling) return;
-    pulling = false;
-    indicator.style.height = '0';
-    indicator.style.opacity = '0.5';
-    icon.style.transform = 'rotate(0deg)';
-    if (triggered) {
-      syncMetaFromTrips();
-      renderHome();
-      showToast('已同步更新');
-    }
-  });
-}
-
 
 let _homeYear = null; // currently selected year tab
 let _tripSheetCurrency = 'TWD';
 
 function renderHome() {
-  // Init pull-to-refresh once
-  if (!renderHome._ptr) { renderHome._ptr = true; initHomePullToRefresh(); }
   const trips = meta.trips || [];
 
   // Collect years that have trips
