@@ -2033,6 +2033,37 @@ canvas { display: block; width: 100%; height: 100%; }
   color: #555555;
 }
 .fc2-url-row:active { background: #F8F8F8; }
+.fc2-bottom-row {
+  display: flex;
+  border-top: 0.5px solid #F0F0F0;
+  height: 44px;
+}
+.fc2-price-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 20px;
+  border-right: 0.5px solid #F0F0F0;
+}
+.fc2-price-label { font-size: 10px; color: #AAAAAA; }
+.fc2-price-val { font-size: 13px; font-weight: 700; color: #C9A84C; }
+.fc2-url-cell {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  font-size: 11px;
+  color: #555555;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fc2-url-cell:active { background: #F8F8F8; }
+.fc2-url-full {
+  flex: 1;
+}
 .ff-seg-header {
   font-size: 11px;
   font-weight: 700;
@@ -3162,7 +3193,6 @@ canvas { display: block; width: 100%; height: 100%; }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 25px;
-  margin-top: -10px;
 }
 .home-trip-list-scroll::-webkit-scrollbar { display: none; }
 .home-trip-list { padding: 0; }
