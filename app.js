@@ -552,6 +552,20 @@ function renderHomeTripList() {
 
   // Year swipe
   initHomeYearSwipe();
+
+  // Lock scroll if content fits, enable if overflows
+  requestAnimationFrame(() => {
+    const scroll = document.querySelector('.home-trip-list-scroll');
+    if (!scroll) return;
+    const updateScroll = () => {
+      scroll.style.overflowY = scroll.scrollHeight > scroll.clientHeight ? 'auto' : 'hidden';
+    };
+    updateScroll();
+    // Re-check on resize (e.g. orientation change)
+    window.removeEventListener('resize', scroll._resizeHandler || (() => {}));
+    scroll._resizeHandler = updateScroll;
+    window.addEventListener('resize', scroll._resizeHandler);
+  });
 }
 
 function openHomeMoreSheet() {
