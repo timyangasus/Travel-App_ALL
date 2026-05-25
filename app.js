@@ -3059,7 +3059,7 @@ function deleteCurrentNote() {
 function flightDefaults() {
   return {
     id: Date.now(),
-    pnr: '', airline: '', url: '',
+    pnr: '', airline: '', url: '', price: '',
     outbound: { flightNo:'', date:'', fromTime:'', toTime:'', fromCode:'', fromName:'', fromTerminal:'', toCode:'', toName:'', toTerminal:'', baggage:'', seat:'' },
     inbound: null
   };
@@ -3096,7 +3096,7 @@ function _ffGet(id) { return document.getElementById(id)?.value.trim()||''; }
 function openFlightSheet(editId) {
   migrateFlights();
   _flightEditId = editId || null;
-  ['pnr','airline','url',
+  ['pnr','airline','url','price',
    'ob-flightNo','ob-date','ob-times','ob-fromCode','ob-fromName','ob-fromTerminal','ob-toCode','ob-toName','ob-toTerminal','ob-baggage','ob-seat',
    'ib-flightNo','ib-date','ib-times','ib-fromCode','ib-fromName','ib-fromTerminal','ib-toCode','ib-toName','ib-toTerminal','ib-baggage','ib-seat'
   ].forEach(k => _ffSet('ff-'+k, ''));
@@ -3105,7 +3105,7 @@ function openFlightSheet(editId) {
   if (editId) {
     const f = data.flights.find(f => f.id === editId);
     if (f) {
-      _ffSet('ff-pnr', f.pnr); _ffSet('ff-airline', f.airline); _ffSet('ff-url', f.url);
+      _ffSet('ff-pnr', f.pnr); _ffSet('ff-airline', f.airline); _ffSet('ff-url', f.url); _ffSet('ff-price', f.price ? parseInt(f.price).toLocaleString() : '');
       const fillSeg = (prefix, seg) => {
         if (!seg) return;
         _ffSet('ff-'+prefix+'-flightNo',     seg.flightNo);
@@ -3227,6 +3227,7 @@ function saveFlightSheet() {
     pnr:      _ffGet('ff-pnr').toUpperCase(),
     airline:  _ffGet('ff-airline'),
     url:      _ffGet('ff-url'),
+    price:    _ffGet('ff-price').replace(/[^0-9]/g,''),
     outbound: parseSeg('ob'),
     inbound:  hasInbound ? parseSeg('ib') : null,
   };
@@ -3318,7 +3319,11 @@ function renderFlightCards() {
         ${tear}
         ${ibSeg}
       </div>
-      ${f.url ? `<div class="fc2-url-row" onclick="event.stopPropagation();window.open('${esc(f.url)}','_blank')">${esc(f.url)}</div>` : ''}
+      ${(f.price || f.url) ? `
+      <div class="fc2-bottom-row">
+        ${f.price ? `<div class="fc2-price-cell${f.url ? ' fc2-price-has-url' : ''}"><div class="fc2-price-label">票價</div><div class="fc2-price-val">NT$ ${parseInt(f.price).toLocaleString()}</div></div>` : ''}
+        ${f.url ? `<div class="fc2-url-cell" onclick="event.stopPropagation();window.open('${esc(f.url)}','_blank')">${(() => { try { return new URL(f.url).hostname.replace(/^www\./, ''); } catch(e) { return f.url; } })()}</div>` : ''}
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -3347,6 +3352,12 @@ function calcNights(checkin, checkout) {
   if (!a || !b) return 0;
   const diff = Math.round((b - a) / 86400000);
   return diff > 0 ? diff : 0;
+}
+
+function fmtFlightPrice(el) {
+  const raw = el.value.replace(/[^0-9]/g, '');
+  if (raw) el.value = parseInt(raw).toLocaleString();
+  else el.value = '';
 }
 
 function fmtHotelPrice(el) {
