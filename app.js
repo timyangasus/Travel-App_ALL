@@ -315,7 +315,7 @@ function switchTab(tab) {
   const tabBar = document.querySelector('.tab-bar');
   if (tabBar) tabBar.style.display = tab === 'home' ? 'none' : '';
   const pageContainer = document.querySelector('.page-container');
-  if (pageContainer) pageContainer.style.height = tab === 'home' ? 'calc(100% + 38px)' : '';
+  if (pageContainer) pageContainer.style.height = '';
   if (tab === 'home')     renderHome();
   if (tab === 'expense')  renderExpense();
   if (tab === 'info')     renderInfo();
