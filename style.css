@@ -3089,7 +3089,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
 #screen-home {
   background: #fff;
-  padding-bottom: calc(var(--tab-height) + 25px) !important;
+  padding-bottom: 0 !important;
   font-family: 'SF Mono', 'SFMono-Regular', ui-monospace, 'Courier New', monospace;
   overflow: hidden !important;
   display: flex;
@@ -3161,7 +3161,7 @@ canvas { display: block; width: 100%; height: 100%; }
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 0px;
+  padding-bottom: 25px;
 }
 .home-trip-list-scroll::-webkit-scrollbar { display: none; }
 .home-trip-list { padding: 0; }
