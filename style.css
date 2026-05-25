@@ -1864,7 +1864,7 @@ canvas { display: block; width: 100%; height: 100%; }
 /* Segments */
 .fc2-body { }
 .fc2-seg {
-  padding: 24px 28px 38px;
+  padding: 12px 28px 38px;
 }
 .fc2-seg + .fc2-seg {
   border-top: 0.5px solid #F0F0F0;
@@ -2036,18 +2036,20 @@ canvas { display: block; width: 100%; height: 100%; }
 .fc2-bottom-row {
   display: flex;
   border-top: 0.5px solid #F0F0F0;
-  height: 56px;
+  height: 73px;
 }
 .fc2-price-cell {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 20px;
+  padding: 0 28px;
+}
+.fc2-price-has-url {
   border-right: 0.5px solid #F0F0F0;
 }
 .fc2-price-label { font-size: 10px; color: #AAAAAA; }
-.fc2-price-val { font-size: 13px; font-weight: 700; color: #C9A84C; }
+.fc2-price-val { font-size: 17px; font-weight: 700; color: #C9A84C; }
 .fc2-url-cell {
   flex: 1;
   display: flex;
@@ -3164,7 +3166,7 @@ canvas { display: block; width: 100%; height: 100%; }
   justify-content: flex-end;
   gap: 17px;
   padding: 0 30px 21px;
-  margin-top: 26px;
+  margin-top: 8px;
   flex-shrink: 0;
   background: #fff;
 }
@@ -3192,7 +3194,7 @@ canvas { display: block; width: 100%; height: 100%; }
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 25px;
+  padding-bottom: 8px;
 }
 .home-trip-list-scroll::-webkit-scrollbar { display: none; }
 .home-trip-list { padding: 0; }
