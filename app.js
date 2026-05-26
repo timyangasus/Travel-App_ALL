@@ -334,7 +334,7 @@ function getHiddenTrips() {
 
 function openTripFilterSheet() {
   const hidden = getHiddenTrips();
-  const allTrips = [...(meta.trips || [])].sort((a, b) => {
+  const allTrips = [...(meta.trips || [])].filter(t => tripYear(t) === _homeYear).sort((a, b) => {
     const parseD = trip => {
       let d = (trip.startDate || '').replace(/[（(][^）)]*[）)]/g, '').trim();
       // Try YYYY/MM/DD
