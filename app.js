@@ -320,6 +320,7 @@ function switchTab(tab) {
   if (tab === 'home')     renderHome();
   if (tab === 'expense')  renderExpense();
   if (tab === 'info')     renderInfo();
+  if (tab === 'photo')    { _photoDayIdx = 0; renderPhotoPage(); }
   if (tab === 'settings') renderSettings();
 }
 
@@ -786,11 +787,10 @@ const INFO_MODULE_DEFS = [
   { id: 'ticket',    label: '票券' },
   { id: 'checklist', label: '待辦清單' },
   { id: 'notes',     label: '備忘錄' },
-  { id: 'photo',     label: '相片' },
   { id: 'map',       label: '地圖' },
 ];
 
-const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes','photo'];
+const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes'];
 
 function getInfoModules() {
   if (!data) return DEFAULT_MODULES;
@@ -1864,7 +1864,6 @@ function openInfoSub(name) {
   if (name === 'shopping')  renderShopItems();
   if (name === 'ticket')    renderTicketCards();
   if (name === 'notes')     renderNotes();
-  if (name === 'photo')     renderPhotoPage();
   if (name === 'map')       renderMapSub();
 }
 
@@ -1882,7 +1881,7 @@ let _photoSwipeInited = false;
 function initPhotoSwipe() {
   if (_photoSwipeInited) return;
   _photoSwipeInited = true;
-  const screen = document.getElementById('screen-info-photo');
+  const screen = document.getElementById('screen-photo');
   if (!screen) return;
   let startX = 0, startY = 0;
   screen.addEventListener('touchstart', e => {
@@ -4375,7 +4374,6 @@ function _importExpenseToDay(dayIdx) {
 
 function closeSmartExpenseDone() {
   closeModal('modal-smart-expense');
-  switchTab('expense');
 }
 
 
