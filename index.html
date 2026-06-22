@@ -577,12 +577,14 @@
   <!-- ═══ INFO SUB: PHOTO ═══ -->
   <div id="screen-photo" class="page" style="overflow:hidden">
     <div id="photo-fixed-header">
-      <div class="screen-header" style="position:relative">
-        <div class="screen-title" style="flex:1">相片</div>
-        <label class="sub-header-action" style="cursor:pointer">
-          <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 -960 960 960" width="30px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-          <input type="file" accept="image/*" multiple style="display:none" onchange="addPhotoFromPicker(this)">
-        </label>
+      <div class="screen-header">
+        <div style="padding: 0 20px 14px; display:flex; align-items:center; justify-content:space-between;">
+          <div class="screen-title">相片</div>
+          <label class="sub-header-action" style="cursor:pointer;margin-top:0;padding:4px;">
+            <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+            <input type="file" accept="image/*" multiple style="display:none" onchange="addPhotoFromPicker(this)">
+          </label>
+        </div>
       </div>
       <div class="day-tabs-wrap" style="border-bottom:0.5px solid var(--border-thin);padding:0 20px">
         <div id="photo-day-date" style="font-size:20px;color:#1A1A1A;font-family:var(--mono);font-weight:700;padding-top:12px;padding-bottom:4px"></div>
@@ -590,7 +592,7 @@
         <div class="day-tabs" id="photo-day-tabs"></div>
       </div>
     </div>
-    <div id="photo-page-grid" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;height:0;background:#fff;width:100%;box-sizing:border-box;padding-bottom:calc(var(--tab-height) + var(--safe-bottom, 0px))"></div>
+    <div id="photo-page-grid" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;height:0;width:100%;box-sizing:border-box;padding-bottom:calc(var(--tab-height) + var(--safe-bottom, 0px))"></div>
   </div>
 
   <!-- ═══ SETTINGS ═══ -->

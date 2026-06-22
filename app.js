@@ -796,10 +796,14 @@ const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes
 function getInfoModules() {
   if (!data) return DEFAULT_MODULES;
   if (!data.settings.infoModules) data.settings.infoModules = [...DEFAULT_MODULES];
-  // 補齊新加的模組（舊資料可能沒有）
-  const known = INFO_MODULE_DEFS.map(m => m.id).filter(id => id !== 'map');
-  known.forEach(id => {
-    if (!data.settings.infoModules.includes(id)) data.settings.infoModules.push(id);
+  if (!data.settings.infoModulesKnown) data.settings.infoModulesKnown = [...data.settings.infoModules];
+  // 只補齊從未見過的新模組（使用者主動勾掉的不動）
+  const nonMap = INFO_MODULE_DEFS.map(m => m.id).filter(id => id !== 'map');
+  nonMap.forEach(id => {
+    if (!data.settings.infoModulesKnown.includes(id)) {
+      data.settings.infoModulesKnown.push(id);
+      data.settings.infoModules.push(id); // 第一次見到才加入
+    }
   });
   return data.settings.infoModules;
 }

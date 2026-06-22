@@ -193,8 +193,8 @@ body {
   letter-spacing: -0.08px;
 }
 
-.tab-item.active .tab-label { color: #B8860B; font-weight: 700; }
-.tab-item.active .tab-icon { color: #C9A84C; }
+.tab-item.active .tab-label { color: #9A7200; font-weight: 700; }
+.tab-item.active .tab-icon { color: #C9A020; }
 
 /* ===================== SEGMENTED CONTROL ===================== */
 .segmented-control {
@@ -948,7 +948,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
 .tab-icon svg { width: 24px; height: 24px; display: block; }
 .tab-icon svg path { fill: #9CA3AF; }
-.tab-item.active .tab-icon svg path { fill: #C9A84C; }
+.tab-item.active .tab-icon svg path { fill: #C9A020; }
 #tab-home .tab-icon svg { transform: scale(1.15); transform-origin: center; }
 
 /* ─── Screens ─── */
@@ -973,7 +973,7 @@ canvas { display: block; width: 100%; height: 100%; }
 .day-banner {
   position: relative;
   width: calc(100% - 64px);
-  height: 60vw;
+  height: 56vw;
   background: #000000;
   overflow: visible;
   margin: 5px 0 0 0;
@@ -1009,8 +1009,8 @@ canvas { display: block; width: 100%; height: 100%; }
     ),
     linear-gradient(
       to top right,
-      rgba(0,0,0,0.45) 0%,
-      rgba(0,0,0,0) 50%
+      rgba(0,0,0,0.22) 0%,
+      rgba(0,0,0,0) 35%
     );
   pointer-events: none;
 }
@@ -3046,7 +3046,7 @@ canvas { display: block; width: 100%; height: 100%; }
   flex-direction: column;
   align-items: flex-end;
   justify-content: flex-start;
-  padding-top: 16px;
+  padding-top: 10px;
   z-index: 3;
   pointer-events: none;
   gap: 0;
