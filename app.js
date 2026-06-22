@@ -1945,6 +1945,13 @@ function renderPhotoPage() {
     const raw = days[_photoDayIdx].banner?.date || '';
     dateEl.textContent = raw.replace(/\d{4}\//, '').trim();
   }
+  // Subtitle label
+  const subEl = document.getElementById('photo-day-subtitle');
+  if (subEl && days[_photoDayIdx]) {
+    const sub = (days[_photoDayIdx].banner?.subtitle || '').trim();
+    subEl.textContent = sub;
+    subEl.style.display = sub ? '' : 'none';
+  }
 
   // Filter photos for selected day (1-based)
   const dayKey = _photoDayIdx + 1;
