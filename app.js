@@ -787,14 +787,20 @@ const INFO_MODULE_DEFS = [
   { id: 'ticket',    label: '票券' },
   { id: 'checklist', label: '待辦清單' },
   { id: 'notes',     label: '備忘錄' },
+  { id: 'expense',   label: '記帳' },
   { id: 'map',       label: '地圖' },
 ];
 
-const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes'];
+const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes','expense'];
 
 function getInfoModules() {
   if (!data) return DEFAULT_MODULES;
   if (!data.settings.infoModules) data.settings.infoModules = [...DEFAULT_MODULES];
+  // 補齊新加的模組（舊資料可能沒有）
+  const known = INFO_MODULE_DEFS.map(m => m.id).filter(id => id !== 'map');
+  known.forEach(id => {
+    if (!data.settings.infoModules.includes(id)) data.settings.infoModules.push(id);
+  });
   return data.settings.infoModules;
 }
 
@@ -1855,6 +1861,12 @@ function renderInfo() {
 }
 
 function openInfoSub(name) {
+  if (name === 'expense') {
+    document.getElementById('screen-info').classList.remove('active');
+    document.getElementById('screen-expense').classList.add('active');
+    renderExpense();
+    return;
+  }
   document.getElementById('screen-info').classList.remove('active');
   const sub = document.getElementById('screen-info-' + name);
   sub.classList.add('active');
@@ -1868,6 +1880,11 @@ function openInfoSub(name) {
 }
 
 function closeInfoSub(name) {
+  if (name === 'expense') {
+    document.getElementById('screen-expense').classList.remove('active');
+    document.getElementById('screen-info').classList.add('active');
+    return;
+  }
   document.getElementById('screen-info-' + name).classList.remove('active');
   document.getElementById('screen-info').classList.add('active');
 }
@@ -5003,7 +5020,7 @@ function clearAllData() {
 
 /* ─── Info Sub-Screen Swipe Gesture ─── */
 (function() {
-  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes']; // map excluded from swipe
+  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes']; // map and expense excluded from swipe
   let _currentInfoSub = null;
   let _startX = 0, _startY = 0;
   const THRESHOLD = 50;
