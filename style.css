@@ -2225,7 +2225,7 @@ canvas { display: block; width: 100%; height: 100%; }
   gap: 4px;
   margin-bottom: 4px;
 }
-.hotel2-dates { font-size: 18px; font-weight: 700; color: #1A1A1A; font-family: var(--mono); white-space: nowrap; }
+.hotel2-dates { font-size: 18px; font-weight: 700; color: #D4AF37; font-family: var(--mono); white-space: nowrap; }
 .hotel2-nights {
   font-size: 15px; font-weight: 700;
   background: #F0F0F0; color: #333;
@@ -2242,7 +2242,7 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .hotel2-del:active { color: #E53935; }
 .hotel2-del svg { display: none; }
-.hotel2-name { font-size: 21px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 10px; font-family: var(--mono); color: #D4AF37; line-height: 1.3; }
+.hotel2-name { font-size: 21px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 10px; font-family: var(--mono); color: #1A1A1A; line-height: 1.3; }
 .hotel2-addr {
   font-size: 10px; color: #555; font-family: var(--mono);
   margin-bottom: 10px; line-height: 1.6;
