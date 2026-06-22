@@ -1171,7 +1171,7 @@ canvas { display: block; width: 100%; height: 100%; }
 .day-tab.active::after { display: none; }
 
 /* Timeline */
-.timeline-section { padding: 24px 20px 80px; position: relative; }
+.timeline-section { padding: 24px 20px 20px; position: relative; }
 .timeline-add-fab { display: none; }
 .timeline { position: relative; }
 .timeline-item {
@@ -1418,7 +1418,7 @@ canvas { display: block; width: 100%; height: 100%; }
   transition: color 0.15s;
 }
 .exp-row-del:active { color: var(--danger); }
-.expense-list { padding: 0 0 calc(var(--tab-height) + 16px); margin-top: 0; }
+.expense-list { padding: 0 0 16px; margin-top: 0; }
 /* Sheet cat button */
 .exp-sheet-cat-btn {
   background: none;
@@ -1545,12 +1545,12 @@ canvas { display: block; width: 100%; height: 100%; }
 #screen-info-flight .info-section { padding: 0; }
 #screen-info-hotel .info-section { padding: 0; }
 #screen-info-flight { background: #C8C8CC; }
-#screen-info-hotel  { background: #fff; }
+#screen-info-hotel  { background: #fff; padding-bottom: 16px; }
 #screen-info,
 #screen-info-checklist,
 #screen-info-shopping,
 #screen-info-ticket,
-#screen-info-notes { background: #fff; }
+#screen-info-notes { background: #fff; padding-bottom: 16px; }
 
 #shopping-items { margin-top: 30px; }
 
