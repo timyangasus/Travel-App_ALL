@@ -1048,7 +1048,7 @@ canvas { display: block; width: 100%; height: 100%; }
   display: block;
   font-family: var(--mono);
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.9);
   background: transparent;
   border: none;
   border-bottom: 1.5px solid transparent;
@@ -3854,6 +3854,7 @@ textarea ~ .field-x {
 .info-list {
   display: flex;
   flex-direction: column;
+  padding-top: 30px;
 }
 .info-list-item {
   display: flex;
@@ -3889,4 +3890,5 @@ textarea ~ .field-x {
   letter-spacing: -0.3px;
 }
 .info-list-chevron path { fill: var(--text-tertiary); }
+
 
