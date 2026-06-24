@@ -1112,7 +1112,7 @@ function renderBanner() {
     const resolved = photos.map(resolvePhoto).filter(Boolean);
     if (resolved.length > 0) {
       bg = `<div class="banner-slides-wrap" id="banner-slides">
-        ${resolved.map(u => `<div class="banner-slide" style="background-image:url('${esc(u)}')"></div>`).join('')}
+        ${resolved.map((u, i) => `<div class="banner-slide${i === 0 ? ' active' : ''}" style="background-image:url('${esc(u)}')"></div>`).join('')}
       </div>`;
     } else {
       bg = `<div class="banner-placeholder-bg"></div>`;
@@ -1626,6 +1626,15 @@ function handleGridUpload(input) {
   const files = [...input.files];
   const photos = data.days[currentDay].banner.photos || [];
   const remaining = 5 - photos.length;
+  if (remaining <= 0) {
+    showUploadStatus('已達 5 張上限');
+    setTimeout(() => showUploadStatus(''), 2000);
+    return;
+  }
+  if (files.length > remaining) {
+    showUploadStatus(`只會加入前 ${remaining} 張（上限 5 張）`);
+    setTimeout(() => showUploadStatus(''), 2500);
+  }
   files.slice(0, remaining).forEach(async file => {
     showUploadStatus('上傳中...');
     try {
