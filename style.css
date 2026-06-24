@@ -3866,7 +3866,7 @@ textarea ~ .field-x {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 20px;
+  padding: 12px 20px;
   background: none;
   border: none;
   border-bottom: 0.5px solid var(--border-thin);
@@ -3877,8 +3877,8 @@ textarea ~ .field-x {
 }
 .info-list-item:active { background: var(--bg-secondary); }
 .info-list-icon {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3886,7 +3886,7 @@ textarea ~ .field-x {
   color: #C9A020;
 }
 .info-list-icon svg path { fill: #C9A020; }
-.info-list-icon svg { width: 36px; height: 36px; }
+.info-list-icon svg { width: 28px; height: 28px; }
 .info-list-label {
   flex: 1;
   font-size: 26px;
