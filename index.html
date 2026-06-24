@@ -2789,7 +2789,8 @@ function renderPhotoGrid() {
 }
 
 function removeBannerPhoto(idx) {
-  data.days[currentDay].banner.photos.splice(idx, 1);
+  data.days[currentDay].banner.photos[idx] = null;
+  save();
   renderPhotoGrid();
 }
 
@@ -2806,13 +2807,17 @@ function replaceBannerPhoto(input, slotIdx) {
 function handleGridUpload(input) {
   const files = [...input.files];
   const photos = data.days[currentDay].banner.photos || [];
-  const remaining = 5 - photos.length;
+  const filled = photos.filter(p => p).length;
+  const remaining = 5 - filled;
   if (remaining <= 0) { showUploadStatus('已達 5 張上限'); setTimeout(() => showUploadStatus(''), 2000); return; }
   files.slice(0, remaining).forEach(async file => {
     showUploadStatus('上傳中...');
     try {
       const url = await uploadToImgBB(file);
-      data.days[currentDay].banner.photos.push(url);
+      const ps = data.days[currentDay].banner.photos;
+      const emptyIdx = ps.findIndex(p => !p);
+      if (emptyIdx !== -1) ps[emptyIdx] = url;
+      else ps.push(url);
       save(); renderPhotoGrid();
     } catch(err) { alert('上傳失敗：' + err.message); }
     finally { showUploadStatus(''); }
