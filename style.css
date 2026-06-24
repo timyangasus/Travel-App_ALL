@@ -3862,6 +3862,7 @@ textarea ~ .field-x {
   align-items: center;
   gap: 16px;
   padding: 12px 20px;
+  min-height: 60px;
   background: none;
   border: none;
   border-bottom: 0.5px solid var(--border-thin);
