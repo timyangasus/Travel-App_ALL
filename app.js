@@ -53,7 +53,9 @@ async function uploadToImgBB(file) {
   });
   const json = await res.json();
   if (!json.success) throw new Error(json.error?.message || 'Upload failed');
-  return json.data.image?.url || json.data.display_url || json.data.url;
+  // display_url = 直接圖片連結（https://i.ibb.co/...）
+  // json.data.url = 相簿頁面（不能直接顯示）
+  return json.data.display_url || json.data.image?.url;
 }
 
 function showUploadStatus(msg) {
@@ -1102,10 +1104,6 @@ function renderBanner() {
   const area  = document.getElementById('banner-area');
   const b     = data.days[currentDay].banner;
   const userPhotos = b.photos || [];
-  // 診斷用 — 確認後移除
-  if (userPhotos.length > 0) {
-    alert('Banner photos:\n' + userPhotos.slice(0,2).join('\n'));
-  }
 
   // 若使用者沒有上傳照片，使用預設圖
   const defaultPhoto = DAY_DEFAULT_PHOTOS[currentDay] || DAY_DEFAULT_PHOTOS[DAY_DEFAULT_PHOTOS.length - 1];
@@ -1116,7 +1114,7 @@ function renderBanner() {
     const resolved = photos.map(resolvePhoto).filter(Boolean);
     if (resolved.length > 0) {
       bg = `<div class="banner-slides-wrap" id="banner-slides">
-        ${resolved.map((u, i) => `<div class="banner-slide${i === 0 ? ' active' : ''}" style="background-image:url('${esc(u)}')"></div>`).join('')}
+        ${resolved.map((u, i) => `<div class="banner-slide" style="background-image:url('${esc(u)}')"></div>`).join('')}
       </div>`;
     } else {
       bg = `<div class="banner-placeholder-bg"></div>`;
@@ -1173,16 +1171,15 @@ function renderBanner() {
   if (_slideshowTimer) { clearInterval(_slideshowTimer); _slideshowTimer = null; }
   if (photos.length > 1) {
     let idx = 0;
-    const slides  = area.querySelectorAll('.banner-slide');
+    const slidesWrap = area.querySelector('#banner-slides');
     const dotEls  = area.querySelectorAll('.banner-dot');
     _slideshowTimer = setInterval(() => {
-      if (slides.length < 2) return;
-      slides[idx].classList.remove('active');
-      if (dotEls[idx]) dotEls[idx].classList.remove('active');
-      idx = (idx + 1) % slides.length;
-      slides[idx].classList.add('active');
-      if (dotEls[idx]) dotEls[idx].classList.add('active');
-    }, 3000);
+      if (!slidesWrap) return;
+      idx = (idx + 1) % photos.length;
+      slidesWrap.style.transition = 'transform 0.5s ease';
+      slidesWrap.style.transform = `translateX(-${idx * 100}%)`;
+      dotEls.forEach((d, i) => d.classList.toggle('active', i === idx));
+    }, 3500);
   }
   // 重繪後補回天氣溫度
   setTimeout(() => { if (typeof applyWeatherToDOM === 'function') applyWeatherToDOM(); }, 0);
