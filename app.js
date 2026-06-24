@@ -1102,6 +1102,10 @@ function renderBanner() {
   const area  = document.getElementById('banner-area');
   const b     = data.days[currentDay].banner;
   const userPhotos = b.photos || [];
+  // 診斷用 — 確認後移除
+  if (userPhotos.length > 0) {
+    alert('Banner photos:\n' + userPhotos.slice(0,2).join('\n'));
+  }
 
   // 若使用者沒有上傳照片，使用預設圖
   const defaultPhoto = DAY_DEFAULT_PHOTOS[currentDay] || DAY_DEFAULT_PHOTOS[DAY_DEFAULT_PHOTOS.length - 1];
