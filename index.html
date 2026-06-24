@@ -2761,8 +2761,8 @@ function renderPhotoGrid() {
   const photos = data.days[currentDay].banner.photos || [];
   grid.innerHTML = '';
 
-  // 固定 3 格
-  for (let i = 0; i < 3; i++) {
+  // 固定 5 格
+  for (let i = 0; i < 5; i++) {
     const cell = document.createElement('div');
     if (photos[i]) {
       const url = resolvePhoto(photos[i]);
@@ -2806,8 +2806,8 @@ function replaceBannerPhoto(input, slotIdx) {
 function handleGridUpload(input) {
   const files = [...input.files];
   const photos = data.days[currentDay].banner.photos || [];
-  const remaining = 3 - photos.length;
-  if (remaining <= 0) { showUploadStatus('已達 3 張上限'); setTimeout(() => showUploadStatus(''), 2000); return; }
+  const remaining = 5 - photos.length;
+  if (remaining <= 0) { showUploadStatus('已達 5 張上限'); setTimeout(() => showUploadStatus(''), 2000); return; }
   files.slice(0, remaining).forEach(async file => {
     showUploadStatus('上傳中...');
     try {
