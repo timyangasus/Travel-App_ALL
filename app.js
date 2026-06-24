@@ -53,9 +53,7 @@ async function uploadToImgBB(file) {
   });
   const json = await res.json();
   if (!json.success) throw new Error(json.error?.message || 'Upload failed');
-  // display_url = 直接圖片連結（https://i.ibb.co/...）
-  // json.data.url = 相簿頁面（不能直接顯示）
-  return json.data.display_url || json.data.image?.url;
+  return json.data.image?.url || json.data.display_url || json.data.url;
 }
 
 function showUploadStatus(msg) {
@@ -322,7 +320,6 @@ function switchTab(tab) {
   if (tab === 'home')     renderHome();
   if (tab === 'expense')  renderExpense();
   if (tab === 'info')     renderInfo();
-  if (tab === 'photo')    { _photoDayIdx = 0; renderPhotoPage(); }
   if (tab === 'settings') renderSettings();
 }
 
@@ -787,26 +784,17 @@ const INFO_MODULE_DEFS = [
   { id: 'hotel',     label: '飯店' },
   { id: 'shopping',  label: '購物清單' },
   { id: 'ticket',    label: '票券' },
-  { id: 'checklist', label: '點檢表' },
+  { id: 'checklist', label: '待辦清單' },
   { id: 'notes',     label: '備忘錄' },
-  { id: 'expense',   label: '記帳' },
+  { id: 'photo',     label: '相片' },
   { id: 'map',       label: '地圖' },
 ];
 
-const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes','expense'];
+const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes','photo'];
 
 function getInfoModules() {
   if (!data) return DEFAULT_MODULES;
   if (!data.settings.infoModules) data.settings.infoModules = [...DEFAULT_MODULES];
-  if (!data.settings.infoModulesKnown) data.settings.infoModulesKnown = [...data.settings.infoModules];
-  // 只補齊從未見過的新模組（使用者主動勾掉的不動）
-  const nonMap = INFO_MODULE_DEFS.map(m => m.id).filter(id => id !== 'map');
-  nonMap.forEach(id => {
-    if (!data.settings.infoModulesKnown.includes(id)) {
-      data.settings.infoModulesKnown.push(id);
-      data.settings.infoModules.push(id); // 第一次見到才加入
-    }
-  });
   return data.settings.infoModules;
 }
 
@@ -1114,7 +1102,7 @@ function renderBanner() {
     const resolved = photos.map(resolvePhoto).filter(Boolean);
     if (resolved.length > 0) {
       bg = `<div class="banner-slides-wrap" id="banner-slides">
-        ${resolved.map((u, i) => `<div class="banner-slide" style="background-image:url('${esc(u)}')"></div>`).join('')}
+        ${resolved.map(u => `<div class="banner-slide" style="background-image:url('${esc(u)}')"></div>`).join('')}
       </div>`;
     } else {
       bg = `<div class="banner-placeholder-bg"></div>`;
@@ -1171,13 +1159,11 @@ function renderBanner() {
   if (_slideshowTimer) { clearInterval(_slideshowTimer); _slideshowTimer = null; }
   if (photos.length > 1) {
     let idx = 0;
-    const slidesWrap = area.querySelector('#banner-slides');
+    const slides  = area.querySelector('#banner-slides');
     const dotEls  = area.querySelectorAll('.banner-dot');
     _slideshowTimer = setInterval(() => {
-      if (!slidesWrap) return;
       idx = (idx + 1) % photos.length;
-      slidesWrap.style.transition = 'transform 0.5s ease';
-      slidesWrap.style.transform = `translateX(-${idx * 100}%)`;
+      slides.style.transform = `translateX(-${idx * 100}%)`;
       dotEls.forEach((d, i) => d.classList.toggle('active', i === idx));
     }, 3500);
   }
@@ -1627,15 +1613,6 @@ function handleGridUpload(input) {
   const files = [...input.files];
   const photos = data.days[currentDay].banner.photos || [];
   const remaining = 5 - photos.length;
-  if (remaining <= 0) {
-    showUploadStatus('已達 5 張上限');
-    setTimeout(() => showUploadStatus(''), 2000);
-    return;
-  }
-  if (files.length > remaining) {
-    showUploadStatus(`只會加入前 ${remaining} 張（上限 5 張）`);
-    setTimeout(() => showUploadStatus(''), 2500);
-  }
   files.slice(0, remaining).forEach(async file => {
     showUploadStatus('上傳中...');
     try {
@@ -1878,12 +1855,6 @@ function renderInfo() {
 }
 
 function openInfoSub(name) {
-  if (name === 'expense') {
-    document.getElementById('screen-info').classList.remove('active');
-    document.getElementById('screen-expense').classList.add('active');
-    renderExpense();
-    return;
-  }
   document.getElementById('screen-info').classList.remove('active');
   const sub = document.getElementById('screen-info-' + name);
   sub.classList.add('active');
@@ -1893,15 +1864,11 @@ function openInfoSub(name) {
   if (name === 'shopping')  renderShopItems();
   if (name === 'ticket')    renderTicketCards();
   if (name === 'notes')     renderNotes();
+  if (name === 'photo')     renderPhotoPage();
   if (name === 'map')       renderMapSub();
 }
 
 function closeInfoSub(name) {
-  if (name === 'expense') {
-    document.getElementById('screen-expense').classList.remove('active');
-    document.getElementById('screen-info').classList.add('active');
-    return;
-  }
   document.getElementById('screen-info-' + name).classList.remove('active');
   document.getElementById('screen-info').classList.add('active');
 }
@@ -1915,7 +1882,7 @@ let _photoSwipeInited = false;
 function initPhotoSwipe() {
   if (_photoSwipeInited) return;
   _photoSwipeInited = true;
-  const screen = document.getElementById('screen-photo');
+  const screen = document.getElementById('screen-info-photo');
   if (!screen) return;
   let startX = 0, startY = 0;
   screen.addEventListener('touchstart', e => {
@@ -1958,13 +1925,6 @@ function renderPhotoPage() {
     const raw = days[_photoDayIdx].banner?.date || '';
     dateEl.textContent = raw.replace(/\d{4}\//, '').trim();
   }
-  // Subtitle label
-  const subEl = document.getElementById('photo-day-subtitle');
-  if (subEl && days[_photoDayIdx]) {
-    const sub = (days[_photoDayIdx].banner?.subtitle || '').trim();
-    subEl.textContent = sub;
-    subEl.style.display = sub ? '' : 'none';
-  }
 
   // Filter photos for selected day (1-based)
   const dayKey = _photoDayIdx + 1;
@@ -1973,7 +1933,7 @@ function renderPhotoPage() {
   const grid = document.getElementById('photo-page-grid');
   if (!grid) return;
   if (!photos.length) { grid.innerHTML = ''; return; }
-  grid.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;width:100%;padding-bottom:12px">${
+  grid.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;width:100%">${
     photos.map(p => `
     <div style="position:relative;width:100%;overflow:hidden;background:#F0F0F0">
       <img src="${resolvePhoto(p.url)}" style="width:100%;height:auto;display:block;cursor:pointer" onclick="openPhotoLightbox('${resolvePhoto(p.url)}')" loading="lazy">
@@ -4415,6 +4375,7 @@ function _importExpenseToDay(dayIdx) {
 
 function closeSmartExpenseDone() {
   closeModal('modal-smart-expense');
+  switchTab('expense');
 }
 
 
@@ -5044,7 +5005,7 @@ function clearAllData() {
 
 /* ─── Info Sub-Screen Swipe Gesture ─── */
 (function() {
-  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes']; // map and expense excluded from swipe
+  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes']; // map excluded from swipe
   let _currentInfoSub = null;
   let _startX = 0, _startY = 0;
   const THRESHOLD = 50;
