@@ -194,7 +194,7 @@ body {
 }
 
 .tab-item.active .tab-label { color: #9A7200; font-weight: 700; }
-.tab-item.active .tab-icon { color: #C9A020; }
+.tab-item.active .tab-icon { color: #9A7200; }
 
 /* ===================== SEGMENTED CONTROL ===================== */
 .segmented-control {
@@ -948,7 +948,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
 .tab-icon svg { width: 24px; height: 24px; display: block; }
 .tab-icon svg path { fill: #9CA3AF; }
-.tab-item.active .tab-icon svg path { fill: #C9A020; }
+.tab-item.active .tab-icon svg path { fill: #9A7200; }
 #tab-home .tab-icon svg { transform: scale(1.15); transform-origin: center; }
 
 /* ─── Screens ─── */
@@ -1003,16 +1003,9 @@ canvas { display: block; width: 100%; height: 100%; }
   inset: 0;
   background:
     linear-gradient(
-      to bottom,
-      rgba(0,0,0,0) 0%,
-      rgba(0,0,0,0) 60%,
-      rgba(0,0,0,0.55) 80%,
-      rgba(0,0,0,0.82) 100%
-    ),
-    linear-gradient(
       to top right,
-      rgba(0,0,0,0.22) 0%,
-      rgba(0,0,0,0) 35%
+      rgba(0,0,0,0.55) 0%,
+      rgba(0,0,0,0) 50%
     );
   pointer-events: none;
 }
@@ -1030,7 +1023,7 @@ canvas { display: block; width: 100%; height: 100%; }
   letter-spacing: 0.14em;
   text-transform: uppercase;
   margin-bottom: 6px;
-  text-shadow: 0 2px 16px rgba(0,0,0,0.6);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5), 0 1px 4px rgba(0,0,0,0.3);
 }
 .banner-date-input {
   display: block;
@@ -1040,7 +1033,7 @@ canvas { display: block; width: 100%; height: 100%; }
   color: #fff;
   letter-spacing: -0.5px;
   line-height: 1.2;
-  text-shadow: 0 4px 24px rgba(0,0,0,0.55), 0 2px 48px rgba(0,0,0,0.35);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5), 0 1px 4px rgba(0,0,0,0.3);
   background: transparent;
   border: none;
   border-bottom: 1.5px solid transparent;
@@ -1055,7 +1048,7 @@ canvas { display: block; width: 100%; height: 100%; }
   display: block;
   font-family: var(--mono);
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.82);
+  color: rgba(255, 255, 255, 0.8);
   background: transparent;
   border: none;
   border-bottom: 1.5px solid transparent;
@@ -1065,7 +1058,7 @@ canvas { display: block; width: 100%; height: 100%; }
   caret-color: rgba(255, 255, 255, 0.8);
   line-height: 1.5;
   transition: border-color 0.2s;
-  text-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 2px 40px rgba(0,0,0,0.4);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5), 0 1px 4px rgba(0,0,0,0.3);
 }
 .banner-subtitle-input::placeholder { color: rgba(255, 255, 255, 0.28); }
 .banner-subtitle-input:focus { border-bottom-color: rgba(255, 255, 255, 0.25); }
@@ -3098,7 +3091,7 @@ canvas { display: block; width: 100%; height: 100%; }
   letter-spacing: -0.5px;
   cursor: pointer;
   margin-bottom: 6px;
-  text-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 2px 40px rgba(0,0,0,0.4);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5), 0 1px 4px rgba(0,0,0,0.3);
 }
 .banner-date-placeholder {
   color: rgba(255,255,255,0.4);
