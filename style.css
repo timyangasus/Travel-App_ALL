@@ -1166,7 +1166,7 @@ canvas { display: block; width: 100%; height: 100%; }
 .day-tab.active::after { display: none; }
 
 /* Timeline */
-.timeline-section { padding: 24px 20px 8px; position: relative; }
+.timeline-section { padding: 19px 20px 8px; position: relative; }
 .timeline-add-fab { display: none; }
 .timeline { position: relative; }
 .timeline-item {
@@ -1200,8 +1200,8 @@ canvas { display: block; width: 100%; height: 100%; }
   margin-top: 6px;
 }
 .timeline-item:last-child .timeline-line { display: none; }
-.timeline-right { flex: 1; padding-bottom: 32px; min-width: 0; padding-right: 40px; word-break: break-all; overflow-wrap: break-word; }
-.timeline-right { flex: 1; padding-bottom: 32px; min-width: 0; padding-right: 0; word-break: break-all; overflow-wrap: break-word; position: relative; }
+.timeline-right { flex: 1; padding-bottom: 27px; min-width: 0; padding-right: 40px; word-break: break-all; overflow-wrap: break-word; }
+.timeline-right { flex: 1; padding-bottom: 27px; min-width: 0; padding-right: 0; word-break: break-all; overflow-wrap: break-word; position: relative; }
 .timeline-time-row {
   display: flex;
   align-items: center;
