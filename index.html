@@ -2804,24 +2804,25 @@ function replaceBannerPhoto(input, slotIdx) {
     .finally(() => showUploadStatus(''));
 }
 
-function handleGridUpload(input) {
+async function handleGridUpload(input) {
   const files = [...input.files];
   const photos = data.days[currentDay].banner.photos || [];
   const filled = photos.filter(p => p).length;
   const remaining = 5 - filled;
   if (remaining <= 0) { showUploadStatus('已達 5 張上限'); setTimeout(() => showUploadStatus(''), 2000); return; }
-  files.slice(0, remaining).forEach(async file => {
-    showUploadStatus('上傳中...');
+  const toUpload = files.slice(0, remaining);
+  for (let i = 0; i < toUpload.length; i++) {
+    showUploadStatus(`上傳中 ${i + 1}/${toUpload.length}...`);
     try {
-      const url = await uploadToImgBB(file);
+      const url = await uploadToImgBB(toUpload[i]);
       const ps = data.days[currentDay].banner.photos;
       const emptyIdx = ps.findIndex(p => !p);
       if (emptyIdx !== -1) ps[emptyIdx] = url;
       else ps.push(url);
       save(); renderPhotoGrid();
-    } catch(err) { alert('上傳失敗：' + err.message); }
-    finally { showUploadStatus(''); }
-  });
+    } catch(err) { alert('上傳失敗：' + err.message); break; }
+  }
+  showUploadStatus('');
 }
 
 function saveBanner() {
