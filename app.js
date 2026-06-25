@@ -1582,8 +1582,8 @@ function renderPhotoGrid() {
   const photos = data.days[currentDay].banner.photos || [];
   grid.innerHTML = '';
 
-  // 固定 5 格
-  for (let i = 0; i < 5; i++) {
+  // 固定 6 格
+  for (let i = 0; i < 6; i++) {
     const cell = document.createElement('div');
     if (photos[i]) {
       const url = resolvePhoto(photos[i]);
@@ -1629,20 +1629,23 @@ function handleGridUpload(input) {
   const files = [...input.files];
   const photos = data.days[currentDay].banner.photos || [];
   const filled = photos.filter(p => p).length;
-  const remaining = 5 - filled;
-  if (remaining <= 0) { showUploadStatus('已達 5 張上限'); setTimeout(() => showUploadStatus(''), 2000); return; }
-  files.slice(0, remaining).forEach(async file => {
-    showUploadStatus('上傳中...');
-    try {
-      const url = await uploadToImgBB(file);
-      const ps = data.days[currentDay].banner.photos;
-      const emptyIdx = ps.findIndex(p => !p);
-      if (emptyIdx !== -1) ps[emptyIdx] = url;
-      else ps.push(url);
-      save(); renderPhotoGrid();
-    } catch(err) { alert('上傳失敗：' + err.message); }
-    finally { showUploadStatus(''); }
-  });
+  const remaining = 6 - filled;
+  if (remaining <= 0) { showUploadStatus('已達 6 張上限'); setTimeout(() => showUploadStatus(''), 2000); return; }
+  const toUpload = files.slice(0, remaining);
+  (async () => {
+    for (const file of toUpload) {
+      showUploadStatus('上傳中...');
+      try {
+        const url = await uploadToImgBB(file);
+        const ps = data.days[currentDay].banner.photos;
+        const emptyIdx = ps.findIndex(p => !p);
+        if (emptyIdx !== -1) ps[emptyIdx] = url;
+        else ps.push(url);
+        save(); renderPhotoGrid();
+      } catch(err) { alert('上傳失敗：' + err.message); }
+      finally { showUploadStatus(''); }
+    }
+  })();
 }
 
 function saveBanner() {
