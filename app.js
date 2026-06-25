@@ -1585,26 +1585,30 @@ function renderPhotoGrid() {
   // 固定 6 格
   for (let i = 0; i < 6; i++) {
     const cell = document.createElement('div');
+    cell.className = 'photo-cell';
+    const inner = document.createElement('div');
+    inner.className = 'photo-cell-inner';
     if (photos[i]) {
       const url = resolvePhoto(photos[i]);
-      cell.className = 'photo-cell photo-cell-filled';
-      cell.style.backgroundImage = url ? `url('${url}')` : '';
-      cell.innerHTML = `<button class="photo-cell-del" onclick="event.stopPropagation();removeBannerPhoto(${i})">×</button>`;
+      inner.classList.add('photo-cell-filled');
+      inner.style.backgroundImage = url ? `url('${url}')` : '';
+      inner.innerHTML = `<button class="photo-cell-del" onclick="event.stopPropagation();removeBannerPhoto(${i})">×</button>`;
       const inp = document.createElement('input');
       inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
       const si = i;
       inp.addEventListener('change', () => replaceBannerPhoto(inp, si));
-      cell.addEventListener('click', () => inp.click());
-      cell.appendChild(inp);
+      inner.addEventListener('click', () => inp.click());
+      inner.appendChild(inp);
     } else {
-      cell.className = 'photo-cell photo-cell-add';
-      cell.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>`;
+      inner.classList.add('photo-cell-add');
+      inner.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>`;
       const inp = document.createElement('input');
       inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true; inp.style.display = 'none';
       inp.addEventListener('change', () => handleGridUpload(inp));
-      cell.addEventListener('click', () => inp.click());
-      cell.appendChild(inp);
+      inner.addEventListener('click', () => inp.click());
+      inner.appendChild(inp);
     }
+    cell.appendChild(inner);
     grid.appendChild(cell);
   }
 }

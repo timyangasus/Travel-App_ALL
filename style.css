@@ -2437,17 +2437,25 @@ canvas { display: block; width: 100%; height: 100%; }
   margin-bottom: 20px;
 }
 .photo-cell {
-  aspect-ratio: 3 / 2;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
   position: relative;
   width: 100%;
+  padding-bottom: 66.666%;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
   min-width: 0;
+}
+.photo-cell-inner {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 .photo-cell-filled {
   background-size: cover;
   background-position: center center;
   background-color: #F3F4F6;
+  width: 100%;
+  height: 100%;
 }
 .photo-cell-del {
   position: absolute;
@@ -2475,6 +2483,8 @@ canvas { display: block; width: 100%; height: 100%; }
   cursor: pointer;
   transition: background 0.15s;
   box-sizing: border-box;
+  width: 100%;
+  height: 100%;
 }
 .photo-cell-add:active { background: #E9EBF0; }
 .photo-cell-add svg path { fill: var(--text-tertiary); }
