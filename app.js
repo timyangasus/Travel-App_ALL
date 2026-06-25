@@ -2146,6 +2146,7 @@ function mapSelPick(idx) {
 
 function mapSelDel(idx) {
   document.getElementById('map-dropdown').style.display = 'none';
+  if (!confirm('確定刪除此地圖？')) return;
   _mapList().splice(idx, 1);
   _mapIdx = Math.max(0, Math.min(_mapIdx, _mapList().length - 1));
   save();
@@ -2822,9 +2823,7 @@ function renderTicketCards() {
         <div class="ticket-card">
           <div class="ticket-img-wrap">
             <img class="ticket-img" src="${photoUrl}" alt="票券" onclick="openTicketLightbox('${photoUrl}')">
-            <button class="ticket-img-del" onclick="deleteTicketCard(${t.id})">
-              <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
-            </button>
+            <button class="ticket-img-del" onclick="deleteTicketCard(${t.id})">×</button>
           </div>
         </div>`;
       }).join('')
@@ -3277,6 +3276,7 @@ function saveFlightSheet() {
 }
 
 function deleteFlightCard(id) {
+  if (!confirm('確定刪除此機票？')) return;
   data.flights = data.flights.filter(f => f.id !== id);
   save(); renderFlightCards();
 }

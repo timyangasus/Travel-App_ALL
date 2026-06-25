@@ -1676,17 +1676,20 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .ticket-img-del {
   position: absolute;
-  top: 8px; right: 8px;
-  width: 30px; height: 30px;
+  top: 6px; right: 6px;
+  width: 22px; height: 22px;
   border-radius: 50%;
-  background: rgba(0,0,0,0.55);
+  background: rgba(0,0,0,0.5);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  color: #fff;
+  padding: 0;
 }
-.ticket-img-del svg path { fill: #fff; }
 .ticket-upload-btn {
   display: inline-flex;
   align-items: center;
