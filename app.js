@@ -2559,6 +2559,7 @@ function addTicketCard() {
 }
 
 function deleteTicketCard(id) {
+  if (!confirm('確定刪除此圖集？')) return;
   data.tickets = data.tickets.filter(t => t.id !== id);
   save(); renderTicketCards();
 }
@@ -3489,6 +3490,7 @@ function saveHotelSheet() {
 }
 
 function deleteHotelCard(id) {
+  if (!confirm('確定刪除此飯店？')) return;
   data.hotels = data.hotels.filter(h => h.id !== id);
   save(); renderHotelCards();
 }
