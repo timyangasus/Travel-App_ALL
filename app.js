@@ -648,11 +648,12 @@ function initHomeTripSlideshows(trips) {
     if (resolved.length < 2) return;
     let idx = 0;
     const slides = el.querySelectorAll('.home-trip-slide');
+    const interval = 3800 + Math.floor(Math.random() * 600);
     _homeTripTimers[trip.id] = setInterval(() => {
       slides[idx].classList.remove('visible');
       idx = (idx + 1) % slides.length;
       slides[idx].classList.add('visible');
-    }, 3000);
+    }, interval);
   });
 }
 
