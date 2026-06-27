@@ -626,34 +626,28 @@ function initHomeTripSlideshows(trips) {
   trips.forEach(trip => {
     const el = document.getElementById('cover-' + trip.id);
     if (!el) return;
-    // Collect all photos from all days
+
+    // 1) Use manually-set coverImg if available
+    if (trip.coverImg) {
+      const u = resolvePhoto(trip.coverImg);
+      if (u) {
+        el.innerHTML = `<div class="home-trip-slide visible" style="background-image:url('${esc(u)}')"></div>`;
+        return;
+      }
+    }
+
+    // 2) Fallback: first photo from any day's banner
     const raw = localStorage.getItem(TRIP_PREFIX + trip.id);
     const tripData = raw ? JSON.parse(raw) : {};
-    const allPhotos = [];
-    (tripData.days || []).forEach(d => {
-      (d.banner?.photos || []).forEach(p => { if (p) allPhotos.push(p); });
-    });
-    if (!allPhotos.length) { el.style.background = '#C9A84C'; return; }
-    // Shuffle
-    for (let i = allPhotos.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [allPhotos[i], allPhotos[j]] = [allPhotos[j], allPhotos[i]];
+    let firstPhoto = null;
+    for (const d of (tripData.days || [])) {
+      const p = (d.banner?.photos || []).find(p => p);
+      if (p) { firstPhoto = p; break; }
     }
-    const resolved = allPhotos.map(resolvePhoto).filter(Boolean);
-    if (!resolved.length) { el.style.background = '#C9A84C'; return; }
-    // Build slides
-    el.innerHTML = resolved.map((u, i) =>
-      `<div class="home-trip-slide${i === 0 ? ' visible' : ''}" style="background-image:url('${esc(u)}')"></div>`
-    ).join('');
-    if (resolved.length < 2) return;
-    let idx = 0;
-    const slides = el.querySelectorAll('.home-trip-slide');
-    const interval = 3800 + Math.floor(Math.random() * 600);
-    _homeTripTimers[trip.id] = setInterval(() => {
-      slides[idx].classList.remove('visible');
-      idx = (idx + 1) % slides.length;
-      slides[idx].classList.add('visible');
-    }, interval);
+    if (!firstPhoto) { el.style.background = '#C9A84C'; return; }
+    const u = resolvePhoto(firstPhoto);
+    if (!u) { el.style.background = '#C9A84C'; return; }
+    el.innerHTML = `<div class="home-trip-slide visible" style="background-image:url('${esc(u)}')"></div>`;
   });
 }
 
