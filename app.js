@@ -502,15 +502,10 @@ function renderHomeTripList() {
     const dateStr = tripDateDisplay(trip) || '';
     return `
       <div class="home-trip-row" data-id="${trip.id}">
-        <div class="home-trip-row-inner" onclick="openTrip('${trip.id}')">
+        <div class="home-trip-row-inner">
           <div class="home-trip-cover" id="cover-${trip.id}"
-            ontouchstart="_coverLongPressStart(event,'${trip.id}')"
-            ontouchend="_coverLongPressCancel()"
-            ontouchcancel="_coverLongPressCancel()"
-            onmousedown="_coverLongPressStart(event,'${trip.id}')"
-            onmouseup="_coverLongPressCancel()"
-            onmouseleave="_coverLongPressCancel()"></div>
-          <div class="home-trip-body" style="margin-left:5px">
+            onclick="event.stopPropagation();openTripCoverPicker('${trip.id}')"></div>
+          <div class="home-trip-body" style="margin-left:5px;cursor:pointer" onclick="openTrip('${trip.id}')">
             <div class="home-trip-date">${esc(dateStr)}</div>
             <div class="home-trip-name">${esc(trip.name || '未命名行程')}</div>
           </div>
@@ -656,25 +651,6 @@ function initHomeTripSlideshows(trips) {
     el.innerHTML = `<div class="home-trip-slide visible" style="background-image:url('${esc(u)}')"></div>`;
   });
 }
-
-/* ─── Cover long-press ─── */
-let _coverLongPressTimer = null;
-
-function _coverLongPressStart(e, id) {
-  e.stopPropagation();
-  _coverLongPressTimer = setTimeout(() => {
-    _coverLongPressTimer = null;
-    // Prevent the parent onclick (openTrip) from firing
-    e.target.closest('.home-trip-row-inner')?.addEventListener('click', _absorbClick, { once: true, capture: true });
-    openTripCoverPicker(id);
-  }, 600);
-}
-
-function _coverLongPressCancel() {
-  if (_coverLongPressTimer) { clearTimeout(_coverLongPressTimer); _coverLongPressTimer = null; }
-}
-
-function _absorbClick(e) { e.stopPropagation(); }
 
 function openTripCoverPicker(id) {
   const inp = document.createElement('input');
