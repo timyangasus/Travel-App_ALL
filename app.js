@@ -84,7 +84,6 @@ let currentTripId = null;
 let currentDay = 0;
 let editingEventId = null;
 let _slideshowTimer = null;
-const _homeTripTimers = {};
 const _blobCache = new Map();
 
 function genId() {
@@ -308,10 +307,6 @@ function esc(s) {
    TAB NAVIGATION
 ═══════════════════════════════════════ */
 function switchTab(tab) {
-  // Clear home trip slideshows when leaving home
-  if (tab !== 'home') {
-    Object.keys(_homeTripTimers).forEach(id => { clearInterval(_homeTripTimers[id]); delete _homeTripTimers[id]; });
-  }
   document.querySelectorAll('.page').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
   document.getElementById('screen-' + tab).classList.add('active');
@@ -495,17 +490,17 @@ function renderHomeTripList() {
     return;
   }
 
-  // Clear existing trip slideshows
-  Object.keys(_homeTripTimers).forEach(id => { clearInterval(_homeTripTimers[id]); delete _homeTripTimers[id]; });
-
   el.innerHTML = '<div class="home-trip-list-topline"></div>' + trips.map(trip => {
     const dateStr = tripDateDisplay(trip) || '';
+    const hasImg = !!trip.coverImg;
+    const coverBg = hasImg
+      ? `background-image:url('${esc(trip.coverImg)}');background-size:cover;background-position:center`
+      : `background:#C9A84C`;
     return `
       <div class="home-trip-row" data-id="${trip.id}">
-        <div class="home-trip-row-inner">
-          <div class="home-trip-cover" id="cover-${trip.id}"
-            onclick="event.stopPropagation();openTripCoverPicker('${trip.id}')"></div>
-          <div class="home-trip-body" style="margin-left:5px;cursor:pointer" onclick="openTrip('${trip.id}')">
+        <div class="home-trip-row-inner" onclick="openTrip('${trip.id}')">
+          <div class="home-trip-cover" style="${coverBg}" onclick="event.stopPropagation();openTripCoverPicker('${trip.id}')"></div>
+          <div class="home-trip-body" style="margin-left:5px">
             <div class="home-trip-date">${esc(dateStr)}</div>
             <div class="home-trip-name">${esc(trip.name || '未命名行程')}</div>
           </div>
@@ -514,9 +509,6 @@ function renderHomeTripList() {
         <div class="home-trip-row-bottom-line"></div>
       </div>`;
   }).join('');
-
-  // Init slideshows after DOM render
-  setTimeout(() => initHomeTripSlideshows(trips), 0);
 
   // Year swipe
   initHomeYearSwipe();
@@ -623,35 +615,6 @@ function openTrip(id) {
 }
 
 /* ─── Trip Cover Picker ─── */
-function initHomeTripSlideshows(trips) {
-  trips.forEach(trip => {
-    const el = document.getElementById('cover-' + trip.id);
-    if (!el) return;
-
-    // 1) Use manually-set coverImg if available
-    if (trip.coverImg) {
-      const u = resolvePhoto(trip.coverImg);
-      if (u) {
-        el.innerHTML = `<div class="home-trip-slide visible" style="background-image:url('${esc(u)}')"></div>`;
-        return;
-      }
-    }
-
-    // 2) Fallback: first photo from any day's banner
-    const raw = localStorage.getItem(TRIP_PREFIX + trip.id);
-    const tripData = raw ? JSON.parse(raw) : {};
-    let firstPhoto = null;
-    for (const d of (tripData.days || [])) {
-      const p = (d.banner?.photos || []).find(p => p);
-      if (p) { firstPhoto = p; break; }
-    }
-    if (!firstPhoto) { el.style.background = '#C9A84C'; return; }
-    const u = resolvePhoto(firstPhoto);
-    if (!u) { el.style.background = '#C9A84C'; return; }
-    el.innerHTML = `<div class="home-trip-slide visible" style="background-image:url('${esc(u)}')"></div>`;
-  });
-}
-
 function openTripCoverPicker(id) {
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*';
