@@ -1348,19 +1348,53 @@ function syncTripDatesFromDays() {
 }
 
 function addDay() {
-  // 先找最後一個有日期的天往後推一天
-  let nextDate = '';
-  for (let i = data.days.length - 1; i >= 0; i--) {
-    const d = parseBannerDate(data.days[i].banner.date);
-    if (d) {
-      d.setDate(d.getDate() + (data.days.length - i));
-      nextDate = dateToStr(d);
-      break;
+  // 依目前所在的天數位置決定新的一天要加在哪裡：
+  // 在最後一天 → 加在最後面；在第一天 → 加在最前面；其他 → 加在該天之後（後面的天數依序順延一天）
+  const n = data.days.length;
+  const isLast  = currentDay === n - 1;
+  const isFirst = currentDay === 0;
+  const blankDay = () => ({ banner: { date: '', subtitle: '', photos: [] }, events: [] });
+
+  if (isLast) {
+    let nextDate = '';
+    for (let i = n - 1; i >= 0; i--) {
+      const d = parseBannerDate(data.days[i].banner.date);
+      if (d) { d.setDate(d.getDate() + (n - i)); nextDate = dateToStr(d); break; }
     }
+    const day = blankDay();
+    day.banner.date = nextDate;
+    data.days.push(day);
+    data.expenses.push([]);
+    currentDay = data.days.length - 1;
+  } else if (isFirst) {
+    let prevDate = '';
+    for (let i = 0; i < n; i++) {
+      const d = parseBannerDate(data.days[i].banner.date);
+      if (d) { d.setDate(d.getDate() - (i + 1)); prevDate = dateToStr(d); break; }
+    }
+    const day = blankDay();
+    day.banner.date = prevDate;
+    data.days.unshift(day);
+    data.expenses.unshift([]);
+    currentDay = 0;
+  } else {
+    // 插入到目前這天之後；插入點以後的每一天各自往後推一天，
+    // 但仍是同一個天物件（events 不變），只有日期欄位跟著遞增，行程內容不會跑到別的日期上
+    const insertIdx = currentDay + 1;
+    let newDate = '';
+    const anchor = parseBannerDate(data.days[currentDay].banner.date);
+    if (anchor) { anchor.setDate(anchor.getDate() + 1); newDate = dateToStr(anchor); }
+    for (let i = n - 1; i >= insertIdx; i--) {
+      const dd = parseBannerDate(data.days[i].banner.date);
+      if (dd) { dd.setDate(dd.getDate() + 1); data.days[i].banner.date = dateToStr(dd); }
+    }
+    const day = blankDay();
+    day.banner.date = newDate;
+    data.days.splice(insertIdx, 0, day);
+    data.expenses.splice(insertIdx, 0, []);
+    currentDay = insertIdx;
   }
-  data.days.push({ banner: { date: nextDate, subtitle: '', photos: [] }, events: [] });
-  data.expenses.push([]);
-  currentDay = data.days.length - 1;
+
   syncTripDatesFromDays();
   save();
   renderItinerary();
