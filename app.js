@@ -1039,6 +1039,11 @@ function deleteDay(i) {
   showConfirm(`刪除 Day ${i + 1}？`, '此天的行程與帳單將一併移除。', () => {
     data.days.splice(i, 1);
     data.expenses.splice(i, 1);
+    // 刪除後，後面每一天各自往前補一天，維持日期連續不留空隙
+    for (let j = i; j < data.days.length; j++) {
+      const d = parseBannerDate(data.days[j].banner.date);
+      if (d) { d.setDate(d.getDate() - 1); data.days[j].banner.date = dateToStr(d); }
+    }
     currentDay = Math.min(currentDay, data.days.length - 1);
     if (expenseDay >= data.days.length) expenseDay = data.days.length - 1;
     syncTripDatesFromDays();
