@@ -1719,6 +1719,7 @@ function toggleCatDropdown() {
 function selectCat(label) {
   _selectedCat = label;
   const labelEl = document.getElementById('exp-cat-label');
+  if (labelEl) labelEl.textContent = label;
   document.getElementById('exp-cat-dropdown')?.classList.remove('open');
 }
 
@@ -1727,10 +1728,16 @@ function openExpenseSheet() {
   initCatDropdown();
   _selectedCat = '餐飲';
   const labelEl = document.getElementById('exp-cat-label');
-  const amt = document.getElementById('exp-amount');
-  const nm  = document.getElementById('exp-name');
-  if (amt) amt.value = '';
-  if (nm)  nm.value  = '';
+  if (labelEl) labelEl.textContent = _selectedCat;
+  const amt  = document.getElementById('exp-amount');
+  const nm   = document.getElementById('exp-name');
+  const time = document.getElementById('exp-time');
+  if (amt)  amt.value  = '';
+  if (nm)   nm.value   = '';
+  if (time) time.value = '';
+  const negBtn = document.getElementById('exp-neg-btn');
+  if (negBtn) { negBtn.style.color = '#AAAAAA'; negBtn.style.borderColor = '#E0E0E0'; }
+  _renderExpSubitemsForEdit([]);
   document.getElementById('modal-expense-sheet').classList.add('open');
   setTimeout(() => document.getElementById('exp-amount')?.focus(), 340);
 }
@@ -2843,6 +2850,7 @@ function openExpenseSheetForEdit(id) {
   initCatDropdown();
   _selectedCat = item.cat || '其他';
   const labelEl = document.getElementById('exp-cat-label');
+  if (labelEl) labelEl.textContent = _selectedCat;
   const nameEl = document.getElementById('exp-name');
   const amtEl  = document.getElementById('exp-amount');
   if (nameEl) nameEl.value = item.name || '';
@@ -4263,26 +4271,16 @@ function _parseExpenseText(text) {
       let hasDirectAmount = false;
 
       if (itemsPart) {
-        // First try 頓號-separated subitems (multiple items)
-        if (/[、，]/.test(itemsPart)) {
-          const parsed = _parseSubitemsFromLine(itemsPart);
-          if (parsed.length > 0) {
-            subitems = parsed;
-            directAmount = parsed.reduce((s,i) => s + i.amount, 0);
-            hasDirectAmount = true;
-          }
-        }
-        if (subitems.length === 0) {
-          // Single item with amount: 品項名（¥1,560）
-          const amtM = itemsPart.match(/\(¥\s*([\d,，]+)\)\s*$/) || itemsPart.match(/（¥\s*([\d,，]+)）\s*$/);
-          if (amtM) {
-            directAmount = parseInt(amtM[1].replace(/[,，]/g, ''));
-            const itemName = itemsPart.slice(0, itemsPart.lastIndexOf(amtM[0])).trim();
-            subitems = [{ name: itemName, amount: directAmount }];
-            hasDirectAmount = true;
-          } else if (itemsPart.trim()) {
-            subitems = [{ name: itemsPart.trim(), amount: 0, _pending: true }];
-          }
+        // 不論是否有頓號分隔，都用同一套解析邏輯，
+        // 這樣單一品項的「品項 x2（各¥660）」格式也能正確算出金額
+        const parsed = _parseSubitemsFromLine(itemsPart);
+        const hasAnyAmount = parsed.some(s => !s._raw && s.amount > 0);
+        if (hasAnyAmount) {
+          subitems = parsed;
+          directAmount = parsed.reduce((s,i) => s + (i.amount || 0), 0);
+          hasDirectAmount = true;
+        } else if (parsed.length > 0) {
+          subitems = [{ name: parsed.map(p => p.name).join('、'), amount: 0, _pending: true }];
         }
       }
 
