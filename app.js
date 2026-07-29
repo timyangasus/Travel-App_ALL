@@ -2909,10 +2909,52 @@ function noteBodyToHtml(text) {
         html += `<span style="white-space:pre-wrap">${escaped}</span>`;
       }
     } else {
-      html += `<img src="${segments[i]}" style="max-width:100%;border-radius:0;display:block;margin:8px 0" onclick="event.stopPropagation()">`;
+      const u = segments[i];
+      html += `<img src="${u}" style="max-width:100%;border-radius:0;display:block;margin:8px 0;cursor:pointer" onclick="event.stopPropagation();openImageLightbox('${u.replace(/'/g, "\\'")}')">`;
     }
   }
   return html;
+}
+
+/* ─── 圖片放大檢視（iOS 風格彈出） ─── */
+function openImageLightbox(url) {
+  let lb = document.getElementById('img-lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'img-lightbox';
+    lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0);z-index:9999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s ease,background-color .25s ease;';
+    lb.onclick = () => closeImageLightbox();
+
+    const img = document.createElement('img');
+    img.id = 'img-lightbox-img';
+    img.style.cssText = 'max-width:92vw;max-height:88vh;object-fit:contain;border-radius:12px;transform:scale(0.92);transition:transform .25s ease;';
+    lb.appendChild(img);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '×';
+    closeBtn.style.cssText = 'position:absolute;top:max(16px, env(safe-area-inset-top));right:16px;z-index:2;background:rgba(255,255,255,0.15);color:#fff;border:none;font-size:26px;line-height:1;width:40px;height:40px;border-radius:50%;cursor:pointer;';
+    closeBtn.onclick = (e) => { e.stopPropagation(); closeImageLightbox(); };
+    lb.appendChild(closeBtn);
+
+    document.body.appendChild(lb);
+  }
+  lb.style.display = 'flex';
+  document.getElementById('img-lightbox-img').src = url;
+  requestAnimationFrame(() => {
+    lb.style.background = 'rgba(0,0,0,0.92)';
+    lb.style.opacity = '1';
+    document.getElementById('img-lightbox-img').style.transform = 'scale(1)';
+  });
+}
+
+function closeImageLightbox() {
+  const lb = document.getElementById('img-lightbox');
+  if (!lb) return;
+  lb.style.background = 'rgba(0,0,0,0)';
+  lb.style.opacity = '0';
+  const img = document.getElementById('img-lightbox-img');
+  if (img) img.style.transform = 'scale(0.92)';
+  setTimeout(() => { lb.style.display = 'none'; }, 220);
 }
 
 function openNoteSheet(id) {
@@ -2965,7 +3007,7 @@ function renderNotes() {
     const textOnly = fullBody.replace(/\n?\[\[IMG:[^\]]+\]\]\n?/g, '').trim();
     const bodyHtml = fullBody ? noteBodyToHtml(fullBody) : '';
     const textOnlyHtml = textOnly ? `<div class="note-card-body note-card-body-clamp" onclick="openNoteSheet(${n.id})">${esc(textOnly).replace(/(https?:\/\/[^\s]+)/g, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`)}</div>` : '';
-    const thumbHtml = thumbUrl ? `<img class="note-card-thumb" src="${thumbUrl}" onclick="openNoteSheet(${n.id})">` : '';
+    const thumbHtml = thumbUrl ? `<img class="note-card-thumb" src="${thumbUrl}" style="cursor:pointer" onclick="event.stopPropagation();openImageLightbox('${thumbUrl.replace(/'/g, "\\'")}')">` : '';
     // Collapsed view: thumbnail + text side by side
     const collapsedInner = `<div class="note-card-content-row" id="ncollapsed-${n.id}">
         ${thumbHtml}
