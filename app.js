@@ -2897,9 +2897,10 @@ function deleteTicketPhoto(id) {
 let _noteEditId = null;
 let _noteImages = []; // staging images in sheet
 
-function noteBodyToHtml(text) {
+function noteBodyToHtml(text, noteId) {
   const segments = text.split(/\[\[IMG:([^\]]+)\]\]/);
   let html = '';
+  let imgIdx = 0;
   for (let i = 0; i < segments.length; i++) {
     if (i % 2 === 0) {
       const t = segments[i].trim();
@@ -2909,15 +2910,54 @@ function noteBodyToHtml(text) {
         html += `<span style="white-space:pre-wrap">${escaped}</span>`;
       }
     } else {
-      const u = segments[i];
-      html += `<img src="${u}" style="max-width:100%;border-radius:0;display:block;margin:8px 0;cursor:pointer" onclick="event.stopPropagation();openImageLightbox('${u.replace(/'/g, "\\'")}')">`;
+      const idx = imgIdx++;
+      html += `<img src="${segments[i]}" style="max-width:100%;border-radius:0;display:block;margin:8px 0;cursor:pointer" onclick="event.stopPropagation();openNoteImageAt(${noteId}, ${idx})">`;
     }
   }
   return html;
 }
 
-/* ─── 圖片放大檢視（iOS 風格彈出） ─── */
-function openImageLightbox(url) {
+/* 取出某篇筆記內所有圖片網址（順序與內文出現順序一致） */
+function _noteImageUrls(n) {
+  let body = n?.content || '';
+  if (n?.images?.length && !body.includes('[[IMG:')) {
+    body += n.images.map(u => '\n[[IMG:' + u + ']]').join('');
+  }
+  return [...body.matchAll(/\[\[IMG:([^\]]+)\]\]/g)].map(m => m[1]);
+}
+
+function openNoteImageAt(noteId, index) {
+  const n = (data.notes || []).find(n => n.id === noteId);
+  if (!n) return;
+  const urls = _noteImageUrls(n);
+  if (!urls.length) return;
+  openImageLightbox(urls[index] || urls[0], urls, index);
+}
+
+/* 折疊卡片中的縮圖列：單張維持原尺寸，多張則排成一列，超過上限用「+N」提示 */
+function _buildNoteThumbHtml(urls, noteId) {
+  if (!urls.length) return '';
+  if (urls.length === 1) {
+    return `<img class="note-card-thumb" src="${urls[0]}" style="cursor:pointer" onclick="event.stopPropagation();openNoteImageAt(${noteId}, 0)">`;
+  }
+  const MAX = 3;
+  const shown = urls.slice(0, MAX);
+  const extra = urls.length - MAX;
+  const thumbs = shown.map((u, i) => {
+    const isLast = i === MAX - 1 && extra > 0;
+    return `<div style="position:relative;width:64px;height:64px;flex-shrink:0">
+      <img src="${u}" style="width:64px;height:64px;object-fit:cover;display:block;cursor:pointer" onclick="event.stopPropagation();openNoteImageAt(${noteId}, ${i})">
+      ${isLast ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,0.45);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:700;pointer-events:none">+${extra}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div style="display:flex;gap:4px;flex-shrink:0">${thumbs}</div>`;
+}
+
+/* ─── 圖片放大檢視（iOS 風格彈出，支援同一篇筆記內多張圖片切換） ─── */
+function openImageLightbox(url, urls, idx) {
+  urls = (urls && urls.length) ? urls : [url];
+  idx = (typeof idx === 'number' && idx >= 0) ? idx : Math.max(0, urls.indexOf(url));
+
   let lb = document.getElementById('img-lightbox');
   if (!lb) {
     lb = document.createElement('div');
@@ -2930,6 +2970,22 @@ function openImageLightbox(url) {
     img.style.cssText = 'max-width:92vw;max-height:88vh;object-fit:contain;border-radius:12px;transform:scale(0.92);transition:transform .25s ease;';
     lb.appendChild(img);
 
+    const counter = document.createElement('div');
+    counter.id = 'img-lightbox-counter';
+    counter.style.cssText = 'position:absolute;top:max(20px, env(safe-area-inset-top));left:0;right:0;text-align:center;color:rgba(255,255,255,0.7);font-family:var(--mono);font-size:13px;pointer-events:none;z-index:2;';
+    lb.appendChild(counter);
+
+    const mkNavBtn = (id, dir, glyph) => {
+      const btn = document.createElement('button');
+      btn.id = id;
+      btn.textContent = glyph;
+      btn.style.cssText = `position:absolute;top:50%;${dir === 'prev' ? 'left:12px' : 'right:12px'};transform:translateY(-50%);z-index:2;background:rgba(255,255,255,0.15);color:#fff;border:none;font-size:22px;line-height:1;width:40px;height:40px;border-radius:50%;cursor:pointer;display:none;align-items:center;justify-content:center;`;
+      btn.onclick = (e) => { e.stopPropagation(); _lbStep(dir === 'prev' ? -1 : 1); };
+      return btn;
+    };
+    lb.appendChild(mkNavBtn('img-lightbox-prev', 'prev', '‹'));
+    lb.appendChild(mkNavBtn('img-lightbox-next', 'next', '›'));
+
     const closeBtn = document.createElement('button');
     closeBtn.innerHTML = '×';
     closeBtn.style.cssText = 'position:absolute;top:max(16px, env(safe-area-inset-top));right:16px;z-index:2;background:rgba(255,255,255,0.15);color:#fff;border:none;font-size:26px;line-height:1;width:40px;height:40px;border-radius:50%;cursor:pointer;';
@@ -2938,13 +2994,34 @@ function openImageLightbox(url) {
 
     document.body.appendChild(lb);
   }
+  lb._urls = urls;
+  lb._idx = idx;
   lb.style.display = 'flex';
-  document.getElementById('img-lightbox-img').src = url;
+  _lbRenderIdx(lb);
   requestAnimationFrame(() => {
     lb.style.background = 'rgba(0,0,0,0.92)';
     lb.style.opacity = '1';
     document.getElementById('img-lightbox-img').style.transform = 'scale(1)';
   });
+}
+
+function _lbRenderIdx(lb) {
+  const img     = document.getElementById('img-lightbox-img');
+  const counter = document.getElementById('img-lightbox-counter');
+  const prevBtn = document.getElementById('img-lightbox-prev');
+  const nextBtn = document.getElementById('img-lightbox-next');
+  img.src = lb._urls[lb._idx];
+  const multi = lb._urls.length > 1;
+  if (counter) counter.textContent = multi ? `${lb._idx + 1} / ${lb._urls.length}` : '';
+  if (prevBtn) prevBtn.style.display = multi ? 'flex' : 'none';
+  if (nextBtn) nextBtn.style.display = multi ? 'flex' : 'none';
+}
+
+function _lbStep(delta) {
+  const lb = document.getElementById('img-lightbox');
+  if (!lb || !lb._urls) return;
+  lb._idx = (lb._idx + delta + lb._urls.length) % lb._urls.length;
+  _lbRenderIdx(lb);
 }
 
 function closeImageLightbox() {
@@ -3000,14 +3077,13 @@ function renderNotes() {
     if (n.images?.length && !fullBody.includes('[[IMG:')) {
       fullBody += n.images.map(u => '\n[[IMG:' + u + ']]').join('');
     }
-    // Extract first image for thumbnail
-    const imgMatch = fullBody.match(/\[\[IMG:([^\]]+)\]\]/);
-    const thumbUrl = imgMatch ? imgMatch[1] : null;
+    // Extract every image for the thumbnail row (not just the first one)
+    const imgUrls = [...fullBody.matchAll(/\[\[IMG:([^\]]+)\]\]/g)].map(m => m[1]);
     // Body without [[IMG:]] for text-only clamp display
     const textOnly = fullBody.replace(/\n?\[\[IMG:[^\]]+\]\]\n?/g, '').trim();
-    const bodyHtml = fullBody ? noteBodyToHtml(fullBody) : '';
+    const bodyHtml = fullBody ? noteBodyToHtml(fullBody, n.id) : '';
     const textOnlyHtml = textOnly ? `<div class="note-card-body note-card-body-clamp" onclick="openNoteSheet(${n.id})">${esc(textOnly).replace(/(https?:\/\/[^\s]+)/g, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`)}</div>` : '';
-    const thumbHtml = thumbUrl ? `<img class="note-card-thumb" src="${thumbUrl}" style="cursor:pointer" onclick="event.stopPropagation();openImageLightbox('${thumbUrl.replace(/'/g, "\\'")}')">` : '';
+    const thumbHtml = _buildNoteThumbHtml(imgUrls, n.id);
     // Collapsed view: thumbnail + text side by side
     const collapsedInner = `<div class="note-card-content-row" id="ncollapsed-${n.id}">
         ${thumbHtml}
