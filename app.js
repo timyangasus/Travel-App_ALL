@@ -44,8 +44,8 @@ async function compressImage(file, maxSize = 1200, quality = 0.82) {
   });
 }
 
-async function uploadToImgBB(file) {
-  const compressed = await compressImage(file);
+async function uploadToImgBB(file, opts) {
+  const compressed = await compressImage(file, opts?.maxSize, opts?.quality);
   const form = new FormData();
   form.append('image', compressed);
   const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
@@ -2218,7 +2218,8 @@ function mapAddNew() {
     const name = prompt('地圖名稱', file.name.replace(/\.[^.]+$/, '') || '地圖') || '地圖';
     showUploadStatus('上傳中…');
     try {
-      const url = await uploadToImgBB(file);
+      // 地圖圖片文字較小較密，用比一般照片更高的解析度與畫質上傳，避免文字糊掉
+      const url = await uploadToImgBB(file, { maxSize: 2400, quality: 0.95 });
       _mapList().push({ id: Date.now(), name, url });
       _mapIdx = _mapList().length - 1;
       save();
