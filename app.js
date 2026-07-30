@@ -30,10 +30,13 @@ async function compressImage(file, maxSize = 1200, quality = 0.82) {
     img.onload = () => {
       URL.revokeObjectURL(url);
       let w = img.naturalWidth, h = img.naturalHeight;
-      if (w > maxSize || h > maxSize) {
-        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
-        else       { w = Math.round(w * maxSize / h); h = maxSize; }
+      if (w <= maxSize && h <= maxSize) {
+        // 已經在尺寸限制內，直接用原檔上傳，避免無謂的 JPEG 重新編碼把文字壓糊
+        resolve(file);
+        return;
       }
+      if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+      else       { w = Math.round(w * maxSize / h); h = maxSize; }
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
@@ -2219,7 +2222,7 @@ function mapAddNew() {
     showUploadStatus('上傳中…');
     try {
       // 地圖圖片文字較小較密，用比一般照片更高的解析度與畫質上傳，避免文字糊掉
-      const url = await uploadToImgBB(file, { maxSize: 2400, quality: 0.95 });
+      const url = await uploadToImgBB(file, { maxSize: 4000, quality: 0.95 });
       _mapList().push({ id: Date.now(), name, url });
       _mapIdx = _mapList().length - 1;
       save();
