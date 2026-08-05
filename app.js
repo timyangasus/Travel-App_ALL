@@ -3866,7 +3866,10 @@ const TRANSIT_COLORS = {
 
 function getTransitColor(lineStr) {
   if (!lineStr) return '#999999';
-  const s = lineStr.toLowerCase();
+  // 轉乘站常會列出多條路線，例如「淺綠線（Sukhumvit Line）／深綠線（Silom Line）」，
+  // 顏色只取第一條列出的路線，避免整串文字比對到後面路線的關鍵字而配錯色
+  const first = lineStr.split(/[／/]/)[0] || lineStr;
+  const s = first.toLowerCase();
   for (const [key, val] of Object.entries(TRANSIT_COLORS)) {
     if (s.includes(key.toLowerCase())) return val;
   }
@@ -4042,6 +4045,24 @@ function _parseItineraryText(text) {
       noteLines = []; continue;
     }
 
+    // 最近站／交通轉乘子項目，兩種寫法都支援：
+    // 1) 有明確標籤："最近站：新宿站｜JR山手線"
+    // 2) AI 常見的 emoji 子項目（emoji 已在 normalize() 中被移除）："BTS 國家體育館站（National Stadium）｜深綠線（Silom Line）"
+    if (currentEvent) {
+      if (/^\u6700\u8fd1\u7ad9[\uff1a:]/.test(line)) {
+        const v = db.replace(/^\u6700\u8fd1\u7ad9[\uff1a:]/, '').trim().split(/[|\uff5c]/);
+        currentEvent.station = (v[0] || '').trim();
+        currentEvent.line = (v[1] || '').trim();
+        continue;
+      }
+      const transitPipe = db.match(/^(.+?)[|\uff5c](.+)$/);
+      if (transitPipe && /(\u7dda|Line|BTS|MRT|JR|\u6377\u904b|\u5730\u9435)/i.test(transitPipe[2])) {
+        currentEvent.station = transitPipe[1].trim();
+        currentEvent.line = transitPipe[2].trim();
+        continue;
+      }
+    }
+
     // Indented sub-bullet or 攻略/備註 line → note
     if ((isIndented || /^[\u653b\u7565\u5099\u8a3b\u8aac\u660e\u6ce8\u610f][\uff1a:]/.test(db)) && currentEvent) {
       const noteLine = db.replace(/^[\u653b\u7565\u5099\u8a3b\u8aac\u660e\u6ce8\u610f]+[\uff1a:]\s*/, '').trim().replace(/[\u3002.]$/, '');
@@ -4052,11 +4073,6 @@ function _parseItineraryText(text) {
     // Label fields
     if (/^\u5730\u5740[\uff1a:]/.test(line)) { if (currentEvent) currentEvent.addr = db.replace(/^\u5730\u5740[\uff1a:]/,'').trim(); continue; }
     if (/^\u8aac\u660e[\uff1a:]/.test(line)) { if (currentEvent) currentEvent.note = (currentEvent.note?currentEvent.note+' ':'')+db.replace(/^\u8aac\u660e[\uff1a:]/,'').trim(); continue; }
-    if (/^\u6700\u8fd1\u7ad9[\uff1a:]/.test(line)) {
-      const v = db.replace(/^\u6700\u8fd1\u7ad9[\uff1a:]/,'').trim().split(/[|\uff5c]/);
-      if (currentEvent) { currentEvent.station=(v[0]||'').trim(); currentEvent.line=(v[1]||'').trim(); }
-      continue;
-    }
 
     // Skip pure section headers
     if (/^(\u884c\u7a0b|\u6ce8\u610f\u4e8b\u9805|\u898f\u5283|\u5efa\u8b70|\u884c\u7a0b\u9806\u5e8f)$/.test(line)) continue;
