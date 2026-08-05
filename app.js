@@ -1034,12 +1034,13 @@ function showConfirm(title, msg, onOk, onCancel) {
 }
 
 
+/* 整天從行程中移除（天數會減少，後面每天日期往前遞補）— 由 Day 分頁的長按觸發 */
 function deleteDay(i) {
   if (data.days.length <= 1) {
     showToast('至少保留一天');
     return;
   }
-  showConfirm(`刪除 Day ${i + 1}？`, '此天的行程與帳單將一併移除。', () => {
+  showConfirm(`移除 Day ${i + 1}？`, '這一天會從行程中整個移除，之後的天數會往前遞補一天。', () => {
     data.days.splice(i, 1);
     data.expenses.splice(i, 1);
     // 刪除後，後面每一天各自往前補一天，維持日期連續不留空隙
@@ -1600,7 +1601,20 @@ function bannerActionAddDay() {
 
 function bannerActionDelete() {
   closeActionSheet('action-sheet-banner');
-  deleteDay(currentDay);
+  clearDayContent(currentDay);
+}
+
+/* 清空這一天的行程與帳單內容，但保留這一天本身（日期、封面照片、天數都不變）*/
+function clearDayContent(i) {
+  if (!data.days[i]) return;
+  showConfirm(`清空 Day ${i + 1} 的行程？`, '此天的行程與帳單將一併移除，但這一天會保留。', () => {
+    data.days[i].events = [];
+    data.expenses[i] = [];
+    save();
+    renderItinerary();
+    renderExpenseDayTabs();
+    showToast('已清空這天的行程');
+  });
 }
 
 function bannerActionEdit() {
