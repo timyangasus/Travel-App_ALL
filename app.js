@@ -787,14 +787,13 @@ const INFO_MODULE_DEFS = [
   { id: 'flight',    label: '機票' },
   { id: 'hotel',     label: '飯店' },
   { id: 'shopping',  label: '購物清單' },
-  { id: 'ticket',    label: '票券' },
   { id: 'checklist', label: '點檢表' },
-  { id: 'notes',     label: '備忘錄' },
+  { id: 'notes',     label: '筆記' },
   { id: 'expense',   label: '記帳' },
   { id: 'map',       label: '地圖' },
 ];
 
-const DEFAULT_MODULES = ['flight','hotel','shopping','ticket','checklist','notes','expense'];
+const DEFAULT_MODULES = ['flight','hotel','shopping','checklist','notes','expense'];
 
 function getInfoModules() {
   if (!data) return DEFAULT_MODULES;
@@ -1955,7 +1954,6 @@ function openInfoSub(name) {
   if (name === 'hotel')     renderHotelCards();
   if (name === 'checklist') renderCheckItems();
   if (name === 'shopping')  renderShopItems();
-  if (name === 'ticket')    renderTicketCards();
   if (name === 'notes')     renderNotes();
   if (name === 'map')       renderMapSub();
 }
@@ -2620,249 +2618,6 @@ function deleteShopItem(i) {
 }
 
 
-/* ─── Tickets ─── */
-function ticketDefaults() {
-  return { id: Date.now(), name: '票券名稱', date: '', note: '', photo: '' };
-}
-
-function addTicketCard() {
-  if (!data.tickets) data.tickets = [];
-  data.tickets.push(ticketDefaults());
-  save(); renderTicketCards();
-}
-
-function deleteTicketCard(id) {
-  if (!confirm('確定刪除此圖集？')) return;
-  data.tickets = data.tickets.filter(t => t.id !== id);
-  save(); renderTicketCards();
-}
-
-function saveTicketField(id, field, val) {
-  const t = data.tickets.find(t => t.id === id);
-  if (t) { t[field] = val; save(); }
-}
-
-async function handleTicketPhoto(input, id) {
-  const file = input.files[0];
-  if (!file) return;
-  showUploadStatus('上傳中...');
-  try {
-    const url = await uploadToImgBB(file);
-    const t = data.tickets.find(t => t.id === id);
-    if (t) { t.photo = url; save(); renderTicketCards(); }
-  } catch(err) {
-    alert('上傳失敗：' + err.message);
-  } finally {
-    showUploadStatus('');
-  }
-}
-
-function addTicketFromPhoto(input) {
-  const files = [...input.files];
-  if (!data.tickets) data.tickets = [];
-  files.forEach(async file => {
-    showUploadStatus('上傳中...');
-    try {
-      const url = await uploadToImgBB(file);
-      data.tickets.push({ id: Date.now() + Math.random(), photo: url });
-      save();
-      renderTicketCards();
-    } catch(err) {
-      alert('上傳失敗：' + err.message);
-    } finally {
-      showUploadStatus('');
-    }
-  });
-  input.value = '';
-}
-
-
-function openTicketLightbox(url) {
-  // Build URL list from current tickets
-  const urls = (data.tickets || [])
-    .filter(t => t.photo)
-    .map(t => resolvePhoto(t.photo));
-  if (!urls.length) return;
-  let idx = urls.indexOf(url);
-  if (idx < 0) idx = 0;
-
-  let lb = document.getElementById('ticket-lightbox');
-  if (!lb) {
-    lb = document.createElement('div');
-    lb.id = 'ticket-lightbox';
-    lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;overflow:hidden;touch-action:none;';
-
-    const img = document.createElement('img');
-    img.id = 'ticket-lightbox-img';
-    img.style.cssText = 'position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;max-width:none;';
-    lb.appendChild(img);
-
-    // Counter
-    const counter = document.createElement('div');
-    counter.id = 'ticket-lb-counter';
-    counter.style.cssText = 'position:absolute;top:20px;left:0;right:0;text-align:center;color:rgba(255,255,255,0.7);font-family:var(--mono);font-size:13px;pointer-events:none;z-index:10;';
-    lb.appendChild(counter);
-
-    // Close button
-    const closeBtn = document.createElement('button');
-    closeBtn.innerHTML = '×';
-    closeBtn.style.cssText = 'position:absolute;top:12px;right:16px;z-index:11;background:rgba(0,0,0,0.5);color:#fff;border:none;font-size:28px;line-height:1;width:44px;height:44px;border-radius:50%;cursor:pointer;';
-    closeBtn.addEventListener('click', () => lb.style.display = 'none');
-    lb.appendChild(closeBtn);
-
-    document.body.appendChild(lb);
-    _initLightboxPinch(lb, img);
-  }
-
-  lb._urls = urls;
-  lb._idx = idx;
-  lb.style.display = 'block';
-  _lbShowIdx(lb);
-}
-
-function _lbShowIdx(lb) {
-  const img = document.getElementById('ticket-lightbox-img');
-  const counter = document.getElementById('ticket-lb-counter');
-  const urls = lb._urls;
-  const idx = lb._idx;
-  img.src = urls[idx];
-  img.style.transform = '';
-  if (counter) counter.textContent = urls.length > 1 ? `${idx + 1} / ${urls.length}` : '';
-  img.onload = () => _lbFitImage(lb, img);
-}
-
-function _lbFitImage(lb, img) {
-  const vw = lb.clientWidth, vh = lb.clientHeight;
-  const iw = img.naturalWidth, ih = img.naturalHeight;
-  const scale = Math.min(vw / iw, vh / ih);
-  const tx = (vw - iw * scale) / 2;
-  const ty = (vh - ih * scale) / 2;
-  img._lbScale = scale;
-  img._lbMinScale = scale;
-  img._lbTx = tx; img._lbTy = ty;
-  img.style.transition = 'none';
-  img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
-}
-
-function _initLightboxPinch(lb, img) {
-  let dragging = false, lastX = 0, lastY = 0;
-  let pinchDist = null, pinchMidX = 0, pinchMidY = 0;
-
-  function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
-  function dist(t1, t2) { return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY); }
-  function mid(t1, t2) { return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 }; }
-
-  function apply(smooth) {
-    const vw = lb.clientWidth, vh = lb.clientHeight;
-    const iw = img.naturalWidth, ih = img.naturalHeight;
-    const s = img._lbScale || 1;
-    const rw = iw * s, rh = ih * s;
-    img._lbTx = rw <= vw ? (vw - rw) / 2 : clamp(img._lbTx, vw - rw, 0);
-    img._lbTy = rh <= vh ? (vh - rh) / 2 : clamp(img._lbTy, vh - rh, 0);
-    img.style.transition = smooth ? 'transform 0.18s ease' : 'none';
-    img.style.transform = `translate(${img._lbTx}px,${img._lbTy}px) scale(${s})`;
-  }
-
-  function zoomAt(px, py, factor) {
-    const min = img._lbMinScale || 0.1;
-    const newScale = clamp((img._lbScale || 1) * factor, min, min * 10);
-    img._lbTx = px - (px - (img._lbTx || 0)) * (newScale / (img._lbScale || 1));
-    img._lbTy = py - (py - (img._lbTy || 0)) * (newScale / (img._lbScale || 1));
-    img._lbScale = newScale;
-    apply(false);
-  }
-
-  lb.addEventListener('touchstart', e => {
-    img.style.transition = 'none';
-    if (e.touches.length === 1) {
-      dragging = true; pinchDist = null;
-      lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-    } else if (e.touches.length === 2) {
-      dragging = false;
-      pinchDist = dist(e.touches[0], e.touches[1]);
-      const m = mid(e.touches[0], e.touches[1]);
-      pinchMidX = m.x; pinchMidY = m.y;
-    }
-  }, { passive: true });
-
-  lb.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if (e.touches.length === 1 && dragging && pinchDist === null) {
-      img._lbTx = (img._lbTx || 0) + e.touches[0].clientX - lastX;
-      img._lbTy = (img._lbTy || 0) + e.touches[0].clientY - lastY;
-      lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-      apply(false);
-    } else if (e.touches.length === 2 && pinchDist !== null) {
-      const newDist = dist(e.touches[0], e.touches[1]);
-      const m = mid(e.touches[0], e.touches[1]);
-      img._lbTx = (img._lbTx || 0) + m.x - pinchMidX;
-      img._lbTy = (img._lbTy || 0) + m.y - pinchMidY;
-      pinchMidX = m.x; pinchMidY = m.y;
-      zoomAt(m.x, m.y, newDist / pinchDist);
-      pinchDist = newDist;
-    }
-  }, { passive: false });
-
-  lb.addEventListener('touchend', e => {
-    if (e.touches.length < 2) pinchDist = null;
-    if (e.touches.length === 0) {
-      dragging = false;
-      // If back to min scale, re-center
-      if ((img._lbScale || 1) <= (img._lbMinScale || 0.1) * 1.05) {
-        _lbFitImage(lb, img);
-      }
-    }
-  }, { passive: true });
-
-  // Double-tap to zoom + swipe to navigate
-  let lastTap = 0;
-  let swipeStartX = 0, swipeStartY = 0, swipeStartScale = 1;
-  lb.addEventListener('touchstart', e => {
-    if (e.touches.length === 1) {
-      swipeStartX = e.touches[0].clientX;
-      swipeStartY = e.touches[0].clientY;
-      swipeStartScale = img._lbScale || 1;
-    }
-  }, { passive: true });
-
-  lb.addEventListener('touchend', e => {
-    if (e.touches.length > 0) return;
-    const now = Date.now();
-    const dx = e.changedTouches[0].clientX - swipeStartX;
-    const dy = e.changedTouches[0].clientY - swipeStartY;
-    const min = img._lbMinScale || 0.1;
-    const atMinScale = (img._lbScale || 1) <= min * 1.05;
-
-    // Swipe navigate when at base scale and fast horizontal swipe
-    if (atMinScale && Math.abs(dx) > 60 && Math.abs(dy) < Math.abs(dx) * 0.6 && (lb._urls?.length > 1)) {
-      const dir = dx < 0 ? 1 : -1;
-      lb._idx = (lb._idx + dir + lb._urls.length) % lb._urls.length;
-      _lbShowIdx(lb);
-      lastTap = 0;
-      return;
-    }
-
-    // Double-tap zoom
-    if (now - lastTap < 300 && Math.abs(dx) < 20 && Math.abs(dy) < 20) {
-      const s = img._lbScale || 1;
-      if (s > min * 1.1) {
-        _lbFitImage(lb, img);
-      } else {
-        const t = e.changedTouches[0];
-        zoomAt(t.clientX, t.clientY, 2.5);
-      }
-    }
-    lastTap = now;
-  }, { passive: true });
-
-  // Wheel zoom (desktop)
-  lb.addEventListener('wheel', e => {
-    e.preventDefault();
-    zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : 1 / 1.12);
-  }, { passive: false });
-}
-
-
 function openExpenseSheetForEdit(id) {
   const item = (data.expenses[expenseDay] || []).find(i => i.id === id);
   if (!item) return;
@@ -2887,27 +2642,6 @@ function openExpenseSheetForEdit(id) {
   _renderExpSubitemsForEdit(item.subitems || []);
   document.getElementById('modal-expense-sheet').classList.add('open');
   setTimeout(() => document.getElementById('exp-amount')?.focus(), 340);
-}
-
-function renderTicketCards() {
-  const cards = data.tickets || [];
-  document.getElementById('ticket-cards').innerHTML = cards.length
-    ? cards.map(t => {
-        const photoUrl = t.photo ? resolvePhoto(t.photo) : '';
-        return `
-        <div class="ticket-card">
-          <div class="ticket-img-wrap">
-            <img class="ticket-img" src="${photoUrl}" alt="票券" onclick="openTicketLightbox('${photoUrl}')">
-            <button class="ticket-img-del" onclick="deleteTicketCard(${t.id})">×</button>
-          </div>
-        </div>`;
-      }).join('')
-    : `<div class="list-empty"></div>`;
-}
-
-function deleteTicketPhoto(id) {
-  const t = data.tickets.find(t => t.id === id);
-  if (t) { t.photo = ''; save(); renderTicketCards(); }
 }
 
 /* ─── Notes ─── */
@@ -3074,12 +2808,25 @@ function openNoteSheet(id) {
   setTimeout(() => { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }, 340);
 }
 
+/* 圖集（原本獨立的照片清單，data.tickets）與筆記合併：
+   把圖集裡所有照片一次性搬進一篇「圖集」筆記，之後圖集資料清空，此函式即不再重複執行 */
+function migrateGalleryIntoNotes() {
+  const photos = (data.tickets || []).filter(t => t.photo).map(t => t.photo);
+  if (!photos.length) return;
+  if (!Array.isArray(data.notes)) data.notes = [];
+  const content = '圖集\n' + photos.map(u => '[[IMG:' + u + ']]').join('\n');
+  data.notes.push({ id: Date.now(), content });
+  data.tickets = [];
+  save();
+}
+
 function renderNotes() {
   if (!data.notes) data.notes = [];
   if (typeof data.notes === 'string') {
     const old = data.notes.trim();
     data.notes = old ? [{ id: Date.now(), content: old }] : [];
   }
+  migrateGalleryIntoNotes();
   const list = document.getElementById('notes-card-list');
   if (!list) return;
   if (!data.notes.length) {

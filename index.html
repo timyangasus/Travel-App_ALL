@@ -206,11 +206,6 @@
         <span class="info-list-label">記帳</span>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="18" height="18"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></svg>
       </button>
-      <button class="info-list-item" id="info-btn-ticket" onclick="openInfoSub('ticket')">
-        <span class="info-list-icon"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Zm0-80h640v-480H160v480Zm0 0v-480 480Zm280-200h320v-240H440v240Zm80-80v-80h160v80H520Z"/></svg></span>
-        <span class="info-list-label">圖集</span>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="18" height="18"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></svg>
-      </button>
       <button class="info-list-item" id="info-btn-notes" onclick="openInfoSub('notes')">
         <span class="info-list-icon"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="M560-80v-123l221-220q9-9 20-13t22-4q12 0 23 4.5t20 13.5l37 37q8 9 12.5 20t4.5 22q0 11-4 22.5T903-300L683-80H560Zm300-263-37-37 37 37ZM620-140h38l121-122-18-19-19-18-122 121v38ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v120h-80v-80H520v-200H240v640h240v80H240Zm280-400Zm241 199-19-18 37 37-18-19Z"/></svg></span>
         <span class="info-list-label">筆記</span>
@@ -536,22 +531,6 @@
   </div>
 
   <!-- ═══ INFO SUB: TICKET ═══ -->
-  <div id="screen-info-ticket" class="page">
-    <div class="screen-header sub-header">
-      <button class="sub-back-btn" onclick="closeInfoSub('ticket')">
-        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z"/></svg>
-      </button>
-      <div class="screen-title" style="flex:1">圖集</div>
-      <label class="sub-header-action">
-        <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 -960 960 960" width="30px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-        <input type="file" accept="image/*" multiple style="display:none" onchange="addTicketFromPhoto(this)">
-      </label>
-    </div>
-    <div class="info-section">
-      <div id="ticket-cards"></div>
-    </div>
-  </div>
-
   <!-- ═══ INFO SUB: NOTES ═══ -->
   <div id="screen-info-notes" class="page">
     <div class="screen-header sub-header">
