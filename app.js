@@ -2038,9 +2038,9 @@ function renderPhotoPage() {
   if (!grid) return;
   if (!photos.length) { grid.innerHTML = ''; return; }
   grid.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;width:100%;padding-bottom:12px">${
-    photos.map(p => `
+    photos.map((p, i) => `
     <div style="position:relative;width:100%;overflow:hidden;background:#F0F0F0">
-      <img src="${resolvePhoto(p.url)}" style="width:100%;height:auto;display:block;cursor:pointer" onclick="openPhotoLightbox('${resolvePhoto(p.url)}')" loading="lazy">
+      <img src="${resolvePhoto(p.url)}" style="width:100%;height:auto;display:block;cursor:pointer" onclick="openPhotoLightbox(${i})" loading="lazy">
       <button onclick="deletePhoto(${p.id})" style="position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.5);color:#fff;border:none;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;line-height:1">×</button>
     </div>`).join('')
   }</div>`;
@@ -2076,9 +2076,11 @@ function deletePhoto(id) {
   save(); renderPhotoPage();
 }
 
-function openPhotoLightbox(url) {
-  if (typeof openTicketLightbox === 'function') { openTicketLightbox(url); return; }
-  window.open(url, '_blank');
+function openPhotoLightbox(idx) {
+  const dayKey = _photoDayIdx + 1;
+  const urls = (data.photos || []).filter(p => p.day === dayKey).map(p => resolvePhoto(p.url));
+  if (!urls.length) return;
+  openImageLightbox(urls[idx] || urls[0], urls, idx);
 }
 
 /* ═══════════════════════════════════════
@@ -3472,6 +3474,21 @@ function deleteFlightCard(id) {
   save(); renderFlightCards();
 }
 
+function calcFlightDuration(fromTime, toTime) {
+  const toMin = t => {
+    const m = String(t || '').match(/^(\d{1,2}):(\d{2})$/);
+    return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null;
+  };
+  const a = toMin(fromTime), b = toMin(toTime);
+  if (a === null || b === null) return '';
+  let diff = b - a;
+  if (diff <= 0) diff += 24 * 60; // 抵達時間較早，視為隔天抵達
+  const h = Math.floor(diff / 60), m = diff % 60;
+  if (h === 0) return `${m}分`;
+  if (m === 0) return `${h}小時`;
+  return `${h}小時${m}分`;
+}
+
 function renderFlightCards() {
   migrateFlights();
   const el = document.getElementById('flight-cards');
@@ -3504,6 +3521,7 @@ function renderFlightCards() {
               <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#D4AF37"><path d="M280-80v-100l120-84v-144L80-280v-120l320-224v-176q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v176l320 224v120L560-408v144l120 84v100l-200-60-200 60Z"/></svg>
               <div class="fc2-dash"></div>
             </div>
+            ${calcFlightDuration(seg.fromTime, seg.toTime) ? `<div class="fc2-duration">${calcFlightDuration(seg.fromTime, seg.toTime)}</div>` : ''}
           </div>
           <span class="fc2-time fc2-time-right">${esc(seg.toTime||'')}</span>
         </div>
@@ -5236,7 +5254,21 @@ function clearAllData() {
 
 /* ─── Info Sub-Screen Swipe Gesture ─── */
 (function() {
-  const INFO_SUBS = ['flight', 'hotel', 'checklist', 'shopping', 'ticket', 'notes']; // map and expense excluded from swipe
+  // 左右滑的順序永遠跟著「旅遊資訊」清單實際顯示的順序走（DOM 順序 + 目前可見的項目），
+  // 不再另外寫死一份順序，避免跟清單本身的排序兜不起來。地圖跟記帳有自己的手勢，不參與滑動。
+  const SWIPE_EXCLUDE = new Set(['expense', 'map']);
+  function _allInfoSubIds() {
+    return [...document.querySelectorAll('.info-list-item')]
+      .map(btn => btn.id.replace(/^info-btn-/, ''))
+      .filter(id => id && !SWIPE_EXCLUDE.has(id));
+  }
+  function _visibleInfoSubOrder() {
+    return [...document.querySelectorAll('.info-list-item')]
+      .filter(btn => btn.style.display !== 'none')
+      .map(btn => btn.id.replace(/^info-btn-/, ''))
+      .filter(id => id && !SWIPE_EXCLUDE.has(id));
+  }
+
   let _currentInfoSub = null;
   let _startX = 0, _startY = 0;
   const THRESHOLD = 50;
@@ -5251,10 +5283,11 @@ function clearAllData() {
 
   function swipeInfoSub(dir) {
     if (!_currentInfoSub || _currentInfoSub === 'map') return; // map: no swipe
-    const idx = INFO_SUBS.indexOf(_currentInfoSub);
+    const order = _visibleInfoSubOrder();
+    const idx = order.indexOf(_currentInfoSub);
     if (idx === -1) return;
-    const nextIdx = (idx + dir + INFO_SUBS.length) % INFO_SUBS.length; // wrapping, map excluded
-    const nextName = INFO_SUBS[nextIdx];
+    const nextIdx = (idx + dir + order.length) % order.length; // wrapping, map/expense excluded
+    const nextName = order[nextIdx];
     document.getElementById('screen-info-' + _currentInfoSub)?.classList.remove('active');
     _currentInfoSub = nextName;
     _origOpenInfoSub(nextName);
@@ -5273,9 +5306,9 @@ function clearAllData() {
     swipeInfoSub(dx < 0 ? 1 : -1);
   }
 
-  // 對所有 sub-screen 加 swipe
+  // 對所有 sub-screen 加 swipe（不論目前是否顯示在清單中，之後被打開都可以滑）
   document.addEventListener('DOMContentLoaded', () => {
-    INFO_SUBS.forEach(name => {
+    _allInfoSubIds().forEach(name => {
       const el = document.getElementById('screen-info-' + name);
       if (!el) return;
       el.addEventListener('touchstart', onTouchStart, { passive: true });

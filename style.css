@@ -1920,6 +1920,14 @@ canvas { display: block; width: 100%; height: 100%; }
   flex: 1;
   border-top: 1.5px dashed #D4AF37;
 }
+.fc2-duration {
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: #D4AF37;
+  margin-top: 3px;
+}
 .fc2-airports {
   display: flex;
   justify-content: space-between;
