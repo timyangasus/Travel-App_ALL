@@ -2707,7 +2707,7 @@ function _buildNoteThumbHtml(urls, noteId) {
   return `<div style="display:flex;gap:4px;flex-shrink:0">${thumbs}</div>`;
 }
 
-/* ─── 圖片放大檢視（iOS 風格彈出，支援同一篇筆記內多張圖片切換） ─── */
+/* ─── 圖片放大檢視（iOS 相簿風格：滿版、可雙指縮放/雙擊縮放、單擊關閉） ─── */
 function openImageLightbox(url, urls, idx) {
   urls = (urls && urls.length) ? urls : [url];
   idx = (typeof idx === 'number' && idx >= 0) ? idx : Math.max(0, urls.indexOf(url));
@@ -2716,12 +2716,11 @@ function openImageLightbox(url, urls, idx) {
   if (!lb) {
     lb = document.createElement('div');
     lb.id = 'img-lightbox';
-    lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0);z-index:9999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s ease,background-color .25s ease;';
-    lb.onclick = () => closeImageLightbox();
+    lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0);z-index:9999;overflow:hidden;touch-action:none;opacity:0;transition:opacity .25s ease,background-color .25s ease;';
 
     const img = document.createElement('img');
     img.id = 'img-lightbox-img';
-    img.style.cssText = 'max-width:92vw;max-height:88vh;object-fit:contain;border-radius:12px;transform:scale(0.92);transition:transform .25s ease;';
+    img.style.cssText = 'position:absolute;top:0;left:0;border-radius:0;transform-origin:0 0;will-change:transform;max-width:none;';
     lb.appendChild(img);
 
     const counter = document.createElement('div');
@@ -2747,15 +2746,15 @@ function openImageLightbox(url, urls, idx) {
     lb.appendChild(closeBtn);
 
     document.body.appendChild(lb);
+    _initLightboxGestures(lb, img);
   }
   lb._urls = urls;
   lb._idx = idx;
-  lb.style.display = 'flex';
+  lb.style.display = 'block';
   _lbRenderIdx(lb);
   requestAnimationFrame(() => {
     lb.style.background = 'rgba(0,0,0,0.92)';
     lb.style.opacity = '1';
-    document.getElementById('img-lightbox-img').style.transform = 'scale(1)';
   });
 }
 
@@ -2765,10 +2764,25 @@ function _lbRenderIdx(lb) {
   const prevBtn = document.getElementById('img-lightbox-prev');
   const nextBtn = document.getElementById('img-lightbox-next');
   img.src = lb._urls[lb._idx];
+  img.onload = () => _lbFitImage(lb, img);
   const multi = lb._urls.length > 1;
   if (counter) counter.textContent = multi ? `${lb._idx + 1} / ${lb._urls.length}` : '';
   if (prevBtn) prevBtn.style.display = multi ? 'flex' : 'none';
   if (nextBtn) nextBtn.style.display = multi ? 'flex' : 'none';
+}
+
+function _lbFitImage(lb, img) {
+  const rect = lb.getBoundingClientRect();
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  if (!iw || !ih) return;
+  const scale = Math.min(rect.width / iw, rect.height / ih);
+  const tx = (rect.width - iw * scale) / 2;
+  const ty = (rect.height - ih * scale) / 2;
+  img._lbScale = scale;
+  img._lbMinScale = scale;
+  img._lbTx = tx; img._lbTy = ty;
+  img.style.transition = 'none';
+  img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
 }
 
 function _lbStep(delta) {
@@ -2783,9 +2797,148 @@ function closeImageLightbox() {
   if (!lb) return;
   lb.style.background = 'rgba(0,0,0,0)';
   lb.style.opacity = '0';
-  const img = document.getElementById('img-lightbox-img');
-  if (img) img.style.transform = 'scale(0.92)';
   setTimeout(() => { lb.style.display = 'none'; }, 220);
+}
+
+function _initLightboxGestures(lb, img) {
+  let pinchDist = null, pinchMidX = 0, pinchMidY = 0;
+  let dragging = false, lastX = 0, lastY = 0;
+  let startX = 0, startY = 0, moved = false;
+  let lastTapTime = 0;
+  let ignoreNextClick = false;
+
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const dist  = (a, b) => Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+  const mid   = (a, b, rect) => ({ x: (a.clientX + b.clientX) / 2 - rect.left, y: (a.clientY + b.clientY) / 2 - rect.top });
+
+  function apply(smooth) {
+    const rect = lb.getBoundingClientRect();
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const s = img._lbScale || 1;
+    const rw = iw * s, rh = ih * s;
+    img._lbTx = rw <= rect.width  ? (rect.width  - rw) / 2 : clamp(img._lbTx, rect.width  - rw, 0);
+    img._lbTy = rh <= rect.height ? (rect.height - rh) / 2 : clamp(img._lbTy, rect.height - rh, 0);
+    img.style.transition = smooth ? 'transform 0.18s ease' : 'none';
+    img.style.transform = `translate(${img._lbTx}px,${img._lbTy}px) scale(${s})`;
+  }
+
+  function zoomAt(px, py, factor) {
+    const min = img._lbMinScale || 0.1;
+    const newScale = clamp((img._lbScale || 1) * factor, min, min * 6);
+    img._lbTx = px - (px - (img._lbTx || 0)) * (newScale / (img._lbScale || 1));
+    img._lbTy = py - (py - (img._lbTy || 0)) * (newScale / (img._lbScale || 1));
+    img._lbScale = newScale;
+    apply(false);
+  }
+
+  function toggleDoubleTapZoom(px, py) {
+    const min = img._lbMinScale || 1;
+    if ((img._lbScale || 1) > min * 1.1) {
+      img._lbScale = min;
+      apply(true);
+    } else {
+      zoomAt(px, py, 2.5);
+      apply(true);
+    }
+  }
+
+  lb.addEventListener('touchstart', e => {
+    img.style.transition = 'none';
+    if (e.touches.length === 1) {
+      dragging = true; pinchDist = null; moved = false;
+      startX = lastX = e.touches[0].clientX;
+      startY = lastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      dragging = false;
+      pinchDist = dist(e.touches[0], e.touches[1]);
+      const rect = lb.getBoundingClientRect();
+      const m = mid(e.touches[0], e.touches[1], rect);
+      pinchMidX = m.x; pinchMidY = m.y;
+    }
+  }, { passive: true });
+
+  lb.addEventListener('touchmove', e => {
+    if (e.touches.length === 1 && dragging && pinchDist === null) {
+      const dx = e.touches[0].clientX - lastX, dy = e.touches[0].clientY - lastY;
+      if (Math.abs(e.touches[0].clientX - startX) > 6 || Math.abs(e.touches[0].clientY - startY) > 6) moved = true;
+      img._lbTx = (img._lbTx || 0) + dx;
+      img._lbTy = (img._lbTy || 0) + dy;
+      lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+      const min = img._lbMinScale || 1;
+      if ((img._lbScale || 1) <= min * 1.02) {
+        // 未放大時先直接跟手移動，放開時再判斷是否為換圖手勢
+        img.style.transform = `translate(${img._lbTx}px,${img._lbTy}px) scale(${img._lbScale || 1})`;
+      } else {
+        apply(false);
+      }
+    } else if (e.touches.length === 2 && pinchDist !== null) {
+      const newDist = dist(e.touches[0], e.touches[1]);
+      const rect = lb.getBoundingClientRect();
+      const m = mid(e.touches[0], e.touches[1], rect);
+      img._lbTx = (img._lbTx || 0) + m.x - pinchMidX;
+      img._lbTy = (img._lbTy || 0) + m.y - pinchMidY;
+      pinchMidX = m.x; pinchMidY = m.y;
+      zoomAt(m.x, m.y, newDist / pinchDist);
+      pinchDist = newDist;
+      moved = true;
+    }
+  }, { passive: true });
+
+  lb.addEventListener('touchend', e => {
+    if (e.touches.length < 2) pinchDist = null;
+    if (e.touches.length > 0) return;
+    dragging = false;
+    ignoreNextClick = true;
+    setTimeout(() => { ignoreNextClick = false; }, 400);
+
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    const min = img._lbMinScale || 1;
+    const atMin = (img._lbScale || 1) <= min * 1.05;
+
+    if (atMin && lb._urls?.length > 1 && Math.abs(dx) > 60 && Math.abs(dy) < Math.abs(dx) * 0.6) {
+      _lbStep(dx < 0 ? 1 : -1);
+      lastTapTime = 0;
+      return;
+    }
+
+    if (!moved) {
+      const rect = lb.getBoundingClientRect();
+      const tapX = e.changedTouches[0].clientX - rect.left;
+      const tapY = e.changedTouches[0].clientY - rect.top;
+      const now = Date.now();
+      if (now - lastTapTime < 300) {
+        toggleDoubleTapZoom(tapX, tapY);
+        lastTapTime = 0;
+      } else {
+        lastTapTime = now;
+        setTimeout(() => {
+          if (Date.now() - lastTapTime < 280) return; // 期間內被判定為雙擊，取消單擊關閉
+          if ((img._lbScale || 1) <= min * 1.05) closeImageLightbox();
+        }, 300);
+      }
+    } else {
+      apply(true);
+    }
+  }, { passive: true });
+
+  // 桌面滑鼠：拖曳判斷 + 單擊關閉 + 滾輪縮放（方便預覽測試）
+  lb.addEventListener('mousedown', e => { startX = e.clientX; startY = e.clientY; moved = false; });
+  lb.addEventListener('mousemove', e => {
+    if (e.buttons !== 1) return;
+    if (Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6) moved = true;
+  });
+  lb.addEventListener('click', e => {
+    if (ignoreNextClick) { ignoreNextClick = false; return; }
+    if (e.target.closest('button')) return;
+    if (!moved) closeImageLightbox();
+    moved = false;
+  });
+  lb.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = lb.getBoundingClientRect();
+    zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+  }, { passive: false });
 }
 
 function openNoteSheet(id) {
@@ -3231,9 +3384,9 @@ function calcFlightDuration(fromTime, toTime) {
   let diff = b - a;
   if (diff <= 0) diff += 24 * 60; // 抵達時間較早，視為隔天抵達
   const h = Math.floor(diff / 60), m = diff % 60;
-  if (h === 0) return `${m}分`;
-  if (m === 0) return `${h}小時`;
-  return `${h}小時${m}分`;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
 function renderFlightCards() {
