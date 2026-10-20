@@ -3823,6 +3823,81 @@ function getApiKey() {
   try { return localStorage.getItem('claude_api_key') || ''; } catch(e) { return ''; }
 }
 
+/* 給 GPT 等 AI 的行程輸出格式範本（與 _parseItineraryText 支援的標籤一一對應） */
+const AI_ITINERARY_TEMPLATE = `請依下列固定格式輸出旅遊行程，不要加任何說明文字，不要用表格，不要用 emoji 當標籤。
+
+【格式規則】
+1. 每一天先寫一行標題：M/D（週X）｜當天主題
+   例：11/6（週五）｜達叻仔與唐人街
+2. 每個行程一行，以「* 」開頭：* HH:MM 行程名稱
+   - 時間用 24 小時制、兩位數、半形冒號，例如 08:45、19:30
+   - 有結束時間就寫區間：* 12:30–13:40 行程名稱
+3. 行程底下的細節是子項目，縮排 3 個空格再加「* 」，一行只寫一個標籤，只能使用下面這些標籤，冒號用「：」：
+   - 地址：（想用 Google 地圖搜尋的店名或地址）
+   - 說明：（其他所有文字都寫在這裡，可以寫多行「說明：」）
+   搭乘電車／捷運／地鐵時，才加上這四行：
+   - 線路名稱：（例：BTS 深綠線（Silom Line））
+   - 線路顏色：（只能寫：紅、橘、黃、綠、深綠、淺綠、藍、深藍、淺藍、紫、棕、粉、灰、黑，後面加「色」，例如 藍色；或直接寫色碼 #1A3F8F）
+   - 上車車站：（車站名）
+   - 下車車站：（車站名，沒有就省略這行）
+4. 搭 Grab、步行、巴士等非軌道交通：不要用上面四個線路標籤，交通方式、預估時間、搭乘方向等全部寫進「說明：」。
+5. 一個行程只能有一條線路。轉乘站只寫要搭的那一條，另一條寫進「說明：」。
+6. 凌晨跨日的行程（例如半夜 00:30）請放在「隔天」的日期標題下，時間直接寫 00:30，不要寫「翌日」「隔天」。
+7. 不要使用「交通方式：」「出發地點：」「目的地：」「地點：」這類其他標籤。
+
+【輸出範例】
+11/5（週四）｜抵達曼谷與 Siam 商圈
+
+* 12:30–13:40 抵達曼谷、入境、領行李
+   * 說明：機場到市區可搭 Grab，約 40 分鐘。
+* 15:00 曼谷文化藝術中心（BACC）
+   * 地址：939 Rama I Rd, Wang Mai, Pathum Wan, Bangkok
+   * 線路名稱：BTS 深綠線（Silom Line）
+   * 線路顏色：深綠色
+   * 上車車站：National Stadium
+   * 說明：飯店步行約 3 分鐘到車站。
+* 16:40 暹羅探索館（Siam Discovery）
+   * 線路名稱：BTS 淺綠線（Sukhumvit Line）
+   * 線路顏色：淺綠色
+   * 上車車站：Siam
+   * 說明：Siam 站為淺綠線與深綠線轉乘站。
+
+11/6（週五）｜達叻仔與唐人街
+
+* 19:30 搭 MRT 返回飯店附近
+   * 線路名稱：MRT 藍線
+   * 線路顏色：藍色
+   * 上車車站：Wat Mangkon
+   * 下車車站：Sam Yan
+   * 說明：往 Hua Lamphong 方向，下車後步行返回飯店。
+* 22:15 Grab 前往帕空花市
+   * 地址：Pak Khlong Talat, Bangkok
+   * 說明：出發地點為巴吞旺公主飯店。
+
+現在請依照以上格式，幫我排出【　　　　　】的行程。`;
+
+function copyItineraryTemplate() {
+  const done = () => showToast('格式範本已複製，貼給 AI 即可');
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = AI_ITINERARY_TEMPLATE;
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    if (ok) done(); else showToast('複製失敗，請稍後再試');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(AI_ITINERARY_TEMPLATE).then(done).catch(fallback);
+  } else {
+    fallback();
+  }
+}
+
 function openSmartImport() {
   const ta = document.getElementById('smart-import-text');
   const countEl = document.getElementById('smart-import-count');
