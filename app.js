@@ -3988,14 +3988,18 @@ function _parseItineraryText(text) {
         continue;
       }
       // GPT 常見的「標籤：內容」子項目（normalize() 已把全形冒號轉成半形）
-      const lbl = db.match(/^(線路名稱|路線名稱|線路|路線|線路顏色|路線顏色|上車車站|上車站|搭乘車站|出發車站|下車車站|下車站|抵達車站)\s*:\s*(.+)$/);
+      const lbl = db.match(/^(線路名稱|路線名稱|線路|路線|線路顏色|路線顏色|線路色|顏色|色碼|上車車站|上車站|搭乘車站|出發車站|車站|站名|下車車站|下車站|抵達車站|地址)\s*:\s*(.+)$/);
       if (lbl) {
         const key = lbl[1], val = lbl[2].trim().replace(/[\u3002.]$/, '');
-        if (/顏色/.test(key)) {
+        if (key === '地址') {
+          currentEvent.addr = val;
+          continue;
+        }
+        if (/色/.test(key)) {
           currentEvent.lineColor = colorFromName(val);
         } else if (/名稱|^(線路|路線)$/.test(key)) {
           currentEvent.line = val;
-        } else if (/^(上車|搭乘|出發)/.test(key)) {
+        } else if (/^(上車|搭乘|出發)|^(車站|站名)$/.test(key)) {
           currentEvent._board = val;
         } else {
           currentEvent._alight = val;
@@ -4012,15 +4016,15 @@ function _parseItineraryText(text) {
     }
 
     // Indented sub-bullet or 攻略/備註 line → note
-    if ((isIndented || /^[\u653b\u7565\u5099\u8a3b\u8aac\u660e\u6ce8\u610f][\uff1a:]/.test(db)) && currentEvent) {
-      const noteLine = db.replace(/^[\u653b\u7565\u5099\u8a3b\u8aac\u660e\u6ce8\u610f]+[\uff1a:]\s*/, '').trim().replace(/[\u3002.]$/, '');
+    if ((isIndented || /^[\u653b\u7565\u5099\u8a3b\u8aaa\u8aac\u660e\u6ce8\u610f][\uff1a:]/.test(db)) && currentEvent) {
+      const noteLine = db.replace(/^[\u653b\u7565\u5099\u8a3b\u8aaa\u8aac\u660e\u6ce8\u610f]+[\uff1a:]\s*/, '').trim().replace(/[\u3002.]$/, '');
       if (noteLine) noteLines.push(noteLine);
       continue;
     }
 
     // Label fields
     if (/^\u5730\u5740[\uff1a:]/.test(line)) { if (currentEvent) currentEvent.addr = db.replace(/^\u5730\u5740[\uff1a:]/,'').trim(); continue; }
-    if (/^\u8aac\u660e[\uff1a:]/.test(line)) { if (currentEvent) currentEvent.note = (currentEvent.note?currentEvent.note+' ':'')+db.replace(/^\u8aac\u660e[\uff1a:]/,'').trim(); continue; }
+    if (/^[\u8aaa\u8aac]\u660e[\uff1a:]/.test(line)) { if (currentEvent) currentEvent.note = (currentEvent.note?currentEvent.note+' ':'')+db.replace(/^[\u8aaa\u8aac]\u660e[\uff1a:]/,'').trim(); continue; }
 
     // Skip pure section headers
     if (/^(\u884c\u7a0b|\u6ce8\u610f\u4e8b\u9805|\u898f\u5283|\u5efa\u8b70|\u884c\u7a0b\u9806\u5e8f)$/.test(line)) continue;
