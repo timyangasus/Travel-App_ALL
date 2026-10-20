@@ -3782,6 +3782,25 @@ const TRANSIT_COLORS = {
   'pink': '#F194B4', 'grey': '#888888', 'gray': '#888888',
 };
 
+const COLOR_WORDS = [
+  ['深綠', '#1D7340'], ['淺綠', '#7DC242'], ['淡綠', '#7DC242'],
+  ['深藍', '#1A3F8F'], ['淺藍', '#4DA3E0'], ['淡藍', '#4DA3E0'],
+  ['藍', '#1A3F8F'], ['紅', '#E60012'], ['綠', '#1D7340'], ['黃', '#F8A501'],
+  ['橘', '#F2952E'], ['橙', '#F2952E'], ['紫', '#8B1A8B'], ['棕', '#964B00'],
+  ['咖啡', '#964B00'], ['粉', '#F194B4'], ['灰', '#888888'], ['黑', '#222222'],
+];
+
+/* 「藍色」「深綠」「#1A3F8F」「blue」→ 色碼；認不出來回傳空字串（之後會改用線路名稱推測） */
+function colorFromName(name) {
+  const s = String(name || '').trim();
+  if (!s) return '';
+  const hex = s.match(/#(?:[0-9a-f]{6}|[0-9a-f]{3})\b/i);
+  if (hex) return hex[0];
+  for (const [w, c] of COLOR_WORDS) if (s.includes(w)) return c;
+  const t = getTransitColor(s);
+  return t === '#999999' ? '' : t;
+}
+
 function getTransitColor(lineStr) {
   if (!lineStr) return '#999999';
   // 轉乘站常會列出多條路線，例如「淺綠線（Sukhumvit Line）／深綠線（Silom Line）」，
@@ -3968,6 +3987,22 @@ function _parseItineraryText(text) {
         currentEvent.line = (v[1] || '').trim();
         continue;
       }
+      // GPT 常見的「標籤：內容」子項目（normalize() 已把全形冒號轉成半形）
+      const lbl = db.match(/^(線路名稱|路線名稱|線路|路線|線路顏色|路線顏色|上車車站|上車站|搭乘車站|出發車站|下車車站|下車站|抵達車站)\s*:\s*(.+)$/);
+      if (lbl) {
+        const key = lbl[1], val = lbl[2].trim().replace(/[\u3002.]$/, '');
+        if (/顏色/.test(key)) {
+          currentEvent.lineColor = colorFromName(val);
+        } else if (/名稱|^(線路|路線)$/.test(key)) {
+          currentEvent.line = val;
+        } else if (/^(上車|搭乘|出發)/.test(key)) {
+          currentEvent._board = val;
+        } else {
+          currentEvent._alight = val;
+        }
+        currentEvent.station = [currentEvent._board, currentEvent._alight].filter(Boolean).join(' → ');
+        continue;
+      }
       const transitPipe = db.match(/^(.+?)[|\uff5c](.+)$/);
       if (transitPipe && /(\u7dda|Line|BTS|MRT|JR|\u6377\u904b|\u5730\u9435)/i.test(transitPipe[2])) {
         currentEvent.station = transitPipe[1].trim();
@@ -4066,7 +4101,7 @@ function _applySmartImport(result) {
       addr:      ev.addr     || '',
       station:   ev.station  || '',
       line:      ev.line     || '',
-      lineColor: (ev.station || ev.line) ? getTransitColor(ev.line || '') : ''
+      lineColor: ev.lineColor || ((ev.station || ev.line) ? getTransitColor(ev.line || '') : '')
     });
     written++;
   });
@@ -4120,7 +4155,7 @@ function _importToDay(dayIdx) {
       addr:      ev.addr     || '',
       station:   ev.station  || '',
       line:      ev.line     || '',
-      lineColor: (ev.station || ev.line) ? getTransitColor(ev.line || '') : ''
+      lineColor: ev.lineColor || ((ev.station || ev.line) ? getTransitColor(ev.line || '') : '')
     });
     written++;
   });
