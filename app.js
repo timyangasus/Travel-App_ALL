@@ -3876,11 +3876,11 @@ const AI_ITINERARY_TEMPLATE = `請依下列固定格式輸出旅遊行程，不�
 
 現在請依照以上格式，幫我排出【　　　　　】的行程。`;
 
-function copyItineraryTemplate() {
-  const done = () => showToast('格式範本已複製，貼給 AI 即可');
+function _copyTemplate(text, okMsg) {
+  const done = () => showToast(okMsg);
   const fallback = () => {
     const ta = document.createElement('textarea');
-    ta.value = AI_ITINERARY_TEMPLATE;
+    ta.value = text;
     ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
     document.body.appendChild(ta);
     ta.focus();
@@ -3892,10 +3892,48 @@ function copyItineraryTemplate() {
     if (ok) done(); else showToast('複製失敗，請稍後再試');
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(AI_ITINERARY_TEMPLATE).then(done).catch(fallback);
+    navigator.clipboard.writeText(text).then(done).catch(fallback);
   } else {
     fallback();
   }
+}
+
+function copyItineraryTemplate() {
+  _copyTemplate(AI_ITINERARY_TEMPLATE, '格式範本已複製，貼給 AI 即可');
+}
+
+/* 給 GPT 等 AI 的支出整理格式範本（與 _parseExpenseText 支援的格式對應） */
+const AI_EXPENSE_TEMPLATE = `請將以下支出記錄重新整理成指定格式，每一筆規則如下：
+
+【格式】
+HH:MM 類別—店名：品項1（¥金額）、品項2（¥金額）、品項3（¥金額）
+
+【規則】
+1. 時間用半形冒號，例如 17:12，時間後面直接接一個空格，不要加「|」或其他符號。
+2. 類別（餐飲／購物／交通／住宿／門票／其他）和店名之間，用一個全形破折號「—」連接，不要用「|」。
+3. 店名後面用全形冒號「：」，接著列出該筆的所有品項。
+4. 每個品項的格式是：品項名稱（¥金額），金額一定要用括號直接包住，緊接在名稱後面，中間不能有冒號或其他文字。
+5. 多個品項之間用頓號「、」分隔；如果只有一個品項也直接照這個格式寫，不用加頓號。
+6. 如果同一品項是多件且單價相同，格式寫成：品項名稱 x數量（各¥單價），例如：可樂 x2（各¥100）。不要直接寫總價，也不管這筆是不是唯一的品項都要照這個寫法。
+7. 不要輸出「單筆總計」「當日總計」「旅行總計」這幾行，也不要輸出來源地址、店家詳細資訊、表情符號（如💰）。
+8. 每一天的資料前面，另起一行寫日期，格式為「YYYY年M月D日」，例如：2026年7月18日。日期行和支出資料行中間空一行分隔即可，不要加星期或其他文字。
+9. 保留原始的品項名稱與金額，不要自行加總或簡化，也不要幫我換算幣別。
+
+【範例輸出】
+2026年7月18日
+
+17:12 餐飲—TS 南千歲店：北海道美味豚丼（¥1,572）、北海道花咲蟹便當（¥1,604）、寶礦力水得（¥210）、綠茶（¥210）
+18:00 餐飲—函館麵廚房 四代目：特製炙燒醬油拉麵 x2（各¥1,350）、糖心蛋（¥180）
+11:54 購物—四季彩之丘：グルメミニマグネット x2（各¥660）
+20:33 餐飲—味覺園 南2条店：新5800円食べ飲み放題 x2（各¥5,800）
+
+請按照以上規則和範例，把我提供的資料重新輸出，不要有其他多餘文字或說明。
+
+【我的支出記錄】
+`;
+
+function copyExpenseTemplate() {
+  _copyTemplate(AI_EXPENSE_TEMPLATE, '格式範本已複製，貼給 AI 即可');
 }
 
 function openSmartImport() {
@@ -4259,9 +4297,16 @@ const EXPENSE_CAT_MAP = {
   '購物': ['購物','店','shop','store','買','商場','market','百貨','免稅'],
   '交通': ['車票','交通','電車','地鐵','計程車','巴士','捷運','JR','MRT','BTS','taxi','bus','train','南海','近鐵'],
   '住宿': ['飯店','旅館','住宿','hotel','hostel','inn'],
-  '門票': ['門票','入場','ticket','pass','樂園'],
+  '票券': ['票券','門票','入場','ticket','pass','樂園'],
   '其他': [],
 };
+
+/* 標題欄明確寫出的類別（例如「購物」「門票」）直接採用，不再用店名關鍵字猜 */
+function _expenseCatFromLabel(label) {
+  const t = String(label || '').trim();
+  if (t === '門票') return '票券';
+  return ['餐飲', '交通', '購物', '住宿', '票券', '其他'].includes(t) ? t : '';
+}
 
 function _guessExpenseCat(text) {
   const t = text.toLowerCase();
@@ -4437,7 +4482,7 @@ function _parseExpenseText(text) {
       const storeName = colonIdx >= 0 ? remainder.slice(0, colonIdx).trim() : remainder.trim();
       const itemsPart = colonIdx >= 0 ? remainder.slice(colonIdx+1).trim() : '';
 
-      const cat = _guessExpenseCat(catPart + ' ' + storeName);
+      const cat = _expenseCatFromLabel(catPart) || _guessExpenseCat(catPart + ' ' + storeName);
 
       // Try to parse subitems from items part (same line)
       let subitems = [];
