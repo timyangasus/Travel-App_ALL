@@ -3810,14 +3810,10 @@ function openSmartImport() {
   if (ta) {
     ta.value = '';
     ta.oninput = () => {
-      const len = ta.value.length;
-      if (countEl) {
-        countEl.textContent = `${len} / 3000`;
-        countEl.style.color = len > 3000 ? '#FF3B30' : '#AAAAAA';
-      }
+      if (countEl) countEl.textContent = `${ta.value.length} 字`;
     };
   }
-  if (countEl) { countEl.textContent = '0 / 3000'; countEl.style.color = '#AAAAAA'; }
+  if (countEl) { countEl.textContent = '0 字'; countEl.style.color = '#AAAAAA'; }
   document.getElementById('smart-import-loading').style.display = 'none';
   document.getElementById('smart-import-report').style.display = 'none';
   document.getElementById('smart-import-actions').style.display = 'flex';
@@ -3829,7 +3825,6 @@ function runSmartImport() {
   const ta = document.getElementById('smart-import-text');
   const text = ta?.value?.trim() || '';
   if (!text) { showToast('請先貼入行程文字'); return; }
-  if (text.length > 3000) { showToast('文字超過 3000 字，請精簡後再試'); return; }
 
   // Show loading briefly then parse
   document.getElementById('smart-import-actions').style.display = 'none';
