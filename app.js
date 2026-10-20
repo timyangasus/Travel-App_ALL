@@ -5430,17 +5430,10 @@ function initInputClearBtns(root) {
     btn.className = 'field-x';
     btn.textContent = '×';
     btn.tabIndex = -1;
-    if (field.tagName === 'TEXTAREA') {
-      btn.style.top = '10px';
-      btn.style.transform = 'none';
-    }
     wrap.appendChild(btn);
 
-    if (field.tagName !== 'TEXTAREA') {
-      field.style.paddingRight = '22px';
-    } else {
-      field.style.paddingRight = '28px';
-    }
+    // 預留空間給 44px 的點擊區，避免文字被 × 蓋住
+    field.style.paddingRight = '40px';
 
     const show = () => btn.classList.toggle('show', field.value.length > 0);
     const hide = () => btn.classList.remove('show');
@@ -5450,14 +5443,17 @@ function initInputClearBtns(root) {
       if (document.activeElement === field) show();
     });
     field.addEventListener('blur', () => setTimeout(hide, 150));
-    btn.addEventListener('mousedown', e => e.preventDefault());
-    btn.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
-    btn.addEventListener('click', () => {
+    const clear = () => {
       field.value = '';
       field.dispatchEvent(new Event('input', { bubbles: true }));
       field.focus();
       hide();
-    });
+    };
+    // 觸控：touchstart 的 preventDefault 會讓瀏覽器不再送出 click，所以改在 touchend 直接清除
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    btn.addEventListener('touchend', e => { e.preventDefault(); clear(); }, { passive: false });
+    btn.addEventListener('click', clear);
   });
 }
 
