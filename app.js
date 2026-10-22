@@ -4203,6 +4203,14 @@ function _applySmartImport(result) {
     reports.push(`✓ 新增 ${extra} 天，請至設定頁更新行程區間`);
   }
 
+  // 取代模式：貼入文字中出現的每一天，先清空該天原有行程，只保留最新貼入的（沒出現的天數不動）
+  const replaced = {};
+  new Set(result.events.map(ev => (ev.day || 1) - 1)).forEach(dayIdx => {
+    if (dayIdx < 0 || dayIdx >= data.days.length) return;
+    replaced[dayIdx + 1] = data.days[dayIdx].events.length;
+    data.days[dayIdx].events = [];
+  });
+
   // Write events
   let written = 0, skipped = 0;
   result.events.forEach(ev => {
@@ -4232,7 +4240,7 @@ function _applySmartImport(result) {
     if (!ev._skipped) dayCount[ev.day] = (dayCount[ev.day] || 0) + 1;
   });
   const dayReports = Object.keys(dayCount).sort((a,b)=>a-b)
-    .map(d => `✓ Day ${d} 匯入 ${dayCount[d]} 筆行程`);
+    .map(d => `✓ Day ${d} 匯入 ${dayCount[d]} 筆行程` + (replaced[d] ? `（取代原有 ${replaced[d]} 筆）` : ''));
   reports.unshift(...dayReports);
   reports.unshift(`✓ 共匯入 ${written} 筆行程`);
   if (result._noDayDetected) reports.push('⚠️ 未偵測到日期或天數，所有行程已放入 Day 1，請自行移至正確天數');
@@ -4261,6 +4269,8 @@ function _importToDay(dayIdx) {
   const result = window._pendingSmartResult;
   if (!result) return;
   const reports = [];
+  const replacedCount = data.days[dayIdx].events.length;
+  data.days[dayIdx].events = [];   // 取代模式：先清空該天原有行程
   let written = 0, skipped = 0;
   result.events.forEach(ev => {
     const dayEvents = data.days[dayIdx].events;
@@ -4279,7 +4289,7 @@ function _importToDay(dayIdx) {
     });
     written++;
   });
-  reports.push(`✓ 共匯入 ${written} 筆行程至 Day ${dayIdx+1}`);
+  reports.push(`✓ 共匯入 ${written} 筆行程至 Day ${dayIdx+1}` + (replacedCount ? `（取代原有 ${replacedCount} 筆）` : ''));
   if (skipped > 0) reports.push(`✓ ${skipped} 筆重複行程已略過`);
   window._pendingSmartResult = null;
   save();
