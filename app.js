@@ -1056,6 +1056,43 @@ function deleteDay(i) {
   });
 }
 
+/* 清理空白天數：移除「沒有日期、也沒有行程／帳單／照片／說明」的天數。
+   有日期的天數（即使目前是空的）一律保留，只處理匯入出錯時產生的多餘空白天。 */
+function cleanEmptyDays() {
+  if (!data || !data.days) return;
+  const isJunk = (d, i) => {
+    const photosOnDay = (data.photos || []).some(p => p.day === i + 1);
+    return !parseBannerDate(d.banner?.date)
+      && !(d.events && d.events.length)
+      && !((data.expenses[i] || []).length)
+      && !((d.banner?.photos || []).length)
+      && !(d.banner?.subtitle || '').trim()
+      && !photosOnDay;
+  };
+  const junk = data.days.map((d, i) => isJunk(d, i));
+  const count = junk.filter(Boolean).length;
+  if (!count) { showToast('沒有可清理的空白天數'); return; }
+  if (count === data.days.length) { showToast('所有天數都是空白，無法清理'); return; }
+
+  showConfirm('清理空白天數？', `找到 ${count} 個沒有日期、也沒有任何內容的天數，將會移除。有日期或有內容的天數不會動。`, () => {
+    // 先算出每個保留天的新編號，再把相片的「第幾天」同步改過去，避免相片錯位
+    const newDayNo = {};
+    let n = 0;
+    data.days.forEach((_, i) => { if (!junk[i]) newDayNo[i + 1] = ++n; });
+    (data.photos || []).forEach(p => { if (newDayNo[p.day]) p.day = newDayNo[p.day]; });
+    data.days     = data.days.filter((_, i) => !junk[i]);
+    data.expenses = data.expenses.filter((_, i) => !junk[i]);
+    currentDay = Math.min(currentDay, data.days.length - 1);
+    expenseDay = Math.min(expenseDay, data.days.length - 1);
+    if (typeof _photoDayIdx !== 'undefined') _photoDayIdx = Math.min(_photoDayIdx, data.days.length - 1);
+    syncTripDatesFromDays();
+    save();
+    renderItinerary();
+    renderExpenseDayTabs();
+    showToast(`已移除 ${count} 個空白天數`);
+  });
+}
+
 /* ─── Toast helper ─── */
 let _toastTimer = null;
 function showToast(msg) {
@@ -4043,15 +4080,18 @@ function _parseItineraryText(text) {
       continue;
     }
 
-    // Date header: 7/18 or 07/18 with weekday or long title
-    const dateHdrM = line.match(/(\d{1,2})\/(\d{1,2})/);
-    if (dateHdrM) {
+    // Date header: 7/18 or 07/18 with weekday or long title.
+    // 必須出現在「行首」且不是縮排的子項目，月 1–12、日 1–31；
+    // 否則地址裡的門牌（例如 34/1 Soi Sribumphen）會被誤判成日期，把後面的行程丟到幾百天之後。
+    const dateHdrM = !isIndented ? line.match(/^[#>*\-\u2022\s]*(\d{1,2})\/(\d{1,2})(?![\d:])/) : null;
+    const validMD = dateHdrM && +dateHdrM[1] >= 1 && +dateHdrM[1] <= 12 && +dateHdrM[2] >= 1 && +dateHdrM[2] <= 31;
+    if (validMD) {
       const hasWD = /[\u9031\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u65e5]|Mon|Tue|Wed|Thu|Fri|Sat|Sun/i.test(line);
       const notTime = !/^\d{1,2}:\d{2}/.test(line.trim());
       if (hasWD || (notTime && line.length > 8)) {
         if (tripStart) {
           const dn = dateToDayNum(parseInt(dateHdrM[1]), parseInt(dateHdrM[2]));
-          if (dn > 0) {
+          if (dn > 0 && dn <= 366) {
             pushCurrentEvent(); currentDay = dn;
             if (currentDay > daysCount) daysCount = currentDay;
             continue;
