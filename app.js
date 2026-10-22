@@ -1056,43 +1056,6 @@ function deleteDay(i) {
   });
 }
 
-/* 清理空白天數：移除「沒有日期、也沒有行程／帳單／照片／說明」的天數。
-   有日期的天數（即使目前是空的）一律保留，只處理匯入出錯時產生的多餘空白天。 */
-function cleanEmptyDays() {
-  if (!data || !data.days) return;
-  const isJunk = (d, i) => {
-    const photosOnDay = (data.photos || []).some(p => p.day === i + 1);
-    return !parseBannerDate(d.banner?.date)
-      && !(d.events && d.events.length)
-      && !((data.expenses[i] || []).length)
-      && !((d.banner?.photos || []).length)
-      && !(d.banner?.subtitle || '').trim()
-      && !photosOnDay;
-  };
-  const junk = data.days.map((d, i) => isJunk(d, i));
-  const count = junk.filter(Boolean).length;
-  if (!count) { showToast('沒有可清理的空白天數'); return; }
-  if (count === data.days.length) { showToast('所有天數都是空白，無法清理'); return; }
-
-  showConfirm('清理空白天數？', `找到 ${count} 個沒有日期、也沒有任何內容的天數，將會移除。有日期或有內容的天數不會動。`, () => {
-    // 先算出每個保留天的新編號，再把相片的「第幾天」同步改過去，避免相片錯位
-    const newDayNo = {};
-    let n = 0;
-    data.days.forEach((_, i) => { if (!junk[i]) newDayNo[i + 1] = ++n; });
-    (data.photos || []).forEach(p => { if (newDayNo[p.day]) p.day = newDayNo[p.day]; });
-    data.days     = data.days.filter((_, i) => !junk[i]);
-    data.expenses = data.expenses.filter((_, i) => !junk[i]);
-    currentDay = Math.min(currentDay, data.days.length - 1);
-    expenseDay = Math.min(expenseDay, data.days.length - 1);
-    if (typeof _photoDayIdx !== 'undefined') _photoDayIdx = Math.min(_photoDayIdx, data.days.length - 1);
-    syncTripDatesFromDays();
-    save();
-    renderItinerary();
-    renderExpenseDayTabs();
-    showToast(`已移除 ${count} 個空白天數`);
-  });
-}
-
 /* ─── Toast helper ─── */
 let _toastTimer = null;
 function showToast(msg) {
