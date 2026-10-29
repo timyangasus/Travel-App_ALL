@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.9';
+const APP_VERSION = '2026.10.29.10';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -5495,32 +5495,43 @@ function bkZip(files) {
   end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
   return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
 }
-// zip ArrayBuffer → { name: Uint8Array }。支援不壓縮和 deflate（被別的工具重新打包過也讀得到）
-async function bkUnzip(buf) {
-  const v = new DataView(buf), u8 = new Uint8Array(buf), dec = new TextDecoder();
+// 不把整個 zip 讀進記憶體：只讀檔尾的目錄，照片之後一張一張從檔案切出來（匯入照片很多時才不會閃退）
+async function bkZipIndex(file) {
+  const tailLen = Math.min(file.size, 65557);
+  const tail = new DataView(await file.slice(file.size - tailLen).arrayBuffer());
   let eocd = -1;
-  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) {
-    if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  for (let i = tailLen - 22; i >= 0; i--) {
+    if (tail.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
   }
   if (eocd < 0) throw new Error('不是有效的備份檔');
-  const count = v.getUint16(eocd + 10, true);
-  let p = v.getUint32(eocd + 16, true);
+  const count = tail.getUint16(eocd + 10, true);
+  const cdSize = tail.getUint32(eocd + 12, true), cdOff = tail.getUint32(eocd + 16, true);
+  const v = new DataView(await file.slice(cdOff, cdOff + cdSize).arrayBuffer());
+  const dec = new TextDecoder();
   const out = {};
+  let p = 0;
   for (let i = 0; i < count; i++) {
     if (v.getUint32(p, true) !== 0x02014b50) throw new Error('備份檔已損毀');
     const method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
     const nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
     const lho = v.getUint32(p + 42, true);
-    const name = dec.decode(u8.subarray(p + 46, p + 46 + nlen));
+    const name = dec.decode(new Uint8Array(v.buffer, p + 46, nlen));
     p += 46 + nlen + xlen + clen;
-    if (name.endsWith('/')) continue;
-    const start = lho + 30 + v.getUint16(lho + 26, true) + v.getUint16(lho + 28, true);
-    const raw = u8.subarray(start, start + csize);
-    if (method === 0) out[name] = raw;
-    else if (method === 8) out[name] = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
-    else throw new Error('不支援的壓縮格式');
+    if (!name.endsWith('/')) out[name] = { method, csize, lho };
   }
   return out;
+}
+// 取出 zip 裡的一個檔案成 Blob（支援不壓縮和 deflate）
+async function bkZipEntryBlob(file, ent, type) {
+  const lh = new DataView(await file.slice(ent.lho, ent.lho + 30).arrayBuffer());
+  const start = ent.lho + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
+  const raw = file.slice(start, start + ent.csize);
+  if (ent.method === 0) return raw.slice(0, raw.size, type || '');
+  if (ent.method === 8) {
+    const b = await new Response(raw.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
+    return new Blob([b], { type: type || '' });
+  }
+  throw new Error('不支援的壓縮格式');
 }
 
 const _EXT_BY_MIME = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/heic': 'heic', 'image/heif': 'heif' };
@@ -5612,20 +5623,19 @@ async function importBackup(input) {
   const file = input.files[0];
   input.value = '';
   if (!file) return;
-  let imported, photos = {};
+  let imported, photos = {}, zipIndex = null;
   try {
-    const buf = await file.arrayBuffer();
-    const u8 = new Uint8Array(buf);
-    if (u8[0] === 0x50 && u8[1] === 0x4B) {            // "PK" ＝ zip
-      const entries = await bkUnzip(buf);
-      if (!entries['data.json']) throw new Error('不是有效的備份檔');
-      imported = JSON.parse(new TextDecoder().decode(entries['data.json']));
-      for (const [name, bytes] of Object.entries(entries)) {
+    const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+    if (head[0] === 0x50 && head[1] === 0x4B) {            // "PK" ＝ zip
+      zipIndex = await bkZipIndex(file);
+      if (!zipIndex['data.json']) throw new Error('不是有效的備份檔');
+      imported = JSON.parse(await (await bkZipEntryBlob(file, zipIndex['data.json'])).text());
+      for (const [name, ent] of Object.entries(zipIndex)) {
         const m = name.match(/^photos\/([A-Za-z0-9_-]+)\.([A-Za-z0-9]+)$/);
-        if (m) photos[m[1]] = new Blob([bytes], { type: _MIME_BY_EXT[m[2].toLowerCase()] || 'application/octet-stream' });
+        if (m) photos[m[1]] = { ent, type: _MIME_BY_EXT[m[2].toLowerCase()] || 'application/octet-stream' };
       }
     } else {
-      imported = JSON.parse(new TextDecoder().decode(buf));   // 舊的 .json 備份
+      imported = JSON.parse(await file.text());   // 舊的 .json 備份
     }
   } catch (err) {
     console.log('讀取備份失敗', err);
@@ -5640,7 +5650,13 @@ async function importBackup(input) {
       try {
         showToast('匯入中…');
         // 先把照片寫進手機，再換資料，中途失敗也不會變成「資料指向不存在的照片」
-        for (const [id, blob] of Object.entries(photos)) await photoPut(id, blob);
+        let n = 0;
+        const total = Object.keys(photos).length;
+        for (const [id, ph] of Object.entries(photos)) {
+          showUploadStatus(`匯入照片 ${++n}/${total}…`);
+          await photoPut(id, await bkZipEntryBlob(file, ph.ent, ph.type));   // 一次只處理一張
+        }
+        showUploadStatus('');
         meta = imported.meta;
         if (!meta.trips) meta.trips = [];
         saveMeta();
@@ -5659,6 +5675,7 @@ async function importBackup(input) {
         showToast('匯入成功');
       } catch (err) {
         console.log('匯入失敗', err);
+        showUploadStatus('');
         showToast('匯入失敗：' + err.message);
       }
     }, null, '覆蓋匯入');
