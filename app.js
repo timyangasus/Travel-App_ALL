@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.11';
+const APP_VERSION = '2026.10.29.12';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -44,6 +44,15 @@ async function compressImage(file, maxSize = 1200, quality = 0.82, targetBytes =
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch);   // 透明背景的 PNG 轉 JPEG 時不要變黑
         ctx.drawImage(img, 0, 0, cw, ch);
+        // 有些手機遇到超大圖會畫出一片空白；偵測到就放棄壓縮、保留原檔，避免把照片壓成空白
+        try {
+          const t = document.createElement('canvas'); t.width = t.height = 12;
+          const tc = t.getContext('2d'); tc.drawImage(canvas, 0, 0, 12, 12);
+          const px = tc.getImageData(0, 0, 12, 12).data;
+          let lo = 255, hi = 0;
+          for (let i = 0; i < px.length; i += 4) { const l = (px[i] + px[i + 1] + px[i + 2]) / 3; if (l < lo) lo = l; if (l > hi) hi = l; }
+          if (hi - lo < 4) { res(null); return; }
+        } catch (e) {}
         canvas.toBlob(res, 'image/jpeg', q);
       });
       let q = quality, best = await encode(w, h, q);
@@ -132,6 +141,31 @@ function _allPhotoRefs() {
   return new Set((text.match(/idb:[A-Za-z0-9_-]+/g) || []).map(s => s.slice(4)));
 }
 
+/* 檢查資料裡參照到的照片是否都在手機上、讀得出來。decode=true 時會真的解碼（較慢，匯入後用） */
+async function checkPhotoHealth(decode) {
+  const refs = [..._allPhotoRefs()];
+  const bad = [];
+  for (const id of refs) {
+    const blob = await photoGet(id).catch(() => null);
+    if (!blob || !blob.size) { bad.push(id); continue; }
+    if (decode) {
+      const ok = await new Promise(res => {
+        const u = URL.createObjectURL(blob), im = new Image();
+        im.onload = () => { URL.revokeObjectURL(u); res(im.naturalWidth > 0); };
+        im.onerror = () => { URL.revokeObjectURL(u); res(false); };
+        im.src = u;
+      });
+      if (!ok) bad.push(id);
+    }
+  }
+  return { total: refs.length, bad };
+}
+function reportBadPhotos(r) {
+  if (!r.bad.length) return;
+  console.log('找不到或無法顯示的照片', r.bad);
+  showConfirm('有照片無法顯示', `資料裡有 ${r.total} 張照片，其中 ${r.bad.length} 張在手機上找不到或已損毀（編號已記在主控台）。如果你還有更早的備份檔，可以用它重新匯入。`, () => {}, null, '知道了');
+}
+
 /* 清掉已經沒有任何行程參照、且存放超過 2 天的照片（刪除行程／換封面後留下的）。
    2 天寬限期是為了不要誤刪「剛選好、還沒按儲存」的照片。 */
 async function gcLocalPhotos() {
@@ -172,6 +206,36 @@ function showUploadStatus(msg) {
   el.textContent = msg;
   el.style.opacity = msg ? '1' : '0';
 }
+
+/* 長時間作業（壓縮、匯出、匯入、轉存）的進度列，附「停止」按鈕 */
+let _progressStop = false;
+const STOP_MSG = '已停止';
+function progressShow(msg) {
+  let el = document.getElementById('_progress-bar');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = '_progress-bar';
+    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.82);color:#fff;padding:6px 8px 6px 18px;border-radius:22px;font-size:13px;z-index:10000;display:none;align-items:center;gap:12px;white-space:nowrap';
+    el.innerHTML = '<span></span><button style="border:0;background:#fff;color:#1A1A1A;font-size:13px;font-weight:600;padding:7px 14px;border-radius:16px;min-height:32px">停止</button>';
+    el.querySelector('button').onclick = () => {
+      _progressStop = true;
+      el.querySelector('span').textContent = '停止中…';
+      el.querySelector('button').style.display = 'none';
+    };
+    document.body.appendChild(el);
+  }
+  if (_progressStop) return;               // 已按停止：不要再蓋掉「停止中…」
+  el.querySelector('span').textContent = msg;
+  el.querySelector('button').style.display = '';
+  el.style.display = 'flex';
+}
+function progressBegin(msg) { _progressStop = false; progressShow(msg); }
+function progressEnd() {
+  const el = document.getElementById('_progress-bar');
+  if (el) el.style.display = 'none';
+  _progressStop = false;
+}
+function progressCheck() { if (_progressStop) throw new Error(STOP_MSG); }
 
 /* ═══════════════════════════════════════
    MULTI-TRIP DATA LAYER
@@ -1239,10 +1303,13 @@ async function _compressPhotos({ todo, mapRefs }) {
   _compressingPhotos = true;
   let wake = null;
   try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
-  let n = 0, saved = 0, shrunk = 0;
+  let n = 0, saved = 0, shrunk = 0, stopped = false;
+  const processed = [];
+  progressBegin('壓縮照片 0/' + todo.length + '…');
   try {
     for (const s of todo) {
-      showUploadStatus(`壓縮照片 ${++n}/${todo.length}…`);
+      if (_progressStop) { stopped = true; break; }
+      progressShow(`壓縮照片 ${++n}/${todo.length}…`);
       try {
         const blob = await photoGet(s.id);
         if (!blob) continue;
@@ -1256,19 +1323,20 @@ async function _compressPhotos({ todo, mapRefs }) {
           if (old) URL.revokeObjectURL(old);
         }
       } catch (e) { console.log('壓縮失敗', s.id, e); }
+      processed.push(s);
     }
     try {
       const tried = new Set(JSON.parse(localStorage.getItem(COMPRESS_TRIED_KEY) || '[]'));
-      todo.forEach(s => tried.add(s.id));
+      processed.forEach(s => tried.add(s.id));
       localStorage.setItem(COMPRESS_TRIED_KEY, JSON.stringify([...tried]));
     } catch (e) {}
     if (shrunk && currentTripId) { try { renderItinerary(); renderExpense(); renderSettings(); } catch (e) {} }
   } finally {
-    showUploadStatus('');
+    progressEnd();
     try { wake?.release(); } catch (e) {}
     _compressingPhotos = false;
   }
-  return { shrunk, saved };
+  return { shrunk, saved, stopped };
 }
 
 let _migratingPhotos = false;
@@ -1321,6 +1389,8 @@ function migrateLegacyPhotos() {
       let ok = 0, dead = 0;
       let pending = urls;
       let lastErr = '';
+      let stopped = false;
+      progressBegin(`轉存舊照片 0/${total}…`);
       try {
         // 暫時失敗的（網路中斷、逾時…）自動再跑一輪，最多 4 輪；某一輪完全沒進展就停
         for (let pass = 1; pass <= 4 && pending.length; pass++) {
@@ -1329,7 +1399,7 @@ function migrateLegacyPhotos() {
           const flush = () => { _applyPhotoMapping(batch); batch = {}; batchN = 0; };
           const queue = [...pending];
           const worker = async () => {
-            while (queue.length) {
+            while (queue.length && !_progressStop) {
               const url = queue.shift();
               try {
                 let blob = await _fetchLegacyPhoto(url);
@@ -1344,11 +1414,12 @@ function migrateLegacyPhotos() {
                 lastErr = e.message || String(e);
                 if (e.dead) dead++; else failed.push(url);
               }
-              showUploadStatus(`轉存舊照片 ${Math.min(ok + dead, total)}/${total}` + (pass > 1 ? `（第 ${pass} 輪重試）` : '') + '…');
+              progressShow(`轉存舊照片 ${Math.min(ok + dead, total)}/${total}` + (pass > 1 ? `（第 ${pass} 輪重試）` : '') + '…');
             }
           };
           await Promise.all([worker(), worker(), worker()]);
           flush();
+          if (_progressStop) { stopped = true; break; }
           if (!passOk && failed.length) { pending = failed; break; }
           pending = failed;
         }
@@ -1365,7 +1436,9 @@ function migrateLegacyPhotos() {
         }
         updateLegacyPhotoRow();
         const left = pending.length;
-        if (!dead && !left) {
+        if (stopped) {
+          showToast(`已停止，已轉存 ${ok} 張；剩下的再按一次可以繼續`);
+        } else if (!dead && !left) {
           showToast(`已轉存 ${ok} 張到手機，建議現在匯出一次備份`);
         } else {
           showConfirm('轉存完成',
@@ -1380,6 +1453,7 @@ function migrateLegacyPhotos() {
         showToast('轉存失敗：' + e.message);
         updateLegacyPhotoRow();
       } finally {
+        progressEnd();
         showUploadStatus('');
         try { wake?.release(); } catch (e) {}
         _migratingPhotos = false;
@@ -5549,8 +5623,10 @@ async function exportBackup(skipCompressCheck) {
         showConfirm('先壓縮照片再匯出？',
           `有 ${need.todo.length} 張照片超過 ${PHOTO_TARGET_BYTES / 1024} KB（共 ${_fmtMB(need.bytes)}）。壓縮後備份檔會小很多，匯出也比較不會當掉。壓縮無法還原成原圖；壓縮期間請保持螢幕亮著，完成後會自動匯出。`,
           async () => {
-            try { await _compressPhotos(need); }
+            let r;
+            try { r = await _compressPhotos(need); }
             catch (e) { showToast('壓縮失敗：' + e.message); return; }
+            if (r.stopped) { showToast('已停止，沒有匯出（已壓縮的照片會保留）'); return; }
             exportBackup(true);
           }, null, '壓縮並匯出');
         return;
@@ -5572,15 +5648,17 @@ async function exportBackup(skipCompressCheck) {
     const ids = [...new Set((json.match(/idb:[A-Za-z0-9_-]+/g) || []).map(s => s.slice(4)))];
     let missing = 0;
     let n = 0;
+    progressBegin(`打包照片 0/${ids.length}…`);
     for (const id of ids) {
-      showUploadStatus(`打包照片 ${++n}/${ids.length}…`);
+      progressShow(`打包照片 ${++n}/${ids.length}…`);
+      progressCheck();
       const blob = await photoGet(id).catch(() => null);
       if (!blob) { missing++; continue; }
       // 一次只把一張照片讀進記憶體算 CRC，之後只留 Blob 參照，不把整包 zip 複製進記憶體
       const crc = bkCrc32(new Uint8Array(await blob.arrayBuffer()));
       files.push({ name: `photos/${id}.${_EXT_BY_MIME[blob.type] || 'bin'}`, data: blob, crc, size: blob.size });
     }
-    showUploadStatus('');
+    progressEnd();
     // 檔名固定不帶日期：存到「檔案」時直接覆蓋舊的，永遠只留最新一份；想留多份再自己改名
     const fileName = '旅遊誌備份.zip';
     const zip = bkZip(files);
@@ -5620,8 +5698,9 @@ async function exportBackup(skipCompressCheck) {
     }
   } catch (e) {
     console.log('匯出失敗', e);
-    showToast('匯出失敗：' + e.message);
+    showToast(e.message === STOP_MSG ? '已停止匯出' : '匯出失敗：' + e.message);
   } finally {
+    progressEnd();
     showUploadStatus('');
     _backupBusy = false;
   }
@@ -5660,11 +5739,17 @@ async function importBackup(input) {
         // 先把照片寫進手機，再換資料，中途失敗也不會變成「資料指向不存在的照片」
         let n = 0;
         const total = Object.keys(photos).length;
+        progressBegin(`匯入照片 0/${total}…`);
         for (const [id, ph] of Object.entries(photos)) {
-          showUploadStatus(`匯入照片 ${++n}/${total}…`);
-          await photoPut(id, await bkZipEntryBlob(file, ph.ent, ph.type));   // 一次只處理一張
+          progressShow(`匯入照片 ${++n}/${total}…`);
+          progressCheck();
+          // 一次只處理一張；並且真的複製成獨立的資料再存，不要只存「指向所選備份檔」的參照
+          const slice = await bkZipEntryBlob(file, ph.ent, ph.type);
+          const blob = new Blob([await slice.arrayBuffer()], { type: ph.type });
+          if (ph.ent.method === 0 && blob.size !== ph.ent.csize) throw new Error('照片讀取不完整，備份檔可能已損毀');
+          await photoPut(id, blob);
         }
-        showUploadStatus('');
+        progressEnd();
         meta = imported.meta;
         if (!meta.trips) meta.trips = [];
         saveMeta();
@@ -5681,10 +5766,17 @@ async function importBackup(input) {
         }
         switchTab('home');
         showToast('匯入成功');
+        // 匯入後逐張檢查照片真的讀得出來；有問題就明確告知，不要等到翻行程才發現
+        showUploadStatus('檢查照片…');
+        const health = await checkPhotoHealth(true);
+        showUploadStatus('');
+        reportBadPhotos(health);
       } catch (err) {
         console.log('匯入失敗', err);
+        showToast(err.message === STOP_MSG ? '已停止匯入，原有資料沒有變動' : '匯入失敗：' + err.message);
+      } finally {
+        progressEnd();
         showUploadStatus('');
-        showToast('匯入失敗：' + err.message);
       }
     }, null, '覆蓋匯入');
     return;
@@ -6090,6 +6182,7 @@ preloadPhotos(JSON.stringify(meta)).then(() => {
   if (document.getElementById('screen-home')?.classList.contains('active')) renderHome();
 }).catch(() => {});
 setTimeout(() => { gcLocalPhotos().catch(() => {}); }, 15000);
+setTimeout(() => { checkPhotoHealth(false).then(reportBadPhotos).catch(() => {}); }, 20000);
 
 
 
