@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.7';
+const APP_VERSION = '2026.10.29.8';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -5461,7 +5461,8 @@ function bkCrc32(bytes) {
   for (let i = 0; i < bytes.length; i++) c = BK_CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
-// files: [{ name, data: Uint8Array }] → zip Blob（store、不壓縮）
+// files: [{ name, data: Uint8Array | Blob, crc?, size? }] → zip Blob（store、不壓縮）
+// data 是 Blob 時要先給 crc 和 size，這樣照片不用全部讀進記憶體（照片多時手機會記憶體不足而閃退）
 function bkZip(files) {
   const enc = new TextEncoder();
   const parts = [], central = [];
@@ -5471,7 +5472,7 @@ function bkZip(files) {
   const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
   const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
   for (const f of files) {
-    const name = enc.encode(f.name), crc = bkCrc32(f.data), size = f.data.length;
+    const name = enc.encode(f.name), crc = f.crc ?? bkCrc32(f.data), size = f.size ?? f.data.length;
     const lh = new DataView(new ArrayBuffer(30));
     lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
     lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true);
@@ -5549,11 +5550,16 @@ async function exportBackup() {
     const files = [{ name: 'data.json', data: new TextEncoder().encode(json) }];
     const ids = [...new Set((json.match(/idb:[A-Za-z0-9_-]+/g) || []).map(s => s.slice(4)))];
     let missing = 0;
+    let n = 0;
     for (const id of ids) {
+      showUploadStatus(`打包照片 ${++n}/${ids.length}…`);
       const blob = await photoGet(id).catch(() => null);
       if (!blob) { missing++; continue; }
-      files.push({ name: `photos/${id}.${_EXT_BY_MIME[blob.type] || 'bin'}`, data: new Uint8Array(await blob.arrayBuffer()) });
+      // 一次只把一張照片讀進記憶體算 CRC，之後只留 Blob 參照，不把整包 zip 複製進記憶體
+      const crc = bkCrc32(new Uint8Array(await blob.arrayBuffer()));
+      files.push({ name: `photos/${id}.${_EXT_BY_MIME[blob.type] || 'bin'}`, data: blob, crc, size: blob.size });
     }
+    showUploadStatus('');
     // 檔名固定不帶日期：存到「檔案」時直接覆蓋舊的，永遠只留最新一份；想留多份再自己改名
     const fileName = '旅遊誌備份.zip';
     const zip = bkZip(files);
@@ -5595,6 +5601,7 @@ async function exportBackup() {
     console.log('匯出失敗', e);
     showToast('匯出失敗：' + e.message);
   } finally {
+    showUploadStatus('');
     _backupBusy = false;
   }
 }
