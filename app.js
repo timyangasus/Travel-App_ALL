@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.1';
+const APP_VERSION = '2026.10.29.2';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -1139,6 +1139,95 @@ function deleteDay(i) {
     renderItinerary();
     renderExpenseDayTabs();
   });
+}
+
+/* ═══════════════════════════════════════
+   把舊的 ImgBB 照片轉存到手機
+   舊資料裡的照片是 https://i.ibb.co/... 連結；這裡把它們下載下來存進手機，
+   再把資料裡的連結換成 idb:<id>。下載失敗的保留原連結，不會弄丟。
+═══════════════════════════════════════ */
+const IMGBB_URL_RE = /https?:\/\/i\.ibb\.co(?:\.com)?\/[^\s"'\\\]\)]+/g;
+
+function _storedTexts() {
+  const out = [{ key: META_KEY, text: localStorage.getItem(META_KEY) || '' }];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(TRIP_PREFIX)) out.push({ key: k, text: localStorage.getItem(k) || '' });
+  }
+  return out;
+}
+function listImgbbUrls() {
+  const set = new Set();
+  _storedTexts().forEach(({ text }) => (text.match(IMGBB_URL_RE) || []).forEach(u => set.add(u)));
+  return [...set];
+}
+function updateLegacyPhotoRow() {
+  const row = document.getElementById('legacy-photo-row');
+  if (!row) return;
+  const n = listImgbbUrls().length;
+  row.style.display = n ? '' : 'none';
+  const hint = document.getElementById('legacy-photo-hint');
+  if (hint) hint.textContent = n ? `${n} 張` : '';
+}
+
+let _migratingPhotos = false;
+function migrateLegacyPhotos() {
+  if (_migratingPhotos) return;
+  const urls = listImgbbUrls();
+  if (!urls.length) { showToast('沒有需要轉存的舊照片'); updateLegacyPhotoRow(); return; }
+  showConfirm('轉存舊照片到手機？',
+    `找到 ${urls.length} 張還放在 ImgBB 的舊照片，會全部下載存到這支手機。需要網路，數量多時要等一下；下載失敗的會保留原連結。`,
+    async () => {
+      _migratingPhotos = true;
+      const mapping = {};
+      let ok = 0, fail = 0, done = 0;
+      const queue = [...urls];
+      const worker = async () => {
+        while (queue.length) {
+          const url = queue.shift();
+          try {
+            const r = await fetch(url);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const blob = await r.blob();
+            if (!/^image\//.test(blob.type)) throw new Error('不是圖片');
+            const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+            await photoPut(id, blob);
+            _blobCache.set(id, URL.createObjectURL(blob));
+            mapping[url] = 'idb:' + id;
+            ok++;
+          } catch (e) { fail++; }
+          done++;
+          showUploadStatus(`轉存舊照片 ${done}/${urls.length}…`);
+        }
+      };
+      try {
+        await Promise.all([worker(), worker(), worker(), worker()]);
+        if (ok) {
+          // 下載全部結束後才改資料；較長的網址先換，避免網址互為前綴時被截斷
+          const pairs = Object.entries(mapping).sort((x, y) => y[0].length - x[0].length);
+          _storedTexts().forEach(({ key, text }) => {
+            let t = text;
+            for (const [u, ref] of pairs) if (t.includes(u)) t = t.split(u).join(ref);
+            if (t !== text) localStorage.setItem(key, t);
+          });
+          loadMeta();
+          if (currentTripId && meta.trips.some(t => t.id === currentTripId)) {
+            const day = currentDay;
+            loadTrip(currentTripId);
+            currentDay = Math.min(day, data.days.length - 1);
+            renderItinerary(); renderExpense(); renderSettings();
+          }
+        }
+        updateLegacyPhotoRow();
+        showToast(`已轉存 ${ok} 張到手機` + (fail ? `，${fail} 張下載失敗（連結失效或沒網路），已保留原連結` : '，建議現在匯出一次備份'));
+      } catch (e) {
+        console.log('轉存失敗', e);
+        showToast('轉存失敗：' + e.message);
+      } finally {
+        showUploadStatus('');
+        _migratingPhotos = false;
+      }
+    }, null, '開始轉存');
 }
 
 /* ─── Toast helper ─── */
@@ -3809,6 +3898,7 @@ const CURRENCIES = [
 function renderSettings() {
   if (!data) return;
   updateBackupHint();
+  updateLegacyPhotoRow();
   const verEl = document.getElementById('app-version');
   if (verEl) verEl.textContent = 'v' + APP_VERSION;
   const s = data.settings;
