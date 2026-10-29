@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.12';
+const APP_VERSION = '2026.10.29.13';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -29,6 +29,7 @@ async function compressImage(file, maxSize = 1200, quality = 0.82, targetBytes =
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = async () => {
+      try {
       URL.revokeObjectURL(url);
       let w = img.naturalWidth, h = img.naturalHeight;
       const fits = w <= maxSize && h <= maxSize;
@@ -65,6 +66,7 @@ async function compressImage(file, maxSize = 1200, quality = 0.82, targetBytes =
       }
       if (!best || (fits && best.size >= file.size)) { resolve(file); return; }
       resolve(best);
+      } catch (e) { console.log('壓縮失敗，改用原檔', e); resolve(file); }
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
     img.src = url;
@@ -79,20 +81,34 @@ let _photoDBPromise = null;
 function photoDB() {
   if (_photoDBPromise) return _photoDBPromise;
   _photoDBPromise = new Promise((resolve, reject) => {
-    if (!window.indexedDB) { reject(new Error('此瀏覽器不支援本機儲存')); return; }
+    if (!window.indexedDB) { _photoDBPromise = null; reject(new Error('此瀏覽器不支援本機儲存')); return; }
+    // iOS 偶爾會讓 open() 一直沒回應；逾時就報錯，不要讓畫面無聲無息卡住
+    const timer = setTimeout(() => { _photoDBPromise = null; reject(new Error('手機照片儲存庫沒有回應，請把 App 完全關掉再開')); }, 10000);
     const req = indexedDB.open('travel_trace_photos', 1);
     req.onupgradeneeded = () => { req.result.createObjectStore('photos', { keyPath: 'id' }); };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => { _photoDBPromise = null; reject(req.error); };
+    req.onsuccess = () => {
+      clearTimeout(timer);
+      req.result.onversionchange = () => { req.result.close(); _photoDBPromise = null; };
+      resolve(req.result);
+    };
+    req.onblocked = () => console.log('照片儲存庫被其他分頁佔用');
+    req.onerror = () => { clearTimeout(timer); _photoDBPromise = null; reject(req.error); };
   });
   return _photoDBPromise;
+}
+// 交易被中止（最常見是手機/瀏覽器儲存空間不足）時，只會觸發 abort、不會觸發 error，要另外接，否則 Promise 永遠不結束
+function _txError(tx) {
+  const e = tx.error;
+  if (e && e.name === 'QuotaExceededError') return new Error('儲存空間不足（手機或瀏覽器的儲存空間已滿）');
+  return e || new Error('照片寫入被中止');
 }
 function photoPut(id, blob) {
   return photoDB().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction('photos', 'readwrite');
     tx.objectStore('photos').put({ id, blob, createdAt: Date.now() });
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+    tx.onerror = () => reject(_txError(tx));
+    tx.onabort = () => reject(_txError(tx));
   }));
 }
 function photoGet(id) {
@@ -111,7 +127,11 @@ const MAP_TARGET_BYTES = 1500 * 1024;
 
 /* 壓縮後存進手機，回傳要寫進資料的參照字串 "idb:<id>" */
 async function savePhoto(file, opts) {
-  const blob = await compressImage(file, opts?.maxSize ?? PHOTO_MAX_DIM, opts?.quality ?? PHOTO_QUALITY, opts?.targetBytes ?? PHOTO_TARGET_BYTES);
+  // 壓縮卡住（超大圖在手機上偶爾會）就超過 30 秒改存原檔，不讓畫面無聲無息沒反應
+  const blob = await Promise.race([
+    compressImage(file, opts?.maxSize ?? PHOTO_MAX_DIM, opts?.quality ?? PHOTO_QUALITY, opts?.targetBytes ?? PHOTO_TARGET_BYTES),
+    new Promise(res => setTimeout(() => res(file), 30000)),
+  ]);
   const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   await photoPut(id, blob);
   _blobCache.set(id, URL.createObjectURL(blob));
@@ -160,10 +180,15 @@ async function checkPhotoHealth(decode) {
   }
   return { total: refs.length, bad };
 }
-function reportBadPhotos(r) {
+async function reportBadPhotos(r) {
   if (!r.bad.length) return;
   console.log('找不到或無法顯示的照片', r.bad);
-  showConfirm('有照片無法顯示', `資料裡有 ${r.total} 張照片，其中 ${r.bad.length} 張在手機上找不到或已損毀（編號已記在主控台）。如果你還有更早的備份檔，可以用它重新匯入。`, () => {}, null, '知道了');
+  let usage = '';
+  try {
+    const e = await navigator.storage?.estimate?.();
+    if (e && e.quota) usage = `\n儲存空間：已用 ${_fmtMB(e.usage || 0)} / 上限 ${_fmtMB(e.quota)}。`;
+  } catch (e) {}
+  showConfirm('有照片無法顯示', `資料裡有 ${r.total} 張照片，其中 ${r.bad.length} 張在手機上找不到或已損毀（編號已記在主控台）。如果你還有更早的備份檔，可以用它重新匯入。` + usage, () => {}, null, '知道了');
 }
 
 /* 清掉已經沒有任何行程參照、且存放超過 2 天的照片（刪除行程／換封面後留下的）。
@@ -797,10 +822,10 @@ function openTripCoverPicker(id) {
       const trip = meta.trips.find(t => t.id === id);
       if (trip) { trip.coverImg = url; saveMeta(); }
       renderHome();
-    } catch(err) { alert('儲存失敗：' + err.message); }
+    } catch(err) { console.log('封面儲存失敗', err); alert('儲存失敗：' + err.message); }
     finally { showUploadStatus(''); }
   };
-  inp.click();
+  _openPicker(inp);
 }
 
 /* ─── Trip Sheet ─── */
@@ -1231,6 +1256,14 @@ function deleteDay(i) {
    再把資料裡的連結換成 idb:<id>。下載失敗的保留原連結，不會弄丟。
 ═══════════════════════════════════════ */
 const IMGBB_URL_RE = /https?:\/\/i\.ibb\.co(?:\.com)?\/[^\s"'\\\]\)]+/g;
+
+// iOS Safari 對沒有放進頁面的 <input type=file> 可能在選完檔案前就回收掉，onchange 不會觸發；先藏進頁面再開啟
+function _openPicker(inp) {
+  inp.style.display = 'none';
+  document.body.appendChild(inp);
+  setTimeout(() => inp.remove(), 10 * 60 * 1000);
+  inp.click();
+}
 
 function _storedTexts() {
   const out = [{ key: META_KEY, text: localStorage.getItem(META_KEY) || '' }];
@@ -2651,10 +2684,11 @@ function mapAddNew() {
       renderMapSub();
     } catch(e) {
       showUploadStatus('');
-      showToast('儲存失敗');
+      console.log('地圖儲存失敗', e);
+      alert('儲存失敗：' + e.message);
     }
   };
-  input.click();
+  _openPicker(input);
 }
 
 function onMapActionBtn() { mapAddNew(); }
@@ -3554,7 +3588,7 @@ function noteInsertImage() {
       showToast('儲存失敗，請再試一次');
     }
   };
-  input.click();
+  _openPicker(input);
 }
 
 function _renderNoteImgPreview() {
@@ -4061,10 +4095,10 @@ function hotelPickCover(id) {
       const url = await savePhoto(file);
       const h = data.hotels.find(h => h.id === id);
       if (h) { h.img = url; save(); renderHotelCards(); }
-    } catch(e) { showToast('儲存失敗'); }
+    } catch(e) { console.log('飯店封面儲存失敗', e); alert('儲存失敗：' + e.message); }
     finally { showUploadStatus(''); }
   };
-  inp.click();
+  _openPicker(inp);
 }
 
 
