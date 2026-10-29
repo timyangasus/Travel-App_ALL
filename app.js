@@ -21,8 +21,6 @@ const EXPENSE_CATS = [
 /* ═══════════════════════════════════════
    DATA LAYER
 ═══════════════════════════════════════ */
-const IMGBB_API_KEY = 'cfd268943c3eb02881f5526f3ddf3431';
-
 async function compressImage(file, maxSize = 1200, quality = 0.82) {
   return new Promise(resolve => {
     const img = new Image();
@@ -47,16 +45,97 @@ async function compressImage(file, maxSize = 1200, quality = 0.82) {
   });
 }
 
-async function uploadToImgBB(file, opts) {
-  const compressed = await compressImage(file, opts?.maxSize, opts?.quality);
-  const form = new FormData();
-  form.append('image', compressed);
-  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-    method: 'POST', body: form
+/* ═══════════════════════════════════════
+   照片本機儲存（IndexedDB）— 照片只存在這支手機，不上傳任何地方
+   資料裡只存參照字串 "idb:<id>"；舊的 ImgBB 網址照常顯示。
+═══════════════════════════════════════ */
+let _photoDBPromise = null;
+function photoDB() {
+  if (_photoDBPromise) return _photoDBPromise;
+  _photoDBPromise = new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('此瀏覽器不支援本機儲存')); return; }
+    const req = indexedDB.open('travel_trace_photos', 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore('photos', { keyPath: 'id' }); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => { _photoDBPromise = null; reject(req.error); };
   });
-  const json = await res.json();
-  if (!json.success) throw new Error(json.error?.message || 'Upload failed');
-  return json.data.image?.url || json.data.display_url || json.data.url;
+  return _photoDBPromise;
+}
+function photoPut(id, blob) {
+  return photoDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction('photos', 'readwrite');
+    tx.objectStore('photos').put({ id, blob, createdAt: Date.now() });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  }));
+}
+function photoGet(id) {
+  return photoDB().then(db => new Promise((resolve, reject) => {
+    const req = db.transaction('photos', 'readonly').objectStore('photos').get(id);
+    req.onsuccess = () => resolve(req.result?.blob || null);
+    req.onerror = () => reject(req.error);
+  }));
+}
+
+/* 壓縮後存進手機，回傳要寫進資料的參照字串 "idb:<id>" */
+async function savePhoto(file, opts) {
+  const blob = await compressImage(file, opts?.maxSize ?? 2000, opts?.quality ?? 0.85);
+  const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  await photoPut(id, blob);
+  _blobCache.set(id, URL.createObjectURL(blob));
+  try { navigator.storage?.persist?.(); } catch (e) {}   // 請瀏覽器盡量不要自動清掉這些照片
+  return 'idb:' + id;
+}
+
+/* 把文字（整份行程資料或 meta）裡出現的 idb:<id> 預先從手機載入，之後畫面才能同步取用 */
+async function preloadPhotos(text) {
+  const ids = [...new Set((String(text || '').match(/idb:[A-Za-z0-9_-]+/g) || []).map(s => s.slice(4)))]
+    .filter(id => !_blobCache.has(id));
+  await Promise.all(ids.map(async id => {
+    try {
+      const blob = await photoGet(id);
+      if (blob) _blobCache.set(id, URL.createObjectURL(blob));
+    } catch (e) {}
+  }));
+}
+
+/* 目前所有行程＋meta 裡被參照到的照片 id */
+function _allPhotoRefs() {
+  let text = localStorage.getItem(META_KEY) || '';
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(TRIP_PREFIX)) text += localStorage.getItem(k) || '';
+  }
+  return new Set((text.match(/idb:[A-Za-z0-9_-]+/g) || []).map(s => s.slice(4)));
+}
+
+/* 清掉已經沒有任何行程參照、且存放超過 7 天的照片（刪除行程／換封面後留下的）。
+   7 天寬限期是為了不要誤刪「剛選好、還沒按儲存」的照片。 */
+async function gcLocalPhotos() {
+  if (!(meta.trips || []).length) return;   // 沒有行程資料時不動任何東西
+  const refs = _allPhotoRefs();
+  const cutoff = Date.now() - 7 * 86400000;
+  const db = await photoDB();
+  const stale = await new Promise((resolve, reject) => {
+    const out = [];
+    const req = db.transaction('photos', 'readonly').objectStore('photos').openCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) { resolve(out); return; }
+      if (!refs.has(c.value.id) && (c.value.createdAt || 0) < cutoff) out.push(c.value.id);
+      c.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+  for (const id of stale) {
+    await new Promise(res => {
+      const tx = db.transaction('photos', 'readwrite');
+      tx.objectStore('photos').delete(id);
+      tx.oncomplete = tx.onerror = () => res();
+    });
+    const u = _blobCache.get(id); if (u) { URL.revokeObjectURL(u); _blobCache.delete(id); }
+  }
+  if (stale.length) console.log('已清除未使用的本機照片：', stale.length);
 }
 
 function showUploadStatus(msg) {
@@ -495,9 +574,10 @@ function renderHomeTripList() {
 
   el.innerHTML = '<div class="home-trip-list-topline"></div>' + trips.map(trip => {
     const dateStr = tripDateDisplay(trip) || '';
-    const hasImg = !!trip.coverImg;
+    const coverUrl = resolvePhoto(trip.coverImg);
+    const hasImg = !!coverUrl;
     const coverBg = hasImg
-      ? `background-image:url('${esc(trip.coverImg)}');background-size:cover;background-position:center`
+      ? `background-image:url('${esc(coverUrl)}');background-size:cover;background-position:center`
       : `background:#C9A84C`;
     return `
       <div class="home-trip-row" data-id="${trip.id}">
@@ -589,8 +669,9 @@ function deleteTrip(id) {
   renderHome();
 }
 
-function openTrip(id) {
+async function openTrip(id) {
   loadTrip(id);
+  try { await preloadPhotos(JSON.stringify(data)); } catch (e) {}
   // sync currency from meta to data.settings
   const trip = meta.trips.find(t => t.id === id);
   if (trip && data.settings) {
@@ -623,13 +704,13 @@ function openTripCoverPicker(id) {
   inp.type = 'file'; inp.accept = 'image/*';
   inp.onchange = async () => {
     const file = inp.files[0]; if (!file) return;
-    showUploadStatus('上傳中...');
+    showUploadStatus('儲存中...');
     try {
-      const url = await uploadToImgBB(file);
+      const url = await savePhoto(file);
       const trip = meta.trips.find(t => t.id === id);
       if (trip) { trip.coverImg = url; saveMeta(); }
       renderHome();
-    } catch(err) { alert('上傳失敗：' + err.message); }
+    } catch(err) { alert('儲存失敗：' + err.message); }
     finally { showUploadStatus(''); }
   };
   inp.click();
@@ -1005,7 +1086,7 @@ function renderItinerary() {
 }
 
 /* ─── Custom Confirm Dialog ─── */
-function showConfirm(title, msg, onOk, onCancel) {
+function showConfirm(title, msg, onOk, onCancel, okLabel) {
   let el = document.getElementById('app-confirm');
   if (!el) {
     el = document.createElement('div');
@@ -1026,6 +1107,7 @@ function showConfirm(title, msg, onOk, onCancel) {
   el.classList.add('show');
   const ok     = document.getElementById('confirm-ok');
   const cancel = document.getElementById('confirm-cancel');
+  ok.textContent = okLabel || '刪除';
   const close  = () => el.classList.remove('show');
   ok.onclick     = () => { close(); onOk(); };
   cancel.onclick = () => { close(); onCancel && onCancel(); };
@@ -1325,7 +1407,8 @@ function inferAllDates() {
 /* resolve stored value → displayable URL */
 function resolvePhoto(val) {
   if (!val) return '';
-  return val; // ImgBB URL, persisted in data/localStorage
+  if (typeof val === 'string' && val.startsWith('idb:')) return _blobCache.get(val.slice(4)) || '';
+  return val; // 舊的 ImgBB 網址 / 內建預設圖
 }
 
 function syncTripDatesFromDays() {
@@ -1677,10 +1760,10 @@ function removeBannerPhoto(idx) {
 function replaceBannerPhoto(input, slotIdx) {
   const file = input.files[0];
   if (!file) return;
-  showUploadStatus('上傳中...');
-  uploadToImgBB(file)
+  showUploadStatus('儲存中...');
+  savePhoto(file)
     .then(url => { data.days[currentDay].banner.photos[slotIdx] = url; save(); renderPhotoGrid(); })
-    .catch(err => alert('上傳失敗：' + err.message))
+    .catch(err => alert('儲存失敗：' + err.message))
     .finally(() => showUploadStatus(''));
 }
 
@@ -1693,15 +1776,15 @@ function handleGridUpload(input) {
   const toUpload = files.slice(0, remaining);
   (async () => {
     for (const file of toUpload) {
-      showUploadStatus('上傳中...');
+      showUploadStatus('儲存中...');
       try {
-        const url = await uploadToImgBB(file);
+        const url = await savePhoto(file);
         const ps = data.days[currentDay].banner.photos;
         const emptyIdx = ps.findIndex(p => !p);
         if (emptyIdx !== -1) ps[emptyIdx] = url;
         else ps.push(url);
         save(); renderPhotoGrid();
-      } catch(err) { alert('上傳失敗：' + err.message); }
+      } catch(err) { alert('儲存失敗：' + err.message); }
       finally { showUploadStatus(''); }
     }
   })();
@@ -2054,14 +2137,14 @@ async function addPhotoFromPicker(input) {
   if (!data.photos) data.photos = [];
   const dayKey = _photoDayIdx + 1;
   for (const file of files) {
-    showUploadStatus('上傳中...');
+    showUploadStatus('儲存中...');
     try {
-      const url = await uploadToImgBB(file);
+      const url = await savePhoto(file);
       data.photos.push({ id: Date.now() + Math.random(), url, day: dayKey });
       save();
       renderPhotoPage();
     } catch(err) {
-      alert('上傳失敗：' + err.message);
+      alert('儲存失敗：' + err.message);
     } finally {
       showUploadStatus('');
     }
@@ -2145,6 +2228,7 @@ function _mapSizeViewer(cb) {
 }
 
 function _mapShow(url) {
+  url = resolvePhoto(url);
   const img    = document.getElementById('map-img');
   const viewer = document.getElementById('map-viewer');
   if (!img || !url) return;
@@ -2233,10 +2317,10 @@ function mapAddNew() {
     if (!file) return;
     // Ask for name
     const name = prompt('地圖名稱', file.name.replace(/\.[^.]+$/, '') || '地圖') || '地圖';
-    showUploadStatus('上傳中…');
+    showUploadStatus('儲存中…');
     try {
       // 地圖圖片文字較小較密，用比一般照片更高的解析度與畫質上傳，避免文字糊掉
-      const url = await uploadToImgBB(file, { maxSize: 4000, quality: 0.95 });
+      const url = await savePhoto(file, { maxSize: 4000, quality: 0.95 });
       _mapList().push({ id: Date.now(), name, url });
       _mapIdx = _mapList().length - 1;
       save();
@@ -2244,7 +2328,7 @@ function mapAddNew() {
       renderMapSub();
     } catch(e) {
       showUploadStatus('');
-      showToast('上傳失敗');
+      showToast('儲存失敗');
     }
   };
   input.click();
@@ -2574,9 +2658,9 @@ function saveShopSheet() {
 async function handleShopPhotoSheet(input) {
   const file = input.files[0];
   if (!file) return;
-  showUploadStatus('上傳中...');
+  showUploadStatus('儲存中...');
   try {
-    const url = await uploadToImgBB(file);
+    const url = await savePhoto(file);
     if (_shopEditIdx !== null && data.shopping[_shopEditIdx]) {
       data.shopping[_shopEditIdx].photo = url;
       save();
@@ -2587,7 +2671,7 @@ async function handleShopPhotoSheet(input) {
       photoEl.classList.add('has-photo');
     }
   } catch(err) {
-    alert('上傳失敗：' + err.message);
+    alert('儲存失敗：' + err.message);
   } finally {
     showUploadStatus('');
   }
@@ -2665,7 +2749,7 @@ function noteBodyToHtml(text, noteId) {
       }
     } else {
       const idx = imgIdx++;
-      html += `<img src="${segments[i]}" style="max-width:100%;border-radius:0;display:block;margin:8px 0;cursor:pointer" onclick="event.stopPropagation();openNoteImageAt(${noteId}, ${idx})">`;
+      html += `<img src="${resolvePhoto(segments[i])}" style="max-width:100%;border-radius:0;display:block;margin:8px 0;cursor:pointer" onclick="event.stopPropagation();openNoteImageAt(${noteId}, ${idx})">`;
     }
   }
   return html;
@@ -2677,7 +2761,7 @@ function _noteImageUrls(n) {
   if (n?.images?.length && !body.includes('[[IMG:')) {
     body += n.images.map(u => '\n[[IMG:' + u + ']]').join('');
   }
-  return [...body.matchAll(/\[\[IMG:([^\]]+)\]\]/g)].map(m => m[1]);
+  return [...body.matchAll(/\[\[IMG:([^\]]+)\]\]/g)].map(m => resolvePhoto(m[1]));
 }
 
 function openNoteImageAt(noteId, index) {
@@ -2998,7 +3082,7 @@ function renderNotes() {
       fullBody += n.images.map(u => '\n[[IMG:' + u + ']]').join('');
     }
     // Extract every image for the thumbnail row (not just the first one)
-    const imgUrls = [...fullBody.matchAll(/\[\[IMG:([^\]]+)\]\]/g)].map(m => m[1]);
+    const imgUrls = [...fullBody.matchAll(/\[\[IMG:([^\]]+)\]\]/g)].map(m => resolvePhoto(m[1]));
     // Body without [[IMG:]] for text-only clamp display
     const textOnly = fullBody.replace(/\n?\[\[IMG:[^\]]+\]\]\n?/g, '').trim();
     const bodyHtml = fullBody ? noteBodyToHtml(fullBody, n.id) : '';
@@ -3131,9 +3215,9 @@ function noteInsertImage() {
   input.onchange = async () => {
     const file = input.files[0];
     if (!file) return;
-    showUploadStatus('上傳圖片中…');
+    showUploadStatus('儲存圖片中…');
     try {
-      const url = await uploadToImgBB(file);
+      const url = await savePhoto(file);
       showUploadStatus('');
       const ta = document.getElementById('note-sheet-content');
       const start = ta.selectionStart;
@@ -3144,7 +3228,7 @@ function noteInsertImage() {
       _renderNoteImgPreview();
     } catch(e) {
       showUploadStatus('');
-      showToast('上傳失敗，請再試一次');
+      showToast('儲存失敗，請再試一次');
     }
   };
   input.click();
@@ -3158,7 +3242,7 @@ function _renderNoteImgPreview() {
   if (!matches.length) { wrap.innerHTML = ''; return; }
   wrap.innerHTML = matches.map((m, i) =>
     `<div style="position:relative;display:inline-block">
-      <img src="${m[1]}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;display:block">
+      <img src="${resolvePhoto(m[1])}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;display:block">
       <button onclick="_removeNoteImg(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#1A1A1A;border:none;color:#fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">×</button>
     </div>`
   ).join('');
@@ -3619,8 +3703,8 @@ function renderHotelCards() {
   el.innerHTML = sorted.map(h => {
     const nights = h.nights || 0;
     const priceDisplay = h.price ? `${sym} ${parseInt(h.price).toLocaleString()}` : '';
-    const coverBg = h.img
-      ? `background-image:url('${h.img}');background-size:cover;background-position:center`
+    const coverBg = resolvePhoto(h.img)
+      ? `background-image:url('${esc(resolvePhoto(h.img))}');background-size:cover;background-position:center`
       : 'background:#F0F0F0';
     return `
     <div class="hotel-card2" onclick="openHotelSheet(${h.id})">
@@ -3649,12 +3733,12 @@ function hotelPickCover(id) {
   inp.type = 'file'; inp.accept = 'image/*';
   inp.onchange = async () => {
     const file = inp.files[0]; if (!file) return;
-    showUploadStatus('上傳中...');
+    showUploadStatus('儲存中...');
     try {
-      const url = await uploadToImgBB(file);
+      const url = await savePhoto(file);
       const h = data.hotels.find(h => h.id === id);
       if (h) { h.img = url; save(); renderHotelCards(); }
-    } catch(e) { showToast('上傳失敗'); }
+    } catch(e) { showToast('儲存失敗'); }
     finally { showUploadStatus(''); }
   };
   inp.click();
@@ -3721,6 +3805,7 @@ const CURRENCIES = [
 
 function renderSettings() {
   if (!data) return;
+  updateBackupHint();
   const s = data.settings;
   const nameEl = document.getElementById('set-trip-name');
   if (nameEl) nameEl.value = s.tripName || '';
@@ -5102,31 +5187,231 @@ function getCurrencySymbol() {
   return c ? c.symbol : 'NT$';
 }
 
-function exportJSON() {
-  // Pack meta + all trip data into one export
-  const allTrips = {};
-  (meta.trips || []).forEach(trip => {
-    try {
-      const raw = localStorage.getItem(TRIP_PREFIX + trip.id);
-      if (raw) allTrips[trip.id] = JSON.parse(raw);
-    } catch(e) {}
-  });
+/* ═══════════════════════════════════════
+   備份與還原：一個 .zip ＝ data.json（所有行程資料）＋ photos/<id>.<副檔名>（本機照片）
+   照片本身已壓縮過，zip 內直接「不壓縮」存放，所以自己打包就好，不用外部套件、離線也能用。
+   舊的 .json 備份檔仍然可以匯入。
+═══════════════════════════════════════ */
+const BACKUP_LAST_KEY = 'travel_last_backup';
+const BK_CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t;
+})();
+function bkCrc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = BK_CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+// files: [{ name, data: Uint8Array }] → zip Blob（store、不壓縮）
+function bkZip(files) {
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), crc = bkCrc32(f.data), size = f.data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+    lh.setUint32(14, crc, true); lh.setUint32(18, size, true); lh.setUint32(22, size, true);
+    lh.setUint16(26, name.length, true);
+    parts.push(lh.buffer, name, f.data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+    ch.setUint32(16, crc, true); ch.setUint32(20, size, true); ch.setUint32(24, size, true);
+    ch.setUint16(28, name.length, true); ch.setUint32(42, offset, true);
+    central.push(ch.buffer, name);
+    offset += 30 + name.length + size;
+  }
+  const cdSize = central.reduce((n, p) => n + p.byteLength, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
+}
+// zip ArrayBuffer → { name: Uint8Array }。支援不壓縮和 deflate（被別的工具重新打包過也讀得到）
+async function bkUnzip(buf) {
+  const v = new DataView(buf), u8 = new Uint8Array(buf), dec = new TextDecoder();
+  let eocd = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) {
+    if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('不是有效的備份檔');
+  const count = v.getUint16(eocd + 10, true);
+  let p = v.getUint32(eocd + 16, true);
+  const out = {};
+  for (let i = 0; i < count; i++) {
+    if (v.getUint32(p, true) !== 0x02014b50) throw new Error('備份檔已損毀');
+    const method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+    const nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+    const lho = v.getUint32(p + 42, true);
+    const name = dec.decode(u8.subarray(p + 46, p + 46 + nlen));
+    p += 46 + nlen + xlen + clen;
+    if (name.endsWith('/')) continue;
+    const start = lho + 30 + v.getUint16(lho + 26, true) + v.getUint16(lho + 28, true);
+    const raw = u8.subarray(start, start + csize);
+    if (method === 0) out[name] = raw;
+    else if (method === 8) out[name] = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+    else throw new Error('不支援的壓縮格式');
+  }
+  return out;
+}
 
-  const exportData = {
-    _version: 2,
-    meta: meta,
-    trips: allTrips,
-    // Also include current trip data for backwards compat
-    currentTripId: currentTripId,
-  };
+const _EXT_BY_MIME = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/heic': 'heic', 'image/heif': 'heif' };
+const _MIME_BY_EXT = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', heic: 'image/heic', heif: 'image/heif' };
 
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `travel-trace-${Date.now()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+function updateBackupHint() {
+  const el = document.getElementById('last-backup-hint');
+  if (!el) return;
+  const t = Number(localStorage.getItem(BACKUP_LAST_KEY));
+  if (!t) { el.textContent = '尚未備份'; return; }
+  const d = new Date(t);
+  el.textContent = `上次 ${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+let _backupBusy = false;
+async function exportBackup() {
+  if (_backupBusy) return;
+  _backupBusy = true;
+  try {
+    showToast('打包中…');
+    const allTrips = {};
+    (meta.trips || []).forEach(trip => {
+      try {
+        const raw = localStorage.getItem(TRIP_PREFIX + trip.id);
+        if (raw) allTrips[trip.id] = JSON.parse(raw);
+      } catch (e) {}
+    });
+    const json = JSON.stringify({ _version: 2, meta: meta, trips: allTrips, currentTripId: currentTripId }, null, 2);
+    const files = [{ name: 'data.json', data: new TextEncoder().encode(json) }];
+    const ids = [...new Set((json.match(/idb:[A-Za-z0-9_-]+/g) || []).map(s => s.slice(4)))];
+    let missing = 0;
+    for (const id of ids) {
+      const blob = await photoGet(id).catch(() => null);
+      if (!blob) { missing++; continue; }
+      files.push({ name: `photos/${id}.${_EXT_BY_MIME[blob.type] || 'bin'}`, data: new Uint8Array(await blob.arrayBuffer()) });
+    }
+    // 檔名固定不帶日期：存到「檔案」時直接覆蓋舊的，永遠只留最新一份；想留多份再自己改名
+    const fileName = '旅遊誌備份.zip';
+    const zip = bkZip(files);
+    const file = new File([zip], fileName, { type: 'application/zip' });
+    const done = () => {
+      localStorage.setItem(BACKUP_LAST_KEY, String(Date.now()));
+      updateBackupHint();
+      showToast(missing ? `已匯出備份（有 ${missing} 張照片在手機上找不到）` : `已匯出備份（${ids.length - missing} 張照片）`);
+    };
+    const download = () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(zip); a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      done();
+    };
+    // iPhone 上用系統分享選單，才能「儲存到檔案」/ AirDrop；不支援分享檔案的瀏覽器就直接下載
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: fileName });
+        done();
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+        if (e.name === 'NotAllowedError') {
+          // 打包太久，系統認為已經不是「剛按下去」的操作，需要再點一次才能開啟分享選單
+          showConfirm('備份已打包完成', '再按一次「儲存」即可選擇存放位置。',
+            async () => {
+              try { await navigator.share({ files: [file], title: fileName }); done(); }
+              catch (e2) { if (e2.name !== 'AbortError') showToast('匯出失敗：' + e2.message); }
+            }, null, '儲存');
+          return;
+        }
+        throw e;
+      }
+    } else {
+      download();
+    }
+  } catch (e) {
+    console.log('匯出失敗', e);
+    showToast('匯出失敗：' + e.message);
+  } finally {
+    _backupBusy = false;
+  }
+}
+
+async function importBackup(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  let imported, photos = {};
+  try {
+    const buf = await file.arrayBuffer();
+    const u8 = new Uint8Array(buf);
+    if (u8[0] === 0x50 && u8[1] === 0x4B) {            // "PK" ＝ zip
+      const entries = await bkUnzip(buf);
+      if (!entries['data.json']) throw new Error('不是有效的備份檔');
+      imported = JSON.parse(new TextDecoder().decode(entries['data.json']));
+      for (const [name, bytes] of Object.entries(entries)) {
+        const m = name.match(/^photos\/([A-Za-z0-9_-]+)\.([A-Za-z0-9]+)$/);
+        if (m) photos[m[1]] = new Blob([bytes], { type: _MIME_BY_EXT[m[2].toLowerCase()] || 'application/octet-stream' });
+      }
+    } else {
+      imported = JSON.parse(new TextDecoder().decode(buf));   // 舊的 .json 備份
+    }
+  } catch (err) {
+    console.log('讀取備份失敗', err);
+    showToast('檔案格式錯誤');
+    return;
+  }
+
+  // v2 format: has meta + trips
+  if (imported._version === 2 && imported.meta) {
+    const photoCount = Object.keys(photos).length;
+    showConfirm('匯入資料', `將匯入 ${(imported.meta.trips||[]).length} 筆行程${photoCount ? `、${photoCount} 張照片` : ''}，現有資料將被覆蓋，確定繼續？`, async () => {
+      try {
+        showToast('匯入中…');
+        // 先把照片寫進手機，再換資料，中途失敗也不會變成「資料指向不存在的照片」
+        for (const [id, blob] of Object.entries(photos)) await photoPut(id, blob);
+        meta = imported.meta;
+        if (!meta.trips) meta.trips = [];
+        saveMeta();
+        Object.entries(imported.trips || {}).forEach(([id, tripData]) => {
+          localStorage.setItem(TRIP_PREFIX + id, JSON.stringify(tripData));
+        });
+        const firstId = imported.currentTripId || meta.trips[0]?.id;
+        if (firstId) loadTrip(firstId);
+        await preloadPhotos(JSON.stringify(meta) + JSON.stringify(data || {}));
+        if (firstId) {
+          renderItinerary();
+          renderExpense();
+          renderSettings();
+        }
+        switchTab('home');
+        showToast('匯入成功');
+      } catch (err) {
+        console.log('匯入失敗', err);
+        showToast('匯入失敗：' + err.message);
+      }
+    }, null, '覆蓋匯入');
+    return;
+  }
+
+  // v1 legacy format: single trip (has days)
+  if (imported.days) {
+    showConfirm('匯入資料', '現有資料將被覆蓋，確定繼續？', () => {
+      data = imported;
+      if (!data.settings) data.settings = { tripName: '', budget: 0, currency: 'TWD', theme: 'light' };
+      data.days.forEach(d => {
+        if (!d.banner) d.banner = { date: '', subtitle: '', photos: [] };
+        if (!d.banner.photos) d.banner.photos = [];
+        d.banner.photos = d.banner.photos.filter(p => p && !p.startsWith('blob-key:'));
+      });
+      save();
+      renderItinerary();
+      renderExpense();
+      renderSettings();
+      showToast('匯入成功');
+    }, null, '覆蓋匯入');
+    return;
+  }
+
+  showToast('檔案格式錯誤');
 }
 
 function exportItinerary() {
@@ -5198,68 +5483,6 @@ function _fallbackCopy(el, text) {
   }
 }
 
-function importJSON(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const imported = JSON.parse(e.target.result);
-
-      // v2 format: has meta + trips
-      if (imported._version === 2 && imported.meta) {
-        showConfirm('匯入資料', `將匯入 ${(imported.meta.trips||[]).length} 筆行程，現有資料將被覆蓋，確定繼續？`, () => {
-          // Restore meta
-          meta = imported.meta;
-          if (!meta.trips) meta.trips = [];
-          saveMeta();
-
-          // Restore each trip
-          Object.entries(imported.trips || {}).forEach(([id, tripData]) => {
-            localStorage.setItem(TRIP_PREFIX + id, JSON.stringify(tripData));
-          });
-
-          // Load first trip or last active
-          const firstId = imported.currentTripId || meta.trips[0]?.id;
-          if (firstId) {
-            loadTrip(firstId);
-            renderItinerary();
-            renderExpense();
-            renderSettings();
-          }
-          switchTab('home');
-          showToast('匯入成功');
-        });
-        return;
-      }
-
-      // v1 legacy format: single trip (has days)
-      if (imported.days) {
-        showConfirm('匯入資料', '現有資料將被覆蓋，確定繼續？', () => {
-          data = imported;
-          if (!data.settings) data.settings = { tripName: '', budget: 0, currency: 'TWD', theme: 'light' };
-          data.days.forEach(d => {
-            if (!d.banner) d.banner = { date: '', subtitle: '', photos: [] };
-            if (!d.banner.photos) d.banner.photos = [];
-            d.banner.photos = d.banner.photos.filter(p => p && !p.startsWith('blob-key:'));
-          });
-          save();
-          renderItinerary();
-          renderExpense();
-          renderSettings();
-          showToast('匯入成功');
-        });
-        return;
-      }
-
-      showToast('檔案格式錯誤');
-    } catch(err) {
-      showToast('檔案格式錯誤');
-    }
-  };
-  reader.readAsText(file);
-  input.value = '';
-}
 
 function clearAllData() {
   showConfirm('清除此行程資料', '此行程所有行程、帳單、資訊將永久刪除。', () => {
@@ -5564,6 +5787,11 @@ applyTheme('light');
 
 // Start on Home screen
 switchTab('home');
+// 本機封面照片載入後再重畫首頁；稍後順手清掉沒在使用的舊照片
+preloadPhotos(JSON.stringify(meta)).then(() => {
+  if (document.getElementById('screen-home')?.classList.contains('active')) renderHome();
+}).catch(() => {});
+setTimeout(() => { gcLocalPhotos().catch(() => {}); }, 15000);
 
 
 

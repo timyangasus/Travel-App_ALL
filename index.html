@@ -594,14 +594,14 @@
       <!-- 第三區塊 -->
       <div class="set-section-label">設定</div>
       <div class="set-section">
-        <div class="set-action" onclick="exportJSON()">
-          <span class="set-action-title">匯出JASON</span>
+        <div class="set-action" onclick="exportBackup()">
+          <span class="set-action-title">匯出備份<span id="last-backup-hint" style="font-size:12px;font-weight:400;color:#AAAAAA;margin-left:10px"></span></span>
           <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px"><path fill="#1A1A1A" d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></svg>
         </div>
         <div class="set-action" onclick="document.getElementById('import-json-input').click()">
-          <span class="set-action-title">匯入JASON</span>
+          <span class="set-action-title">匯入備份</span>
           <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px"><path fill="#1A1A1A" d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></svg>
-          <input type="file" id="import-json-input" accept=".json" style="display:none" onchange="importJSON(this)">
+          <input type="file" id="import-json-input" accept=".zip,.json,application/zip,application/json" style="display:none" onchange="importBackup(this)">
         </div>
         <div class="set-action" onclick="exportItinerary()">
           <span class="set-action-title">匯出行程文字</span>
