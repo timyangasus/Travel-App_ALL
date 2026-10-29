@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.8';
+const APP_VERSION = '2026.10.29.9';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -95,12 +95,14 @@ function photoGet(id) {
 }
 
 // 每張照片壓到大約這個大小以內（地圖文字小又密，給寬鬆一點）
+const PHOTO_MAX_DIM = 1500;
+const PHOTO_QUALITY = 0.7;
 const PHOTO_TARGET_BYTES = 500 * 1024;
 const MAP_TARGET_BYTES = 1500 * 1024;
 
 /* 壓縮後存進手機，回傳要寫進資料的參照字串 "idb:<id>" */
 async function savePhoto(file, opts) {
-  const blob = await compressImage(file, opts?.maxSize ?? 2000, opts?.quality ?? 0.85, opts?.targetBytes ?? PHOTO_TARGET_BYTES);
+  const blob = await compressImage(file, opts?.maxSize ?? PHOTO_MAX_DIM, opts?.quality ?? PHOTO_QUALITY, opts?.targetBytes ?? PHOTO_TARGET_BYTES);
   const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   await photoPut(id, blob);
   _blobCache.set(id, URL.createObjectURL(blob));
@@ -1230,7 +1232,7 @@ let _compressingPhotos = false;
 function compressStoredPhotos() {
   if (_compressingPhotos || _migratingPhotos) return;
   showConfirm('壓縮手機裡的照片？',
-    `把超過 ${PHOTO_TARGET_BYTES / 1024} KB 的照片重新壓縮（長邊最多 2000px，地圖放寬到 ${MAP_TARGET_BYTES / 1024} KB / 4000px 以保持文字清楚）。壓縮後無法還原成原圖，建議先匯出一次備份。壓縮期間請保持螢幕亮著。`,
+    `把超過 ${PHOTO_TARGET_BYTES / 1024} KB 的照片重新壓縮（長邊最多 ${PHOTO_MAX_DIM}px，地圖放寬到 ${MAP_TARGET_BYTES / 1024} KB / 4000px 以保持文字清楚）。壓縮後無法還原成原圖，建議先匯出一次備份。壓縮期間請保持螢幕亮著。`,
     async () => {
       _compressingPhotos = true;
       let wake = null;
@@ -1250,7 +1252,7 @@ function compressStoredPhotos() {
             const blob = await photoGet(s.id);
             if (!blob) continue;
             const isMap = mapRefs.has('idb:' + s.id);
-            const out = await compressImage(blob, isMap ? 4000 : 2000, isMap ? 0.95 : 0.85, isMap ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
+            const out = await compressImage(blob, isMap ? 4000 : PHOTO_MAX_DIM, isMap ? 0.95 : PHOTO_QUALITY, isMap ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
             if (out !== blob && out.size < blob.size * 0.9) {
               await photoPut(s.id, out);
               saved += blob.size - out.size; shrunk++;
@@ -1339,7 +1341,7 @@ function migrateLegacyPhotos() {
               try {
                 let blob = await _fetchLegacyPhoto(url);
                 const isMap = mapUrls.has(url);
-                blob = await compressImage(blob, isMap ? 4000 : 2000, isMap ? 0.95 : 0.85, isMap ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
+                blob = await compressImage(blob, isMap ? 4000 : PHOTO_MAX_DIM, isMap ? 0.95 : PHOTO_QUALITY, isMap ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
                 const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
                 await photoPut(id, blob);
                 batch[url] = 'idb:' + id;
