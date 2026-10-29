@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.14';
+const APP_VERSION = '2026.10.29.15';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -2435,11 +2435,11 @@ function initPhotoSwipe() {
     } else {
       _photoDayIdx = (_photoDayIdx - 1 + total) % total;
     }
-    renderPhotoPage();
+    renderPhotoPage(true);
   }, { passive: true });
 }
 
-function renderPhotoPage() {
+function renderPhotoPage(resetScroll) {
   if (!data.photos) data.photos = [];
   const days = data.days || [];
   if (!days.length) return;
@@ -2473,11 +2473,19 @@ function renderPhotoPage() {
 
   const grid = document.getElementById('photo-page-grid');
   if (!grid) return;
+  if (resetScroll) grid.scrollTop = 0;   // 換天時回到最上面，不要停在上一天捲到的位置
   if (!photos.length) { grid.innerHTML = ''; return; }
+  // 還沒載入快取的照片（空網址）會變成整片空白：先從手機載入再重畫一次
+  if (photos.some(p => !resolvePhoto(p.url))) {
+    const dayAtStart = _photoDayIdx;
+    preloadPhotos(JSON.stringify(photos)).then(() => {
+      if (_photoDayIdx === dayAtStart && photos.every(p => resolvePhoto(p.url))) renderPhotoPage();
+    });
+  }
   grid.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;width:100%;padding-bottom:12px">${
     photos.map((p, i) => `
     <div style="position:relative;width:100%;overflow:hidden;background:#F0F0F0">
-      <img src="${resolvePhoto(p.url)}" style="width:100%;height:auto;display:block;cursor:pointer" onclick="openPhotoLightbox(${i})" loading="lazy">
+      <img src="${resolvePhoto(p.url)}" style="width:100%;height:auto;min-height:240px;display:block;cursor:pointer" onclick="openPhotoLightbox(${i})" onload="this.style.minHeight='0'" onerror="if(!this.dataset.retry){this.dataset.retry=1;var s=this.src;this.src='';this.src=s}">
       <button onclick="deletePhoto(${p.id})" style="position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.5);color:#fff;border:none;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;line-height:1">×</button>
     </div>`).join('')
   }</div>`;
@@ -2485,7 +2493,7 @@ function renderPhotoPage() {
 
 function selectPhotoDay(idx) {
   _photoDayIdx = idx;
-  renderPhotoPage();
+  renderPhotoPage(true);
 }
 
 async function addPhotoFromPicker(input) {
