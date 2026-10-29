@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.13';
+const APP_VERSION = '2026.10.29.14';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -5767,7 +5767,18 @@ async function importBackup(input) {
   // v2 format: has meta + trips
   if (imported._version === 2 && imported.meta) {
     const photoCount = Object.keys(photos).length;
-    showConfirm('匯入資料', `將匯入 ${(imported.meta.trips||[]).length} 筆行程${photoCount ? `、${photoCount} 張照片` : ''}，現有資料將被覆蓋，確定繼續？`, async () => {
+    // 覆蓋之前先核對：資料裡用到的照片，備份檔或手機上有沒有；對不上就先講清楚，不要蓋掉才發現
+    const refIds = [...new Set((JSON.stringify(imported).match(/idb:[A-Za-z0-9_-]+/g) || []).map(s => s.slice(4)))];
+    const lacking = [];
+    for (const id of refIds) {
+      if (photos[id]) continue;
+      if (!(await photoGet(id).catch(() => null))) lacking.push(id);
+    }
+    const warn = lacking.length
+      ? `\n\n⚠️ 資料裡用到 ${refIds.length} 張照片，但備份檔裡有 ${photoCount} 張，其中 ${lacking.length} 張在備份檔和這支手機上都找不到，匯入後這些會顯示不出來。如果手上有更完整的備份，建議改用那一份。`
+      : '';
+    console.log('匯入核對', { 資料用到: refIds.length, 備份檔照片: photoCount, 找不到: lacking });
+    showConfirm('匯入資料', `將匯入 ${(imported.meta.trips||[]).length} 筆行程${photoCount ? `、${photoCount} 張照片` : ''}，現有資料將被覆蓋，確定繼續？` + warn, async () => {
       try {
         showToast('匯入中…');
         // 先把照片寫進手機，再換資料，中途失敗也不會變成「資料指向不存在的照片」
