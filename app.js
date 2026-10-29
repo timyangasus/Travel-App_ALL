@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.6';
+const APP_VERSION = '2026.10.29.7';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -24,24 +24,38 @@ const EXPENSE_CATS = [
 /* ═══════════════════════════════════════
    DATA LAYER
 ═══════════════════════════════════════ */
-async function compressImage(file, maxSize = 1200, quality = 0.82) {
+async function compressImage(file, maxSize = 1200, quality = 0.82, targetBytes = 0) {
   return new Promise(resolve => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-    img.onload = () => {
+    img.onload = async () => {
       URL.revokeObjectURL(url);
       let w = img.naturalWidth, h = img.naturalHeight;
-      if (w <= maxSize && h <= maxSize) {
-        // 已經在尺寸限制內，直接用原檔上傳，避免無謂的 JPEG 重新編碼把文字壓糊
-        resolve(file);
-        return;
+      const fits = w <= maxSize && h <= maxSize;
+      // 尺寸沒超過、檔案也夠小就直接用原檔，避免無謂的 JPEG 重新編碼把文字壓糊
+      if (fits && (!targetBytes || file.size <= targetBytes)) { resolve(file); return; }
+      if (!fits) {
+        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else       { w = Math.round(w * maxSize / h); h = maxSize; }
       }
-      if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
-      else       { w = Math.round(w * maxSize / h); h = maxSize; }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', quality);
+      const encode = (cw, ch, q) => new Promise(res => {
+        const canvas = document.createElement('canvas');
+        canvas.width = cw; canvas.height = ch;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch);   // 透明背景的 PNG 轉 JPEG 時不要變黑
+        ctx.drawImage(img, 0, 0, cw, ch);
+        canvas.toBlob(res, 'image/jpeg', q);
+      });
+      let q = quality, best = await encode(w, h, q);
+      if (best && targetBytes) {
+        // 還是太大：先降畫質（最低 0.6），再不行就縮小尺寸（最小邊長 1200）
+        while (best && best.size > targetBytes && q > 0.6) { q = Math.max(0.6, q - 0.1); best = await encode(w, h, q); }
+        for (let i = 0; best && best.size > targetBytes && Math.max(w, h) > 1200 && i < 4; i++) {
+          w = Math.round(w * 0.85); h = Math.round(h * 0.85); best = await encode(w, h, q);
+        }
+      }
+      if (!best || (fits && best.size >= file.size)) { resolve(file); return; }
+      resolve(best);
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
     img.src = url;
@@ -80,9 +94,13 @@ function photoGet(id) {
   }));
 }
 
+// 每張照片壓到大約這個大小以內（地圖文字小又密，給寬鬆一點）
+const PHOTO_TARGET_BYTES = 500 * 1024;
+const MAP_TARGET_BYTES = 1500 * 1024;
+
 /* 壓縮後存進手機，回傳要寫進資料的參照字串 "idb:<id>" */
 async function savePhoto(file, opts) {
-  const blob = await compressImage(file, opts?.maxSize ?? 2000, opts?.quality ?? 0.85);
+  const blob = await compressImage(file, opts?.maxSize ?? 2000, opts?.quality ?? 0.85, opts?.targetBytes ?? PHOTO_TARGET_BYTES);
   const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   await photoPut(id, blob);
   _blobCache.set(id, URL.createObjectURL(blob));
@@ -1170,6 +1188,94 @@ function updateLegacyPhotoRow() {
   if (hint) hint.textContent = n ? `${n} 張` : '';
 }
 
+/* 所有行程裡「地圖」用到的照片（網址或 idb:<id>） */
+function _mapPhotoRefs() {
+  const set = new Set();
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(TRIP_PREFIX)) continue;
+    try { (JSON.parse(localStorage.getItem(k)).maps || []).forEach(m => m && m.url && set.add(m.url)); } catch (e) {}
+  }
+  return set;
+}
+
+function _fmtMB(bytes) { return (bytes / 1048576).toFixed(bytes >= 10485760 ? 0 : 1) + ' MB'; }
+
+/* 手機上所有照片的 { id, size, type }，只讀大小不載入內容 */
+async function _photoStats() {
+  const db = await photoDB();
+  return new Promise((resolve, reject) => {
+    const out = [];
+    const req = db.transaction('photos', 'readonly').objectStore('photos').openCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) { resolve(out); return; }
+      out.push({ id: c.value.id, size: c.value.blob?.size || 0, type: c.value.blob?.type || '' });
+      c.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function updatePhotoSizeHint() {
+  const hint = document.getElementById('compress-photo-hint');
+  if (!hint) return;
+  try {
+    const st = await _photoStats();
+    hint.textContent = st.length ? `${st.length} 張 · ${_fmtMB(st.reduce((a, b) => a + b.size, 0))}` : '';
+  } catch (e) { hint.textContent = ''; }
+}
+
+let _compressingPhotos = false;
+function compressStoredPhotos() {
+  if (_compressingPhotos || _migratingPhotos) return;
+  showConfirm('壓縮手機裡的照片？',
+    `把超過 ${PHOTO_TARGET_BYTES / 1024} KB 的照片重新壓縮（長邊最多 2000px，地圖放寬到 ${MAP_TARGET_BYTES / 1024} KB / 4000px 以保持文字清楚）。壓縮後無法還原成原圖，建議先匯出一次備份。壓縮期間請保持螢幕亮著。`,
+    async () => {
+      _compressingPhotos = true;
+      let wake = null;
+      try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
+      try {
+        const mapRefs = _mapPhotoRefs();
+        const stats = await _photoStats();
+        const before = stats.reduce((a, b) => a + b.size, 0);
+        const todo = stats.filter(s => {
+          if (/gif|svg/.test(s.type)) return false;
+          return s.size > (mapRefs.has('idb:' + s.id) ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
+        });
+        let n = 0, saved = 0, shrunk = 0;
+        for (const s of todo) {
+          showUploadStatus(`壓縮照片 ${++n}/${todo.length}…`);
+          try {
+            const blob = await photoGet(s.id);
+            if (!blob) continue;
+            const isMap = mapRefs.has('idb:' + s.id);
+            const out = await compressImage(blob, isMap ? 4000 : 2000, isMap ? 0.95 : 0.85, isMap ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
+            if (out !== blob && out.size < blob.size * 0.9) {
+              await photoPut(s.id, out);
+              saved += blob.size - out.size; shrunk++;
+              const old = _blobCache.get(s.id);
+              _blobCache.set(s.id, URL.createObjectURL(out));
+              if (old) URL.revokeObjectURL(old);
+            }
+          } catch (e) { console.log('壓縮失敗', s.id, e); }
+        }
+        showUploadStatus('');
+        if (typeof renderItinerary === 'function' && currentTripId) { try { renderItinerary(); renderExpense(); renderSettings(); } catch (e) {} }
+        showConfirm('壓縮完成',
+          shrunk ? `壓縮了 ${shrunk} 張，照片總量 ${_fmtMB(before)} → ${_fmtMB(before - saved)}。\n建議現在重新匯出一次備份。` : '沒有需要壓縮的照片。',
+          () => {}, null, '知道了');
+        updatePhotoSizeHint();
+      } catch (e) {
+        showUploadStatus('');
+        showToast('壓縮失敗：' + e.message);
+      } finally {
+        try { wake?.release(); } catch (e) {}
+        _compressingPhotos = false;
+      }
+    }, null, '開始壓縮');
+}
+
 let _migratingPhotos = false;
 
 // 把 { 舊網址: 'idb:id' } 寫回資料；較長的網址先換，避免網址互為前綴時被截斷
@@ -1216,6 +1322,7 @@ function migrateLegacyPhotos() {
       let wake = null;
       try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
       const total = urls.length;
+      const mapUrls = _mapPhotoRefs();
       let ok = 0, dead = 0;
       let pending = urls;
       let lastErr = '';
@@ -1230,7 +1337,9 @@ function migrateLegacyPhotos() {
             while (queue.length) {
               const url = queue.shift();
               try {
-                const blob = await _fetchLegacyPhoto(url);
+                let blob = await _fetchLegacyPhoto(url);
+                const isMap = mapUrls.has(url);
+                blob = await compressImage(blob, isMap ? 4000 : 2000, isMap ? 0.95 : 0.85, isMap ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
                 const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
                 await photoPut(id, blob);
                 batch[url] = 'idb:' + id;
@@ -2465,7 +2574,7 @@ function mapAddNew() {
     showUploadStatus('儲存中…');
     try {
       // 地圖圖片文字較小較密，用比一般照片更高的解析度與畫質上傳，避免文字糊掉
-      const url = await savePhoto(file, { maxSize: 4000, quality: 0.95 });
+      const url = await savePhoto(file, { maxSize: 4000, quality: 0.95, targetBytes: MAP_TARGET_BYTES });
       _mapList().push({ id: Date.now(), name, url });
       _mapIdx = _mapList().length - 1;
       save();
@@ -3952,6 +4061,7 @@ function renderSettings() {
   if (!data) return;
   updateBackupHint();
   updateLegacyPhotoRow();
+  updatePhotoSizeHint();
   const verEl = document.getElementById('app-version');
   if (verEl) verEl.textContent = 'v' + APP_VERSION;
   const s = data.settings;
