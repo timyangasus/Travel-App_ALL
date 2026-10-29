@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.10';
+const APP_VERSION = '2026.10.29.11';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -1219,63 +1219,56 @@ async function _photoStats() {
   });
 }
 
-async function updatePhotoSizeHint() {
-  const hint = document.getElementById('compress-photo-hint');
-  if (!hint) return;
-  try {
-    const st = await _photoStats();
-    hint.textContent = st.length ? `${st.length} 張 · ${_fmtMB(st.reduce((a, b) => a + b.size, 0))}` : '';
-  } catch (e) { hint.textContent = ''; }
+let _compressingPhotos = false;
+const COMPRESS_TRIED_KEY = 'travel_photo_compress_tried';
+
+/* 手機裡還超過大小上限、值得壓縮的照片。壓過一次但縮不下去的會記下來，之後不再重複提示 */
+async function _photosNeedingCompress() {
+  const mapRefs = _mapPhotoRefs();
+  let tried = new Set();
+  try { tried = new Set(JSON.parse(localStorage.getItem(COMPRESS_TRIED_KEY) || '[]')); } catch (e) {}
+  const stats = await _photoStats();
+  const todo = stats.filter(s => {
+    if (/gif|svg/.test(s.type) || tried.has(s.id)) return false;
+    return s.size > (mapRefs.has('idb:' + s.id) ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
+  });
+  return { todo, mapRefs, bytes: todo.reduce((a, b) => a + b.size, 0) };
 }
 
-let _compressingPhotos = false;
-function compressStoredPhotos() {
-  if (_compressingPhotos || _migratingPhotos) return;
-  showConfirm('壓縮手機裡的照片？',
-    `把超過 ${PHOTO_TARGET_BYTES / 1024} KB 的照片重新壓縮（長邊最多 ${PHOTO_MAX_DIM}px，地圖放寬到 ${MAP_TARGET_BYTES / 1024} KB / 4000px 以保持文字清楚）。壓縮後無法還原成原圖，建議先匯出一次備份。壓縮期間請保持螢幕亮著。`,
-    async () => {
-      _compressingPhotos = true;
-      let wake = null;
-      try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
+async function _compressPhotos({ todo, mapRefs }) {
+  _compressingPhotos = true;
+  let wake = null;
+  try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
+  let n = 0, saved = 0, shrunk = 0;
+  try {
+    for (const s of todo) {
+      showUploadStatus(`壓縮照片 ${++n}/${todo.length}…`);
       try {
-        const mapRefs = _mapPhotoRefs();
-        const stats = await _photoStats();
-        const before = stats.reduce((a, b) => a + b.size, 0);
-        const todo = stats.filter(s => {
-          if (/gif|svg/.test(s.type)) return false;
-          return s.size > (mapRefs.has('idb:' + s.id) ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
-        });
-        let n = 0, saved = 0, shrunk = 0;
-        for (const s of todo) {
-          showUploadStatus(`壓縮照片 ${++n}/${todo.length}…`);
-          try {
-            const blob = await photoGet(s.id);
-            if (!blob) continue;
-            const isMap = mapRefs.has('idb:' + s.id);
-            const out = await compressImage(blob, isMap ? 4000 : PHOTO_MAX_DIM, isMap ? 0.95 : PHOTO_QUALITY, isMap ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
-            if (out !== blob && out.size < blob.size * 0.9) {
-              await photoPut(s.id, out);
-              saved += blob.size - out.size; shrunk++;
-              const old = _blobCache.get(s.id);
-              _blobCache.set(s.id, URL.createObjectURL(out));
-              if (old) URL.revokeObjectURL(old);
-            }
-          } catch (e) { console.log('壓縮失敗', s.id, e); }
+        const blob = await photoGet(s.id);
+        if (!blob) continue;
+        const isMap = mapRefs.has('idb:' + s.id);
+        const out = await compressImage(blob, isMap ? 4000 : PHOTO_MAX_DIM, isMap ? 0.95 : PHOTO_QUALITY, isMap ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
+        if (out !== blob && out.size < blob.size * 0.9) {
+          await photoPut(s.id, out);
+          saved += blob.size - out.size; shrunk++;
+          const old = _blobCache.get(s.id);
+          _blobCache.set(s.id, URL.createObjectURL(out));
+          if (old) URL.revokeObjectURL(old);
         }
-        showUploadStatus('');
-        if (typeof renderItinerary === 'function' && currentTripId) { try { renderItinerary(); renderExpense(); renderSettings(); } catch (e) {} }
-        showConfirm('壓縮完成',
-          shrunk ? `壓縮了 ${shrunk} 張，照片總量 ${_fmtMB(before)} → ${_fmtMB(before - saved)}。\n建議現在重新匯出一次備份。` : '沒有需要壓縮的照片。',
-          () => {}, null, '知道了');
-        updatePhotoSizeHint();
-      } catch (e) {
-        showUploadStatus('');
-        showToast('壓縮失敗：' + e.message);
-      } finally {
-        try { wake?.release(); } catch (e) {}
-        _compressingPhotos = false;
-      }
-    }, null, '開始壓縮');
+      } catch (e) { console.log('壓縮失敗', s.id, e); }
+    }
+    try {
+      const tried = new Set(JSON.parse(localStorage.getItem(COMPRESS_TRIED_KEY) || '[]'));
+      todo.forEach(s => tried.add(s.id));
+      localStorage.setItem(COMPRESS_TRIED_KEY, JSON.stringify([...tried]));
+    } catch (e) {}
+    if (shrunk && currentTripId) { try { renderItinerary(); renderExpense(); renderSettings(); } catch (e) {} }
+  } finally {
+    showUploadStatus('');
+    try { wake?.release(); } catch (e) {}
+    _compressingPhotos = false;
+  }
+  return { shrunk, saved };
 }
 
 let _migratingPhotos = false;
@@ -4063,7 +4056,6 @@ function renderSettings() {
   if (!data) return;
   updateBackupHint();
   updateLegacyPhotoRow();
-  updatePhotoSizeHint();
   const verEl = document.getElementById('app-version');
   if (verEl) verEl.textContent = 'v' + APP_VERSION;
   const s = data.settings;
@@ -5547,8 +5539,24 @@ function updateBackupHint() {
 }
 
 let _backupBusy = false;
-async function exportBackup() {
-  if (_backupBusy) return;
+async function exportBackup(skipCompressCheck) {
+  if (_backupBusy || _compressingPhotos || _migratingPhotos) return;
+  // 手機裡還有超過大小上限的照片：先問要不要壓縮，壓完自動接著匯出
+  if (skipCompressCheck !== true) {
+    try {
+      const need = await _photosNeedingCompress();
+      if (need.todo.length) {
+        showConfirm('先壓縮照片再匯出？',
+          `有 ${need.todo.length} 張照片超過 ${PHOTO_TARGET_BYTES / 1024} KB（共 ${_fmtMB(need.bytes)}）。壓縮後備份檔會小很多，匯出也比較不會當掉。壓縮無法還原成原圖；壓縮期間請保持螢幕亮著，完成後會自動匯出。`,
+          async () => {
+            try { await _compressPhotos(need); }
+            catch (e) { showToast('壓縮失敗：' + e.message); return; }
+            exportBackup(true);
+          }, null, '壓縮並匯出');
+        return;
+      }
+    } catch (e) { console.log('檢查照片大小失敗', e); }
+  }
   _backupBusy = true;
   try {
     showToast('打包中…');
