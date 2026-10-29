@@ -522,6 +522,7 @@ body {
   letter-spacing: -0.12px;
   color: var(--label-secondary);
   line-height: 1.47;
+  white-space: pre-line;
 }
 
 .confirm-actions {

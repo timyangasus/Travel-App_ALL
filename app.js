@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.5';
+const APP_VERSION = '2026.10.29.6';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -1171,46 +1171,87 @@ function updateLegacyPhotoRow() {
 }
 
 let _migratingPhotos = false;
+
+// 把 { 舊網址: 'idb:id' } 寫回資料；較長的網址先換，避免網址互為前綴時被截斷
+function _applyPhotoMapping(mapping) {
+  const pairs = Object.entries(mapping).sort((x, y) => y[0].length - x[0].length);
+  if (!pairs.length) return;
+  _storedTexts().forEach(({ key, text }) => {
+    let t = text;
+    for (const [u, ref] of pairs) if (t.includes(u)) t = t.split(u).join(ref);
+    if (t !== text) localStorage.setItem(key, t);
+  });
+}
+
+// 下載一張舊照片：逾時 40 秒，暫時性錯誤最多試 3 次；連結已失效（404/403/410、不是圖片）不重試
+async function _fetchLegacyPhoto(url) {
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise(r => setTimeout(r, attempt * 2000));
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 40000);
+    try {
+      const r = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+      if (r.status === 404 || r.status === 403 || r.status === 410) { const e = new Error('HTTP ' + r.status); e.dead = true; throw e; }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const blob = await r.blob();
+      if (!/^image\//.test(blob.type)) { const e = new Error('不是圖片'); e.dead = true; throw e; }
+      return blob;
+    } catch (e) {
+      lastErr = e;
+      if (e.dead) break;
+    } finally { clearTimeout(timer); }
+  }
+  throw lastErr;
+}
+
 function migrateLegacyPhotos() {
   if (_migratingPhotos) return;
   const urls = listImgbbUrls();
   if (!urls.length) { showToast('沒有需要轉存的舊照片'); updateLegacyPhotoRow(); return; }
   showConfirm('轉存舊照片到手機？',
-    `找到 ${urls.length} 張還放在 ImgBB 的舊照片，會全部下載存到這支手機。需要網路，數量多時要等一下；下載失敗的會保留原連結。`,
+    `找到 ${urls.length} 張還放在 ImgBB 的舊照片，會全部下載存到這支手機。需要網路，數量多時要等一下，請保持螢幕亮著、不要切到別的 App。失敗的會自動重試，連結已失效的會保留原連結。`,
     async () => {
       _migratingPhotos = true;
-      const mapping = {};
-      let ok = 0, fail = 0, done = 0;
-      const queue = [...urls];
-      const worker = async () => {
-        while (queue.length) {
-          const url = queue.shift();
-          try {
-            const r = await fetch(url);
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const blob = await r.blob();
-            if (!/^image\//.test(blob.type)) throw new Error('不是圖片');
-            const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-            await photoPut(id, blob);
-            _blobCache.set(id, URL.createObjectURL(blob));
-            mapping[url] = 'idb:' + id;
-            ok++;
-          } catch (e) { fail++; }
-          done++;
-          showUploadStatus(`轉存舊照片 ${done}/${urls.length}…`);
-        }
-      };
+      let wake = null;
+      try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
+      const total = urls.length;
+      let ok = 0, dead = 0;
+      let pending = urls;
+      let lastErr = '';
       try {
-        await Promise.all([worker(), worker(), worker(), worker()]);
+        // 暫時失敗的（網路中斷、逾時…）自動再跑一輪，最多 4 輪；某一輪完全沒進展就停
+        for (let pass = 1; pass <= 4 && pending.length; pass++) {
+          const failed = [];
+          let batch = {}, batchN = 0, passOk = 0;
+          const flush = () => { _applyPhotoMapping(batch); batch = {}; batchN = 0; };
+          const queue = [...pending];
+          const worker = async () => {
+            while (queue.length) {
+              const url = queue.shift();
+              try {
+                const blob = await _fetchLegacyPhoto(url);
+                const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+                await photoPut(id, blob);
+                batch[url] = 'idb:' + id;
+                ok++; passOk++;
+                if (++batchN >= 20) flush();   // 每 20 張就寫回資料，中途被中斷也不會白做
+              } catch (e) {
+                lastErr = e.message || String(e);
+                if (e.dead) dead++; else failed.push(url);
+              }
+              showUploadStatus(`轉存舊照片 ${Math.min(ok + dead, total)}/${total}` + (pass > 1 ? `（第 ${pass} 輪重試）` : '') + '…');
+            }
+          };
+          await Promise.all([worker(), worker(), worker()]);
+          flush();
+          if (!passOk && failed.length) { pending = failed; break; }
+          pending = failed;
+        }
         if (ok) {
-          // 下載全部結束後才改資料；較長的網址先換，避免網址互為前綴時被截斷
-          const pairs = Object.entries(mapping).sort((x, y) => y[0].length - x[0].length);
-          _storedTexts().forEach(({ key, text }) => {
-            let t = text;
-            for (const [u, ref] of pairs) if (t.includes(u)) t = t.split(u).join(ref);
-            if (t !== text) localStorage.setItem(key, t);
-          });
           loadMeta();
+          // 資料換成 idb: 之後，先把圖載進快取再重畫
+          for (const { text } of _storedTexts()) await preloadPhotos(text);
           if (currentTripId && meta.trips.some(t => t.id === currentTripId)) {
             const day = currentDay;
             loadTrip(currentTripId);
@@ -1219,12 +1260,24 @@ function migrateLegacyPhotos() {
           }
         }
         updateLegacyPhotoRow();
-        showToast(`已轉存 ${ok} 張到手機` + (fail ? `，${fail} 張下載失敗（連結失效或沒網路），已保留原連結` : '，建議現在匯出一次備份'));
+        const left = pending.length;
+        if (!dead && !left) {
+          showToast(`已轉存 ${ok} 張到手機，建議現在匯出一次備份`);
+        } else {
+          showConfirm('轉存完成',
+            `成功 ${ok} 張。` +
+            (dead ? `\n連結已失效 ${dead} 張（ImgBB 上已經沒有了，保留原連結）。` : '') +
+            (left ? `\n還有 ${left} 張沒轉成功（${lastErr}）：可能是網路不穩，也可能是 ImgBB 上已經刪掉了。網路穩的時候再按一次「轉存舊照片到手機」可以重試。` : '') +
+            '\n建議現在匯出一次備份。',
+            () => {}, null, '知道了');
+        }
       } catch (e) {
         console.log('轉存失敗', e);
         showToast('轉存失敗：' + e.message);
+        updateLegacyPhotoRow();
       } finally {
         showUploadStatus('');
+        try { wake?.release(); } catch (e) {}
         _migratingPhotos = false;
       }
     }, null, '開始轉存');
