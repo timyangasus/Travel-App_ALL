@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.30.12';
+const APP_VERSION = '2026.10.30.13';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -711,17 +711,22 @@ function renderHomeTripList() {
   }
 
   el.classList.toggle('compact', trips.length >= 6);
-  el.innerHTML = '<div class="home-trip-list-topline"></div>' + trips.map(trip => {
+  // 日期文字顏色：由上到下從粉紅漸變到紫色（依畫面順序，不論排序方向）
+  const dateColor = i => {
+    const a = [247, 107, 138], b = [154, 106, 227];
+    const t = trips.length > 1 ? i / (trips.length - 1) : 0;
+    return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * t)).join(',')})`;
+  };
+  el.innerHTML = '<div class="home-trip-list-topline"></div>' + trips.map((trip, i) => {
     const dateStr = tripDateDisplay(trip) || '';
     const coverUrls = tripCovers(trip).map(resolvePhoto).filter(Boolean);
     const coverSlides = coverUrls.map((u, i) => `<div class="cover-slide${i === 0 ? ' visible' : ''}" style="background-image:url('${esc(u)}')"></div>`).join('');
-    const coverBg = 'background:#C9A84C';   // 底色；有照片時由上面的 .cover-slide 蓋住
     return `
       <div class="home-trip-row" data-id="${trip.id}">
         <div class="home-trip-row-inner" onclick="openTrip('${trip.id}')">
-          <div class="home-trip-cover" style="${coverBg}" onclick="event.stopPropagation();openTripCoverPicker('${trip.id}')">${coverSlides}</div>
+          <div class="home-trip-cover" onclick="event.stopPropagation();openTripCoverPicker('${trip.id}')">${coverSlides}</div>
           <div class="home-trip-body" style="margin-left:5px">
-            <div class="home-trip-date">${esc(dateStr)}</div>
+            <div class="home-trip-date" style="color:${dateColor(i)}">${esc(dateStr)}</div>
             <div class="home-trip-name">${esc(trip.name || '未命名行程')}</div>
           </div>
           ${_tripDeleteMode ? `<button class="home-trip-del-x" onclick="event.stopPropagation();confirmDeleteTrip('${trip.id}')">×</button>` : ''}
@@ -863,7 +868,7 @@ function renderTripCoverSheet() {
   for (let i = 0; i < TRIP_COVER_MAX; i++) {
     if (i < covers.length) {
       const u = resolvePhoto(covers[i]);
-      html += `<div class="cover-slot" style="${u ? `background-image:url('${esc(u)}')` : 'background:#C9A84C'}"><button class="cover-slot-del" onclick="removeTripCover(${i})" aria-label="移除">×</button></div>`;
+      html += `<div class="cover-slot" style="${u ? `background-image:url('${esc(u)}')` : 'background:linear-gradient(180deg,#F96769,#C184B6 55%,#7F9DEE)'}"><button class="cover-slot-del" onclick="removeTripCover(${i})" aria-label="移除">×</button></div>`;
     } else {
       html += `<button class="cover-slot cover-slot-add" onclick="addTripCovers()" aria-label="新增封面照片">+</button>`;
     }
