@@ -3217,6 +3217,39 @@ canvas { display: block; width: 100%; height: 100%; }
   position: relative;
 }
 
+.home-trip-cover .cover-slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+.home-trip-cover .cover-slide.visible { opacity: 1; }
+
+/* 封面照片設定視窗 */
+.cover-sheet-title { text-align: center; font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--text-primary); padding: 6px 20px 2px; }
+.cover-sheet-sub { text-align: center; font-family: var(--mono); font-size: 12px; color: var(--text-secondary); padding-bottom: 14px; }
+.cover-slots { display: flex; gap: 10px; padding: 0 20px 18px; }
+.cover-slot {
+  position: relative;
+  flex: 1;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  background: #F0F0F0 center / cover no-repeat;
+  border: none;
+  overflow: hidden;
+}
+.cover-slot-add { border: 1.5px dashed #C9A84C; background: #fff; color: #C9A84C; font-size: 30px; font-weight: 300; cursor: pointer; }
+.cover-slot-add:active { background: rgba(201,168,76,0.12); }
+.cover-slot-del {
+  position: absolute; top: 4px; right: 4px;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(0,0,0,0.55); color: #fff; border: none;
+  font-size: 15px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+
 .home-trip-cover img {
   width: 100%;
   height: 100%;

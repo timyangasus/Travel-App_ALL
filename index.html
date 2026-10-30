@@ -1031,6 +1031,17 @@
   </div>
 </div>
 
+<!-- ═══ TRIP COVER SHEET ═══ -->
+<div class="modal-overlay" id="modal-trip-cover" onclick="if(event.target===this)closeActionSheet('modal-trip-cover')">
+  <div class="action-sheet">
+    <div class="modal-handle"></div>
+    <div class="cover-sheet-title">封面照片</div>
+    <div class="cover-sheet-sub">最多 3 張，首頁會輪流顯示</div>
+    <div class="cover-slots" id="trip-cover-slots"></div>
+    <button class="action-sheet-btn action-sheet-btn-cancel" onclick="closeActionSheet('modal-trip-cover')">完成</button>
+  </div>
+</div>
+
 <!-- ═══ HOME MORE SHEET ═══ -->
 <div class="modal-overlay" id="modal-home-more">
   <div class="action-sheet">
