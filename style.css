@@ -193,8 +193,8 @@ body {
   letter-spacing: -0.08px;
 }
 
-.tab-item.active .tab-label { color: #9A7200; font-weight: 700; }
-.tab-item.active .tab-icon { color: #9A7200; }
+.tab-item.active .tab-label { color: #EE8945; font-weight: 700; }
+.tab-item.active .tab-icon { color: #EE8945; }
 
 /* ===================== SEGMENTED CONTROL ===================== */
 .segmented-control {
@@ -949,7 +949,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
 .tab-icon svg { width: 24px; height: 24px; display: block; }
 .tab-icon svg path { fill: #9CA3AF; }
-.tab-item.active .tab-icon svg path { fill: #9A7200; }
+.tab-item.active .tab-icon svg path { fill: #EE8945; }
 #tab-home .tab-icon svg { transform: scale(1.15); transform-origin: center; }
 
 /* ─── Screens ─── */
