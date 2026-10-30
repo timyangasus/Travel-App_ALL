@@ -3204,7 +3204,7 @@ canvas { display: block; width: 100%; height: 100%; }
   padding: 9.2px 10px 9.2px 0;
   gap: 4px;
 }
-#screen-home { --cover-gradient: linear-gradient(180deg, #F96769 0%, #C184B6 55%, #7F9DEE 100%); }
+#screen-home { --cover-gradient: #7F9DEE; }   /* 沒有照片時的封面底色：主圖示漸層最下方的紫藍色 */
 
 /* 1~5 個行程：封面放大一點，讓 5 個大約佔滿一頁 */
 .home-trip-list:not(.compact) .home-trip-cover { width: 36vw; max-width: 164px; }
@@ -3217,7 +3217,7 @@ canvas { display: block; width: 100%; height: 100%; }
   max-width: 161px;
   aspect-ratio: 4 / 3;
   flex-shrink: 0;
-  background: var(--cover-gradient);   /* 沒有照片時的底色：和主圖示同一組漸層 */
+  background: var(--cover-gradient);   /* 沒有照片時的底色 */
   overflow: visible;
   cursor: pointer;
   position: relative;
