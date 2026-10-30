@@ -1824,11 +1824,11 @@ canvas { display: block; width: 100%; height: 100%; }
   gap: 0;
   margin-bottom: 6px;
 }
-/* 去程維持金色；回程改成圖示的橙色 */
-.fc2-seg.in .fc2-time,
-.fc2-seg.in .fc2-duration { color: #EE8945; }
-.fc2-seg.in .fc2-dash { border-top-color: #EE8945; }
-.fc2-seg.in .fc2-plane { fill: #EE8945; }
+/* 去程（上）改成圖示的橙色；回程（下）維持金色 */
+.fc2-seg.out .fc2-time,
+.fc2-seg.out .fc2-duration { color: #EE8945; }
+.fc2-seg.out .fc2-dash { border-top-color: #EE8945; }
+.fc2-seg.out .fc2-plane { fill: #EE8945; }
 .fc2-time {
   font-size: 30px;
   font-weight: 600;
