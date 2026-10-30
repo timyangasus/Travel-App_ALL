@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.30.1';
+const APP_VERSION = '2026.10.30.2';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -544,7 +544,7 @@ function openTripFilterSheet() {
       if (m) return new Date(tripYear(trip), +m[1]-1, +m[2]);
       return new Date(9999,0,1);
     };
-    return parseD(a) - parseD(b);
+    return (parseD(a) - parseD(b)) * _homeSortDir();
   });
   const list = document.getElementById('trip-filter-list');
   list.innerHTML = allTrips.map(trip => {
@@ -656,7 +656,32 @@ function renderHome() {
   }
 
   // Render trip list for selected year
+  updateHomeSortBtn();
   renderHomeTripList();
+}
+
+/* 首頁行程排序：'asc' ＝ 舊到新（最早出發的在最上面，預設）、'desc' ＝ 新到舊。存在這支手機，下次打開沿用 */
+const HOME_SORT_KEY = 'travel_home_sort';
+function _homeSortDir() {
+  try { return localStorage.getItem(HOME_SORT_KEY) === 'desc' ? -1 : 1; } catch (e) { return 1; }
+}
+function updateHomeSortBtn() {
+  const btn = document.getElementById('home-sort-btn');
+  if (!btn) return;
+  const desc = _homeSortDir() < 0;
+  // 箭頭方向 ＝ 越往下越新（↓，舊到新）／越往下越舊（↑，新到舊）
+  const path = desc
+    ? 'M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z'
+    : 'M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z';
+  btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px" fill="#C9A84C"><path d="${path}"/></svg>`;
+  btn.title = desc ? '新到舊' : '舊到新';
+}
+function toggleHomeSort() {
+  const next = _homeSortDir() > 0 ? 'desc' : 'asc';
+  try { localStorage.setItem(HOME_SORT_KEY, next); } catch (e) {}
+  updateHomeSortBtn();
+  renderHomeTripList();
+  showToast(next === 'desc' ? '新到舊（最新的在最上面）' : '舊到新（最早的在最上面）');
 }
 
 function selectHomeYear(y) {
@@ -681,7 +706,7 @@ function renderHomeTripList() {
   const hidden = getHiddenTrips();
   const trips = (meta.trips || [])
     .filter(t => tripYear(t) === _homeYear && !hidden.includes(t.id))
-    .sort((a, b) => parseStartDate(a) - parseStartDate(b));
+    .sort((a, b) => (parseStartDate(a) - parseStartDate(b)) * _homeSortDir());
 
   if (!trips.length) {
     el.innerHTML = `<div class="home-empty">點右上角 ⋯ 新增行程</div>`;
