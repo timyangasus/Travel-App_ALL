@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.30.19';
+const APP_VERSION = '2026.10.30.20';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -1625,6 +1625,12 @@ function migrateLegacyPhotos() {
     }, null, '開始轉存');
 }
 
+/* 金色(0) → 圖示橙色(1) 的漸層取色：行程時間軸用 */
+function gradGoldOrange(t) {
+  const a = [212, 175, 55], b = [238, 137, 69];
+  return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * t)).join(',')})`;
+}
+
 /* ─── Toast helper ─── */
 let _toastTimer = null;
 function showToast(msg) {
@@ -1780,7 +1786,10 @@ function renderTimeline() {
     list.innerHTML = `<div class="timeline-empty">點 ＋ 新增行程</div>`;
     return;
   }
+  // 時間軸：圓點、時間、連接線由上到下從金色漸變到圖示的橙色
+  const tAt = i => evs.length > 1 ? i / (evs.length - 1) : 0;
   list.innerHTML = evs.map((ev, i) => {
+    const c = gradGoldOrange(tAt(i)), cNext = gradGoldOrange(tAt(i + 1));
     const noteHtml = ev.note ? `<div class="timeline-note" onclick="editEvent(${ev.id})" style="cursor:pointer">${noteToHtml(ev.note)}</div>` : '';
     const addrHtml = ev.addr ? `<div class="timeline-addr" onclick="openAddr('${esc(ev.addr)}')">${esc(ev.addr)}</div>` : '';
     const stationHtml = (ev.station || ev.line) ? `
@@ -1791,12 +1800,12 @@ function renderTimeline() {
     return `
     <div class="timeline-item" style="animation-delay:${i * 0.05}s">
       <div class="timeline-left">
-        <div class="timeline-dot"></div>
-        <div class="timeline-line"></div>
+        <div class="timeline-dot" style="border-color:${c}"></div>
+        <div class="timeline-line" style="background:linear-gradient(to bottom,${c},${cNext})"></div>
       </div>
       <div class="timeline-right">
         <div class="timeline-time-row">
-          <span class="timeline-time" onclick="editEvent(${ev.id})" style="cursor:pointer">${ev.time}</span>
+          <span class="timeline-time" onclick="editEvent(${ev.id})" style="cursor:pointer;color:${c}">${ev.time}</span>
           <button class="t-del-btn" onclick="deleteEvent(${ev.id})">×</button>
         </div>
         <div class="timeline-title" onclick="editEvent(${ev.id})">${esc(ev.title)}</div>
