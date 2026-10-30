@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.30.9';
+const APP_VERSION = '2026.10.30.10';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -869,6 +869,8 @@ function renderTripCoverSheet() {
     }
   }
   el.innerHTML = html;
+  const sub = document.getElementById('trip-cover-sub');
+  if (sub) sub.textContent = covers.length >= TRIP_COVER_MAX ? '已滿 3 張；要換照片請先移除一張' : `點 + 可一次選多張（還能加 ${TRIP_COVER_MAX - covers.length} 張），首頁會輪流顯示`;
 }
 function removeTripCover(i) {
   const trip = meta.trips.find(t => t.id === _coverSheetTripId);
@@ -887,8 +889,10 @@ function addTripCovers() {
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
   inp.onchange = async () => {
-    const files = [...inp.files].slice(0, room);
+    const picked = [...inp.files];
+    const files = picked.slice(0, room);
     if (!files.length) return;
+    if (picked.length > room) showToast(`封面最多 ${TRIP_COVER_MAX} 張，只加入前 ${room} 張`);
     try {
       for (let i = 0; i < files.length; i++) {
         showUploadStatus(`儲存中... ${i + 1}/${files.length}`);
@@ -905,22 +909,26 @@ function addTripCovers() {
   _openPicker(inp);
 }
 
-/* 首頁封面輪播：有 2 張以上的行程，每隔幾秒淡入淡出換下一張 */
-let _homeCoverTimer = null;
-function stopHomeCoverSlideshow() { if (_homeCoverTimer) { clearInterval(_homeCoverTimer); _homeCoverTimer = null; } }
+/* 首頁封面輪播：有 2 張以上的行程，各自用不同的間隔淡入淡出換下一張（3～7 秒隨機、起始時間也隨機），不會全部同時換 */
+let _homeCoverTimers = [];
+function stopHomeCoverSlideshow() { _homeCoverTimers.forEach(clearTimeout); _homeCoverTimers = []; }
 function startHomeCoverSlideshow() {
   stopHomeCoverSlideshow();
-  const rows = [...document.querySelectorAll('.home-trip-cover')].map(c => ({ slides: [...c.querySelectorAll('.cover-slide')], idx: 0 })).filter(r => r.slides.length > 1);
-  if (!rows.length) return;
-  // 各行程起始張數隨機，不要全部同時換
-  rows.forEach(r => { r.slides[0].classList.remove('visible'); r.idx = Math.floor(Math.random() * r.slides.length); r.slides[r.idx].classList.add('visible'); });
-  _homeCoverTimer = setInterval(() => {
-    rows.forEach(r => {
-      r.slides[r.idx].classList.remove('visible');
-      r.idx = (r.idx + 1) % r.slides.length;
-      r.slides[r.idx].classList.add('visible');
-    });
-  }, 3500);
+  document.querySelectorAll('.home-trip-cover').forEach(c => {
+    const slides = [...c.querySelectorAll('.cover-slide')];
+    if (slides.length < 2) return;
+    let idx = Math.floor(Math.random() * slides.length);
+    slides.forEach((sl, i) => sl.classList.toggle('visible', i === idx));
+    const wait = () => 3000 + Math.random() * 4000;
+    const step = () => {
+      if (!c.isConnected) return;
+      slides[idx].classList.remove('visible');
+      idx = (idx + 1) % slides.length;
+      slides[idx].classList.add('visible');
+      _homeCoverTimers.push(setTimeout(step, wait()));
+    };
+    _homeCoverTimers.push(setTimeout(step, 1000 + Math.random() * 6000));
+  });
 }
 
 /* ─── Trip Sheet ─── */
