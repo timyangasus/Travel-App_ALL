@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.30.3';
+const APP_VERSION = '2026.10.30.4';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -668,7 +668,7 @@ function _homeSortDir() {
 function updateHomeSortBtn() {
   const btn = document.getElementById('home-sort-btn');
   if (!btn) return;
-  // 上下雙箭頭圖示（Material「mobiledata_arrows」）；目前是哪種排序以點擊後的提示為準
+  // 上下雙箭頭圖示（Material「mobiledata_arrows」）
   btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="#C9A84C"><path d="M8,9.98h2v7.17l1.55-1.55L13,17L9,21L5,17l1.45-1.4L8,17.15V9.98Zm8,4H14V6.8L12.4,8.4L11,7l4-4l4,4L17.6,8.4L16,6.8v7.17Z"/></svg>';
   btn.title = _homeSortDir() < 0 ? '新到舊' : '舊到新';
 }
@@ -677,7 +677,6 @@ function toggleHomeSort() {
   try { localStorage.setItem(HOME_SORT_KEY, next); } catch (e) {}
   updateHomeSortBtn();
   renderHomeTripList();
-  showToast(next === 'desc' ? '新到舊（最新的在最上面）' : '舊到新（最早的在最上面）');
 }
 
 function selectHomeYear(y) {
