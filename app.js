@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.30.21';
+const APP_VERSION = '2026.10.30.22';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3996,7 +3996,7 @@ function renderFlightCards() {
       </div>`;
     };
     return `
-      <div class="fc2-seg">
+      <div class="fc2-seg${label === '回程' ? ' in' : ''}">
         <div class="fc2-seg-tag">${label}</div>
         <div class="fc2-date-row">
           <span>${esc(seg.date||'')}</span>
@@ -4007,7 +4007,7 @@ function renderFlightCards() {
           <div class="fc2-mid">
             <div class="fc2-dashes">
               <div class="fc2-dash"></div>
-              <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#D4AF37"><path d="M280-80v-100l120-84v-144L80-280v-120l320-224v-176q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v176l320 224v120L560-408v144l120 84v100l-200-60-200 60Z"/></svg>
+              <svg class="fc2-plane" xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#D4AF37"><path d="M280-80v-100l120-84v-144L80-280v-120l320-224v-176q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v176l320 224v120L560-408v144l120 84v100l-200-60-200 60Z"/></svg>
               <div class="fc2-dash"></div>
             </div>
             ${calcFlightDuration(seg.fromTime, seg.toTime) ? `<div class="fc2-duration">${calcFlightDuration(seg.fromTime, seg.toTime)}</div>` : ''}
