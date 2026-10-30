@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.30.14';
+const APP_VERSION = '2026.10.30.15';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -553,7 +553,7 @@ function openTripFilterSheet() {
     const dateStr = tripDateDisplay(trip) || '';
     return `<div class="fsheet-row" style="cursor:pointer;align-items:center" onclick="toggleTripFilter('${trip.id}')">
       <div style="flex:1;min-width:0">
-        <div style="font-size:15px;color:#C9A84C;font-family:var(--mono);font-weight:700">${esc(dateStr)}</div>
+        <div style="font-size:15px;color:#F76B8A;font-family:var(--mono);font-weight:700">${esc(dateStr)}</div>
         <div style="font-size:19px;font-weight:700;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(trip.name||'未命名')}</div>
       </div>
       <span id="tf-cb-${trip.id}" class="info-mod-cb${visible ? ' checked' : ''}">
@@ -670,7 +670,7 @@ function updateHomeSortBtn() {
   const btn = document.getElementById('home-sort-btn');
   if (!btn) return;
   // 上下雙箭頭圖示（Material「mobiledata_arrows」）
-  btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="#C9A84C"><path d="M8,9.98h2v7.17l1.55-1.55L13,17L9,21L5,17l1.45-1.4L8,17.15V9.98Zm8,4H14V6.8L12.4,8.4L11,7l4-4l4,4L17.6,8.4L16,6.8v7.17Z"/></svg>';
+  btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="#F76B8A"><path d="M8,9.98h2v7.17l1.55-1.55L13,17L9,21L5,17l1.45-1.4L8,17.15V9.98Zm8,4H14V6.8L12.4,8.4L11,7l4-4l4,4L17.6,8.4L16,6.8v7.17Z"/></svg>';
   btn.title = _homeSortDir() < 0 ? '新到舊' : '舊到新';
 }
 function toggleHomeSort() {
@@ -711,12 +711,8 @@ function renderHomeTripList() {
   }
 
   el.classList.toggle('compact', trips.length >= 6);
-  // 日期文字顏色：由上到下從粉紅漸變到紫色（依畫面順序，不論排序方向）
-  const dateColor = i => {
-    const a = [247, 107, 138], b = [154, 106, 227];
-    const t = trips.length > 1 ? i / (trips.length - 1) : 0;
-    return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * t)).join(',')})`;
-  };
+  // 日期文字顏色：由上到下從紫色漸變到粉紅（依畫面順序，不論排序方向）
+  const dateColor = i => gradPurplePink(trips.length > 1 ? i / (trips.length - 1) : 0);
   el.innerHTML = '<div class="home-trip-list-topline"></div>' + trips.map((trip, i) => {
     const dateStr = tripDateDisplay(trip) || '';
     const coverUrls = tripCovers(trip).map(resolvePhoto).filter(Boolean);
@@ -1630,6 +1626,12 @@ function migrateLegacyPhotos() {
     }, null, '開始轉存');
 }
 
+/* 紫(0) → 粉紅(1) 的漸層取色：首頁日期、行程時間軸共用 */
+function gradPurplePink(t) {
+  const a = [154, 106, 227], b = [247, 107, 138];
+  return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * t)).join(',')})`;
+}
+
 /* ─── Toast helper ─── */
 let _toastTimer = null;
 function showToast(msg) {
@@ -1785,7 +1787,10 @@ function renderTimeline() {
     list.innerHTML = `<div class="timeline-empty">點 ＋ 新增行程</div>`;
     return;
   }
+  // 時間軸：圓點、時間、連接線由上到下從紫色漸變到粉紅
+  const tAt = i => evs.length > 1 ? i / (evs.length - 1) : 0;
   list.innerHTML = evs.map((ev, i) => {
+    const c = gradPurplePink(tAt(i)), cNext = gradPurplePink(tAt(i + 1));
     const noteHtml = ev.note ? `<div class="timeline-note" onclick="editEvent(${ev.id})" style="cursor:pointer">${noteToHtml(ev.note)}</div>` : '';
     const addrHtml = ev.addr ? `<div class="timeline-addr" onclick="openAddr('${esc(ev.addr)}')">${esc(ev.addr)}</div>` : '';
     const stationHtml = (ev.station || ev.line) ? `
@@ -1796,12 +1801,12 @@ function renderTimeline() {
     return `
     <div class="timeline-item" style="animation-delay:${i * 0.05}s">
       <div class="timeline-left">
-        <div class="timeline-dot"></div>
-        <div class="timeline-line"></div>
+        <div class="timeline-dot" style="border-color:${c}"></div>
+        <div class="timeline-line" style="background:linear-gradient(to bottom,${c},${cNext})"></div>
       </div>
       <div class="timeline-right">
         <div class="timeline-time-row">
-          <span class="timeline-time" onclick="editEvent(${ev.id})" style="cursor:pointer">${ev.time}</span>
+          <span class="timeline-time" onclick="editEvent(${ev.id})" style="cursor:pointer;color:${c}">${ev.time}</span>
           <button class="t-del-btn" onclick="deleteEvent(${ev.id})">×</button>
         </div>
         <div class="timeline-title" onclick="editEvent(${ev.id})">${esc(ev.title)}</div>
@@ -2432,7 +2437,7 @@ function renderExpenseList() {
   const totalAbs = Math.abs(total);
   document.getElementById('expense-total').textContent = `${total < 0 ? '-' : ''}${sym} ${totalAbs.toLocaleString()}`;
   const totalEl = document.getElementById('expense-total');
-  if (totalEl) totalEl.style.color = total < 0 ? '#E53E3E' : '#D4AF37';
+  if (totalEl) totalEl.style.color = total < 0 ? '#E53E3E' : '#F76B8A';
   document.getElementById('expense-count').textContent = `${items.length} 筆記錄`;
 
   const allTotal = data.expenses.reduce((s, day) =>
@@ -2777,7 +2782,7 @@ function _mapUpdateSel() {
   if (!dd) return;
   dd.innerHTML = maps.map((m, i) => {
     const active = i === _mapIdx;
-    return '<div onclick="mapSelPick(' + i + ')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-family:var(--mono);font-size:14px;color:' + (active ? '#D4AF37' : '#1A1A1A') + ';font-weight:' + (active ? 700 : 400) + ';cursor:pointer;border-bottom:0.5px solid #F0F0F0">' +
+    return '<div onclick="mapSelPick(' + i + ')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-family:var(--mono);font-size:14px;color:' + (active ? '#F76B8A' : '#1A1A1A') + ';font-weight:' + (active ? 700 : 400) + ';cursor:pointer;border-bottom:0.5px solid #F0F0F0">' +
       '<span>' + esc(m.name) + '</span>' +
       '<button onclick="event.stopPropagation();mapSelDel(' + i + ')" style="background:none;border:none;color:#CCC;font-size:18px;cursor:pointer;line-height:1;padding:0 0 0 12px">×</button>' +
       '</div>';
@@ -3601,12 +3606,12 @@ function renderNotes() {
       <button onclick="event.stopPropagation();toggleNotePin(${n.id})" style="position:absolute;top:8px;right:35px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
         <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 0 24 24" width="22px">
           ${n.pinned
-            ? '<circle cx="12" cy="12" r="7" fill="#B8860B"/>'
-            : '<circle cx="12" cy="12" r="6.25" fill="none" stroke="#B8860B" stroke-width="1.5"/>'}
+            ? '<circle cx="12" cy="12" r="7" fill="#F76B8A"/>'
+            : '<circle cx="12" cy="12" r="6.25" fill="none" stroke="#F76B8A" stroke-width="1.5"/>'}
         </svg>
       </button>
       <button onclick="event.stopPropagation();copyNoteText(${n.id})" style="position:absolute;top:10px;right:72px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
-        <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px"><path fill="#B8860B" d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px"><path fill="#F76B8A" d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>
       </button>
       <div class="note-card-title" style="padding-right:108px;margin-bottom:8px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
       <div class="note-card-inner collapsed" id="ninner-${n.id}">
@@ -4003,7 +4008,7 @@ function renderFlightCards() {
           <div class="fc2-mid">
             <div class="fc2-dashes">
               <div class="fc2-dash"></div>
-              <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#D4AF37"><path d="M280-80v-100l120-84v-144L80-280v-120l320-224v-176q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v176l320 224v120L560-408v144l120 84v100l-200-60-200 60Z"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#F76B8A"><path d="M280-80v-100l120-84v-144L80-280v-120l320-224v-176q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v176l320 224v120L560-408v144l120 84v100l-200-60-200 60Z"/></svg>
               <div class="fc2-dash"></div>
             </div>
             ${calcFlightDuration(seg.fromTime, seg.toTime) ? `<div class="fc2-duration">${calcFlightDuration(seg.fromTime, seg.toTime)}</div>` : ''}
