@@ -3204,6 +3204,8 @@ canvas { display: block; width: 100%; height: 100%; }
   padding: 9.2px 10px 9.2px 0;
   gap: 4px;
 }
+/* 1~5 個行程：封面放大一點，讓 5 個大約佔滿一頁 */
+.home-trip-list:not(.compact) .home-trip-cover { width: 38vw; max-width: 170px; }
 /* 當年行程 6 個以上：縮小上下間距，6 個剛好一頁放得下 */
 .home-trip-list.compact .home-trip-row-inner { padding-top: 6px; padding-bottom: 6px; }
 
