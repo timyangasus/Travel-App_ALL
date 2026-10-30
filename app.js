@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.29.15';
+const APP_VERSION = '2026.10.30.1';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -120,16 +120,20 @@ function photoGet(id) {
 }
 
 // 每張照片壓到大約這個大小以內（地圖文字小又密，給寬鬆一點）
-const PHOTO_MAX_DIM = 1500;
+// 三種規格：「照片」頁的相片 1200px；封面、Banner、飯店、購物等其他地方 800px；地圖要看得清文字所以最大
+const PHOTO_MAX_DIM = 1200;
 const PHOTO_QUALITY = 0.7;
-const PHOTO_TARGET_BYTES = 500 * 1024;
+const PHOTO_TARGET_BYTES = 400 * 1024;
 const MAP_TARGET_BYTES = 1500 * 1024;
+const SPEC_TAB   = { maxSize: PHOTO_MAX_DIM, quality: PHOTO_QUALITY, targetBytes: PHOTO_TARGET_BYTES };
+const SPEC_OTHER = { maxSize: 800, quality: PHOTO_QUALITY, targetBytes: 200 * 1024 };
+const SPEC_MAP   = { maxSize: 4000, quality: 0.95, targetBytes: MAP_TARGET_BYTES };
 
 /* 壓縮後存進手機，回傳要寫進資料的參照字串 "idb:<id>" */
 async function savePhoto(file, opts) {
   // 壓縮卡住（超大圖在手機上偶爾會）就超過 30 秒改存原檔，不讓畫面無聲無息沒反應
   const blob = await Promise.race([
-    compressImage(file, opts?.maxSize ?? PHOTO_MAX_DIM, opts?.quality ?? PHOTO_QUALITY, opts?.targetBytes ?? PHOTO_TARGET_BYTES),
+    compressImage(file, opts?.maxSize ?? SPEC_OTHER.maxSize, opts?.quality ?? SPEC_OTHER.quality, opts?.targetBytes ?? SPEC_OTHER.targetBytes),
     new Promise(res => setTimeout(() => res(file), 30000)),
   ]);
   const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -1287,18 +1291,41 @@ function updateLegacyPhotoRow() {
   if (hint) hint.textContent = n ? `${n} 張` : '';
 }
 
-/* 所有行程裡「地圖」用到的照片（網址或 idb:<id>） */
-function _mapPhotoRefs() {
-  const set = new Set();
+/* 每張照片該用哪種規格：地圖 > 「照片」頁 > 其他。回傳 ref("idb:..."或網址) → 規格 的函式 */
+function _specResolver() {
+  const map = new Set(), tab = new Set();
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (!k || !k.startsWith(TRIP_PREFIX)) continue;
-    try { (JSON.parse(localStorage.getItem(k)).maps || []).forEach(m => m && m.url && set.add(m.url)); } catch (e) {}
+    try {
+      const t = JSON.parse(localStorage.getItem(k));
+      (t.maps || []).forEach(m => m && m.url && map.add(m.url));
+      (t.photos || []).forEach(m => m && m.url && tab.add(m.url));
+    } catch (e) {}
   }
-  return set;
+  return ref => map.has(ref) ? SPEC_MAP : tab.has(ref) ? SPEC_TAB : SPEC_OTHER;
 }
 
 function _fmtMB(bytes) { return (bytes / 1048576).toFixed(bytes >= 10485760 ? 0 : 1) + ' MB'; }
+
+/* 讀 JPEG 檔頭取得長邊像素（不解碼整張圖，很快）；不是 JPEG 或讀不到就回傳 0 */
+async function _jpegMaxDim(blob) {
+  try {
+    const b = new Uint8Array(await blob.slice(0, 262144).arrayBuffer());
+    if (b[0] !== 0xFF || b[1] !== 0xD8) return 0;
+    let i = 2;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xFF) { i++; continue; }
+      const m = b[i + 1];
+      if (m === 0xFF) { i++; continue; }
+      if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) {
+        return Math.max((b[i + 5] << 8) | b[i + 6], (b[i + 7] << 8) | b[i + 8]);
+      }
+      i += 2 + ((b[i + 2] << 8) | b[i + 3]);
+    }
+  } catch (e) {}
+  return 0;
+}
 
 /* 手機上所有照片的 { id, size, type }，只讀大小不載入內容 */
 async function _photoStats() {
@@ -1317,22 +1344,27 @@ async function _photoStats() {
 }
 
 let _compressingPhotos = false;
-const COMPRESS_TRIED_KEY = 'travel_photo_compress_tried';
+const COMPRESS_TRIED_KEY = 'travel_photo_compress_tried_v2';   // 規格改過，舊的「已試過」紀錄作廢
 
 /* 手機裡還超過大小上限、值得壓縮的照片。壓過一次但縮不下去的會記下來，之後不再重複提示 */
 async function _photosNeedingCompress() {
-  const mapRefs = _mapPhotoRefs();
+  const specOf = _specResolver();
   let tried = new Set();
   try { tried = new Set(JSON.parse(localStorage.getItem(COMPRESS_TRIED_KEY) || '[]')); } catch (e) {}
   const stats = await _photoStats();
+  // 大小沒超過但尺寸超過規格的（例如舊的 1500px 照片）也要抓出來；只對還沒試過的照片讀檔頭
+  for (const s of stats) {
+    if (/gif|svg/.test(s.type) || tried.has(s.id) || s.size <= 0) continue;
+    if (s.size <= specOf('idb:' + s.id).targetBytes) s.dim = await _jpegMaxDim(await photoGet(s.id).catch(() => null) || new Blob());
+  }
   const todo = stats.filter(s => {
     if (/gif|svg/.test(s.type) || tried.has(s.id)) return false;
-    return s.size > (mapRefs.has('idb:' + s.id) ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
+    return s.size > specOf('idb:' + s.id).targetBytes || (s.dim || 0) > specOf('idb:' + s.id).maxSize * 1.1;
   });
-  return { todo, mapRefs, bytes: todo.reduce((a, b) => a + b.size, 0) };
+  return { todo, specOf, bytes: todo.reduce((a, b) => a + b.size, 0) };
 }
 
-async function _compressPhotos({ todo, mapRefs }) {
+async function _compressPhotos({ todo, specOf }) {
   _compressingPhotos = true;
   let wake = null;
   try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
@@ -1346,8 +1378,8 @@ async function _compressPhotos({ todo, mapRefs }) {
       try {
         const blob = await photoGet(s.id);
         if (!blob) continue;
-        const isMap = mapRefs.has('idb:' + s.id);
-        const out = await compressImage(blob, isMap ? 4000 : PHOTO_MAX_DIM, isMap ? 0.95 : PHOTO_QUALITY, isMap ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
+        const sp = specOf('idb:' + s.id);
+        const out = await compressImage(blob, sp.maxSize, sp.quality, sp.targetBytes);
         if (out !== blob && out.size < blob.size * 0.9) {
           await photoPut(s.id, out);
           saved += blob.size - out.size; shrunk++;
@@ -1418,7 +1450,7 @@ function migrateLegacyPhotos() {
       let wake = null;
       try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
       const total = urls.length;
-      const mapUrls = _mapPhotoRefs();
+      const specOf = _specResolver();
       let ok = 0, dead = 0;
       let pending = urls;
       let lastErr = '';
@@ -1436,8 +1468,8 @@ function migrateLegacyPhotos() {
               const url = queue.shift();
               try {
                 let blob = await _fetchLegacyPhoto(url);
-                const isMap = mapUrls.has(url);
-                blob = await compressImage(blob, isMap ? 4000 : PHOTO_MAX_DIM, isMap ? 0.95 : PHOTO_QUALITY, isMap ? MAP_TARGET_BYTES : PHOTO_TARGET_BYTES);
+                const sp = specOf(url);
+                blob = await compressImage(blob, sp.maxSize, sp.quality, sp.targetBytes);
                 const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
                 await photoPut(id, blob);
                 batch[url] = 'idb:' + id;
@@ -2503,7 +2535,7 @@ async function addPhotoFromPicker(input) {
   for (const file of files) {
     showUploadStatus('儲存中...');
     try {
-      const url = await savePhoto(file);
+      const url = await savePhoto(file, SPEC_TAB);
       data.photos.push({ id: Date.now() + Math.random(), url, day: dayKey });
       save();
       renderPhotoPage();
@@ -2684,7 +2716,7 @@ function mapAddNew() {
     showUploadStatus('儲存中…');
     try {
       // 地圖圖片文字較小較密，用比一般照片更高的解析度與畫質上傳，避免文字糊掉
-      const url = await savePhoto(file, { maxSize: 4000, quality: 0.95, targetBytes: MAP_TARGET_BYTES });
+      const url = await savePhoto(file, SPEC_MAP);
       _mapList().push({ id: Date.now(), name, url });
       _mapIdx = _mapList().length - 1;
       save();
@@ -5663,7 +5695,7 @@ async function exportBackup(skipCompressCheck) {
       const need = await _photosNeedingCompress();
       if (need.todo.length) {
         showConfirm('先壓縮照片再匯出？',
-          `有 ${need.todo.length} 張照片超過 ${PHOTO_TARGET_BYTES / 1024} KB（共 ${_fmtMB(need.bytes)}）。壓縮後備份檔會小很多，匯出也比較不會當掉。壓縮無法還原成原圖；壓縮期間請保持螢幕亮著，完成後會自動匯出。`,
+          `有 ${need.todo.length} 張照片尺寸或大小超過規定（「照片」頁最長邊 1200px、其他地方 800px；共 ${_fmtMB(need.bytes)}）。壓縮後備份檔會小很多，匯出也比較不會當掉。壓縮無法還原成原圖；壓縮期間請保持螢幕亮著，完成後會自動匯出。`,
           async () => {
             let r;
             try { r = await _compressPhotos(need); }
