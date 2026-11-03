@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.03.2';
+const APP_VERSION = '2026.11.03.3';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3559,10 +3559,11 @@ function _ndAutosize() {
 }
 
 function _ndRenderHead() {
+  // 書籤圖示：空心＝沒釘選，實心＝已釘選
+  const outline = 'M5,21V5Q5,4.17 5.59,3.59T7,3H17q0.82,0 1.41,0.59T19,5V21l-7-3L5,21Zm2-3.05l5-2.15l5,2.15V5H7V17.95ZM7,5H17H12H7Z';
+  const solid = 'M5,21V5Q5,4.17 5.59,3.59T7,3H17q0.82,0 1.41,0.59T19,5V21l-7-3L5,21Z';
   document.getElementById('nd-pin').innerHTML =
-    `<svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 0 24 24" width="22px">${_nd.pinned
-      ? '<circle cx="12" cy="12" r="7" fill="#C9A84C"/>'
-      : '<circle cx="12" cy="12" r="6.25" fill="none" stroke="#C9A84C" stroke-width="1.5"/>'}</svg>`;
+    `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px"><path d="${_nd.pinned ? solid : outline}"/></svg>`;
 }
 
 function _ndRenderImgs() {
@@ -3650,21 +3651,6 @@ function ndTogglePin() {
     if (n) { if (_nd.pinned) n.pinned = true; else delete n.pinned; save(); }
   }
   _ndRenderHead();
-}
-
-function ndCopy() {
-  const t = document.getElementById('nd-title').value.trim();
-  const b = document.getElementById('nd-text').value.trim();
-  const text = [t, b].filter(Boolean).join('\n');
-  if (!text) { showToast('沒有可複製的文字'); return; }
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => showToast('已複製')).catch(() => showToast('複製失敗'));
-  } else {
-    const ta = document.createElement('textarea');
-    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-    showToast('已複製');
-  }
 }
 
 function ndDelete() {
@@ -3954,7 +3940,7 @@ function renderFlightCards() {
       </div>`;
     };
     return `
-      <div class="fc2-seg${label === '去程' ? ' out' : ''}">
+      <div class="fc2-seg">
         <div class="fc2-seg-tag">${label}</div>
         <div class="fc2-date-row">
           <span>${esc(seg.date||'')}</span>
