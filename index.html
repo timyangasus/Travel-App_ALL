@@ -961,7 +961,8 @@
   <div class="nd-body" id="nd-body">
     <textarea id="nd-title" class="nd-title" rows="1" placeholder="標題"
       oninput="ndInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('nd-text').focus()}"></textarea>
-    <textarea id="nd-text" class="nd-text" rows="1" placeholder="寫點什麼…" oninput="ndInput()"></textarea>
+    <div id="nd-view" class="nd-text nd-view" onclick="ndViewClick(event)" style="display:none"></div>
+    <textarea id="nd-text" class="nd-text" rows="1" placeholder="寫點什麼…" oninput="ndInput()" onfocus="_nd.editing=true" onblur="ndTextBlur()"></textarea>
     <div class="nd-images" id="nd-images"></div>
   </div>
   <div class="nd-toolbar">

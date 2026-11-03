@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.03.5';
+const APP_VERSION = '2026.11.03.6';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3548,13 +3548,26 @@ function renderNotes() {
   list.innerHTML = html;
 }
 
+/* 文字裡的網址變成可以點的連結（只認英數字與網址符號，遇到中文標點就斷開） */
+function _linkify(text) {
+  const re = /https?:\/\/[A-Za-z0-9\-._~:\/?#\[\]@!$&'()*+,;=%]+/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(text))) {
+    const url = m[0].replace(/[.,;:!?)\]]+$/, '');
+    out += esc(text.slice(last, m.index)) + `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a>`;
+    last = m.index + url.length;
+    re.lastIndex = last;
+  }
+  return out + esc(text.slice(last));
+}
+
 /* ─── 編輯畫面 ─── */
-let _nd = { id: null, imgs: [], pinned: false, timer: null, open: false, ts: 0 };
+let _nd = { id: null, imgs: [], pinned: false, timer: null, open: false, ts: 0, editing: false };
 
 function _ndAutosize() {
   ['nd-title', 'nd-text'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    if (el && el.offsetParent !== null) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
   });
 }
 
@@ -3604,6 +3617,28 @@ function _ndSave() {
   save();
 }
 
+/* 內文有網址、而且現在沒在打字時：顯示成可點連結的閱讀版；點到文字（不是連結）就切回輸入框 */
+function _ndSyncView() {
+  const ta = document.getElementById('nd-text'), view = document.getElementById('nd-view');
+  const showView = !_nd.editing && /https?:\/\//.test(ta.value);
+  if (showView) view.innerHTML = _linkify(ta.value);
+  view.style.display = showView ? '' : 'none';
+  ta.style.display = showView ? 'none' : '';
+  _ndAutosize();
+}
+function ndViewClick(e) {
+  if (e.target.closest('a')) return;   // 點連結：照原本開啟網址
+  _nd.editing = true;
+  _ndSyncView();
+  const ta = document.getElementById('nd-text');
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+function ndTextBlur() {
+  _nd.editing = false;
+  setTimeout(() => { if (_nd.open && !_nd.editing) _ndSyncView(); }, 150);
+}
+
 function ndInput() {
   _ndAutosize();
   clearTimeout(_nd.timer);
@@ -3613,12 +3648,13 @@ function ndInput() {
 function openNoteSheet(id) {
   const note = id === null ? null : data.notes.find(n => n.id === id);
   const p = note ? _noteParts(note) : { title: '', body: '', imgs: [] };
-  _nd = { id: note ? note.id : null, imgs: p.imgs.slice(), pinned: !!note?.pinned, timer: null, open: true, ts: note ? _noteTs(note) : Date.now() };
+  _nd = { id: note ? note.id : null, imgs: p.imgs.slice(), pinned: !!note?.pinned, timer: null, open: true, ts: note ? _noteTs(note) : Date.now(), editing: false };
   document.getElementById('nd-title').value = p.title;
   document.getElementById('nd-text').value = p.body;
   _ndRenderHead(); _ndRenderImgs();
   const el = document.getElementById('note-detail');
   el.classList.add('open');
+  _ndSyncView();
   document.getElementById('nd-body').scrollTop = 0;
   _ndAutosize();
   ndSyncViewport();
