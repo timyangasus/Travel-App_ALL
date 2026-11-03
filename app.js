@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.10.30.29';
+const APP_VERSION = '2026.11.03.1';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3237,65 +3237,6 @@ function openExpenseSheetForEdit(id) {
 /* ═══════════════════════════════════════
    NOTES — card-based
 ═══════════════════════════════════════ */
-let _noteEditId = null;
-let _noteImages = []; // staging images in sheet
-
-function noteBodyToHtml(text, noteId) {
-  const segments = text.split(/\[\[IMG:([^\]]+)\]\]/);
-  let html = '';
-  let imgIdx = 0;
-  for (let i = 0; i < segments.length; i++) {
-    if (i % 2 === 0) {
-      const t = segments[i].trim();
-      if (t) {
-        const escaped = esc(t).replace(/(https?:\/\/[^\s]+)/g,
-          url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`);
-        html += `<span style="white-space:pre-wrap">${escaped}</span>`;
-      }
-    } else {
-      const idx = imgIdx++;
-      html += `<img src="${resolvePhoto(segments[i])}" style="max-width:100%;border-radius:0;display:block;margin:8px 0;cursor:pointer" onclick="event.stopPropagation();openNoteImageAt(${noteId}, ${idx})">`;
-    }
-  }
-  return html;
-}
-
-/* 取出某篇筆記內所有圖片網址（順序與內文出現順序一致） */
-function _noteImageUrls(n) {
-  let body = n?.content || '';
-  if (n?.images?.length && !body.includes('[[IMG:')) {
-    body += n.images.map(u => '\n[[IMG:' + u + ']]').join('');
-  }
-  return [...body.matchAll(/\[\[IMG:([^\]]+)\]\]/g)].map(m => resolvePhoto(m[1]));
-}
-
-function openNoteImageAt(noteId, index) {
-  const n = (data.notes || []).find(n => n.id === noteId);
-  if (!n) return;
-  const urls = _noteImageUrls(n);
-  if (!urls.length) return;
-  openImageLightbox(urls[index] || urls[0], urls, index);
-}
-
-/* 折疊卡片中的縮圖列：單張維持原尺寸，多張則排成一列，超過上限用「+N」提示 */
-function _buildNoteThumbHtml(urls, noteId) {
-  if (!urls.length) return '';
-  if (urls.length === 1) {
-    return `<img class="note-card-thumb" src="${urls[0]}" style="cursor:pointer" onclick="event.stopPropagation();openNoteImageAt(${noteId}, 0)">`;
-  }
-  const MAX = 3;
-  const shown = urls.slice(0, MAX);
-  const extra = urls.length - MAX;
-  const thumbs = shown.map((u, i) => {
-    const isLast = i === MAX - 1 && extra > 0;
-    return `<div style="position:relative;width:64px;height:64px;flex-shrink:0">
-      <img src="${u}" style="width:64px;height:64px;object-fit:cover;display:block;cursor:pointer" onclick="event.stopPropagation();openNoteImageAt(${noteId}, ${i})">
-      ${isLast ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,0.45);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:700;pointer-events:none">+${extra}</div>` : ''}
-    </div>`;
-  }).join('');
-  return `<div style="display:flex;gap:4px;flex-shrink:0">${thumbs}</div>`;
-}
-
 /* ─── 圖片放大檢視（iOS 相簿風格：滿版、可雙指縮放/雙擊縮放、單擊關閉） ─── */
 function openImageLightbox(url, urls, idx) {
   urls = (urls && urls.length) ? urls : [url];
@@ -3530,24 +3471,36 @@ function _initLightboxGestures(lb, img) {
   }, { passive: false });
 }
 
-function openNoteSheet(id) {
-  _noteEditId = id;
-  const isNew = id === null;
-  document.getElementById('note-sheet-title').textContent = isNew ? '新增筆記' : '編輯筆記';
-  const delRow = document.getElementById('note-delete-row');
-  if (delRow) delRow.style.display = isNew ? 'none' : 'flex';
-  const note = isNew ? null : data.notes.find(n => n.id === id);
-  const ta = document.getElementById('note-sheet-content');
-  // Migrate legacy images array into [[IMG:]] markers
-  let noteContent = note?.content || '';
-  if (note?.images?.length && !noteContent.includes('[[IMG:')) {
-    noteContent += note.images.map(u => '\n[[IMG:' + u + ']]').join('');
+/* ═══════════════════════════════════════
+   筆記：清單式（日期＋標題＋預覽＋縮圖）→ 點進去滿版編輯
+   資料格式不變：notes[] = { id, content, pinned? }；content 第一行是標題，圖片用 [[IMG:ref]] 標記放在最後
+═══════════════════════════════════════ */
+const NOTE_WD = ['日','一','二','三','四','五','六'];
+
+function _noteTs(n) { return n.createdAt || (n.id > 1e12 ? n.id : 0); }
+
+/* 把一篇筆記拆成 { title, body, imgs }（imgs 是原始參照 "idb:…" 或網址） */
+function _noteParts(n) {
+  let content = n?.content || '';
+  if (n?.images?.length && !content.includes('[[IMG:')) {
+    content += n.images.map(u => '\n[[IMG:' + u + ']]').join('');
   }
-  ta.value = noteContent;
-  ta.setSelectionRange(0, 0);
-  _renderNoteImgPreview();
-  document.getElementById('modal-note-sheet').classList.add('open');
-  setTimeout(() => { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }, 340);
+  const imgs = [...content.matchAll(/\[\[IMG:([^\]]+)\]\]/g)].map(m => m[1]);
+  const text = content.replace(/\[\[IMG:[^\]]+\]\]/g, '').replace(/\n{3,}/g, '\n\n');
+  const lines = text.split('\n');
+  const title = (lines[0] || '').trim();
+  const body = lines.slice(1).join('\n').replace(/^\s*\n/, '').trimEnd();
+  return { title, body, imgs };
+}
+
+function _noteThumbHtml(refs) {
+  const urls = refs.map(resolvePhoto).filter(Boolean);
+  if (!urls.length) return '';
+  const show = urls.slice(0, 4);
+  const extra = urls.length - 4;
+  const cells = show.map((u, i) =>
+    `<div class="nl-cell"><img src="${esc(u)}" alt="">${i === 3 && extra > 0 ? `<div class="nl-more">+${extra}</div>` : ''}</div>`).join('');
+  return `<div class="nl-thumb n${show.length}">${cells}</div>`;
 }
 
 /* 圖集（原本獨立的照片清單，data.tickets）與筆記合併：
@@ -3572,201 +3525,218 @@ function renderNotes() {
   const list = document.getElementById('notes-card-list');
   if (!list) return;
   if (!data.notes.length) {
-    list.innerHTML = '<div style="color:#CCCCCC;font-family:var(--mono);font-size:14px;text-align:center;padding:40px 0">尚無筆記</div>';
+    list.innerHTML = '<div style="color:#CCCCCC;font-family:var(--mono);font-size:14px;text-align:center;padding:40px 0">尚無筆記，點右上角 ＋ 新增</div>';
     return;
   }
-  const sorted = [...data.notes].reverse();
-  sorted.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-  list.innerHTML = sorted.map(n => {
-    const lines = (n.content || '').split('\n');
-    const title = lines[0] || '';
-    const body = lines.slice(1).join('\n').trim();
-    // merge legacy images into body
-    let fullBody = body;
-    if (n.images?.length && !fullBody.includes('[[IMG:')) {
-      fullBody += n.images.map(u => '\n[[IMG:' + u + ']]').join('');
+  const sorted = [...data.notes].sort((a, b) =>
+    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || _noteTs(b) - _noteTs(a));
+  let html = '', lastKey = null;
+  sorted.forEach(n => {
+    const ts = _noteTs(n);
+    const d = ts ? new Date(ts) : null;
+    const key = n.pinned ? 'pin' : (d ? `${d.getFullYear()}-${d.getMonth()}` : 'none');
+    if (key !== lastKey) {
+      lastKey = key;
+      const label = n.pinned ? '置頂' : (d ? `${d.getFullYear()}年${d.getMonth() + 1}月` : '未標日期');
+      html += `<div class="nl-sec">${label}</div>`;
     }
-    // Extract every image for the thumbnail row (not just the first one)
-    const imgUrls = [...fullBody.matchAll(/\[\[IMG:([^\]]+)\]\]/g)].map(m => resolvePhoto(m[1]));
-    // Body without [[IMG:]] for text-only clamp display
-    const textOnly = fullBody.replace(/\n?\[\[IMG:[^\]]+\]\]\n?/g, '').trim();
-    const bodyHtml = fullBody ? noteBodyToHtml(fullBody, n.id) : '';
-    const textOnlyHtml = textOnly ? `<div class="note-card-body note-card-body-clamp" onclick="openNoteSheet(${n.id})">${esc(textOnly).replace(/(https?:\/\/[^\s]+)/g, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`)}</div>` : '';
-    const thumbHtml = _buildNoteThumbHtml(imgUrls, n.id);
-    // Collapsed view: thumbnail + text side by side
-    const collapsedInner = `<div class="note-card-content-row" id="ncollapsed-${n.id}">
-        ${thumbHtml}
-        <div class="note-card-text-col" style="margin-top:-5px">${textOnlyHtml}</div>
-      </div>`;
-    // Expanded view: full bodyHtml with images inline
-    const expandedInner = bodyHtml ? `<div class="note-card-body" onclick="openNoteSheet(${n.id})" style="display:none" id="nexpanded-${n.id}">${bodyHtml}</div>` : '';
-    return `<div class="note-card" id="ncard-${n.id}">
-      <button onclick="event.stopPropagation();confirmDeleteNote(${n.id})" style="position:absolute;top:8px;right:4px;background:none;border:none;font-size:18px;color:#CCCCCC;cursor:pointer;line-height:1;padding:6px;display:flex;align-items:center">×</button>
-      <button onclick="event.stopPropagation();toggleNotePin(${n.id})" style="position:absolute;top:8px;right:35px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
-        <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 0 24 24" width="22px">
-          ${n.pinned
-            ? '<circle cx="12" cy="12" r="7" fill="#B8860B"/>'
-            : '<circle cx="12" cy="12" r="6.25" fill="none" stroke="#B8860B" stroke-width="1.5"/>'}
-        </svg>
-      </button>
-      <button onclick="event.stopPropagation();copyNoteText(${n.id})" style="position:absolute;top:10px;right:72px;background:none;border:none;cursor:pointer;padding:6px;line-height:1;display:flex;align-items:center">
-        <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px"><path fill="#B8860B" d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>
-      </button>
-      <div class="note-card-title" style="padding-right:108px;margin-bottom:8px" onclick="openNoteSheet(${n.id})">${esc(title)}</div>
-      <div class="note-card-inner collapsed" id="ninner-${n.id}">
-        ${collapsedInner}
-        ${expandedInner}
+    const p = _noteParts(n);
+    html += `<div class="nl-card" onclick="openNoteSheet(${n.id})">
+      <div class="nl-left"><div class="nl-day">${d ? d.getDate() : '–'}</div><div class="nl-wd">${d ? '週' + NOTE_WD[d.getDay()] : ''}</div></div>
+      <div class="nl-mid">
+        <div class="nl-title">${esc(p.title || '（無標題）')}</div>
+        <div class="nl-body">${esc(p.body.replace(/\s+/g, ' '))}</div>
       </div>
-      <div class="note-card-toggle" id="ntoggle-${n.id}" onclick="toggleNoteCard(${n.id})" style="display:none">
-        <svg id="ntoggle-icon-${n.id}" xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#AAAAAA"><path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z"/></svg>
-      </div>
+      ${_noteThumbHtml(p.imgs)}
     </div>`;
+  });
+  list.innerHTML = html;
+}
+
+/* ─── 編輯畫面 ─── */
+let _nd = { id: null, imgs: [], pinned: false, timer: null, open: false, ts: 0 };
+
+function _ndAutosize() {
+  ['nd-title', 'nd-text'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+  });
+}
+
+function _ndRenderHead() {
+  const main = document.getElementById('nd-date-main'), sub = document.getElementById('nd-date-sub');
+  if (_nd.ts) {
+    const d = new Date(_nd.ts);
+    main.textContent = `${d.getMonth() + 1}月${d.getDate()}日（週${NOTE_WD[d.getDay()]}）`;
+    const h = d.getHours(), m = String(d.getMinutes()).padStart(2, '0');
+    sub.textContent = `${h % 12 === 0 ? 12 : h % 12}:${m} ${h < 12 ? 'AM' : 'PM'}`;
+  } else { main.textContent = ''; sub.textContent = ''; }
+  document.getElementById('nd-pin').innerHTML =
+    `<svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 0 24 24" width="22px">${_nd.pinned
+      ? '<circle cx="12" cy="12" r="7" fill="#C9A84C"/>'
+      : '<circle cx="12" cy="12" r="6.25" fill="none" stroke="#C9A84C" stroke-width="1.5"/>'}</svg>`;
+}
+
+function _ndRenderImgs() {
+  const wrap = document.getElementById('nd-images');
+  wrap.innerHTML = _nd.imgs.map((ref, i) => {
+    const u = resolvePhoto(ref);
+    return `<div class="nd-img">${u ? `<img src="${esc(u)}" alt="" onclick="ndOpenImg(${i})">` : ''}<button class="nd-img-del" onclick="ndRemoveImg(${i})" aria-label="移除">×</button></div>`;
   }).join('');
-
-  setTimeout(() => {
-    if (!Array.isArray(data.notes)) return;
-    sorted.forEach(n => {
-      const inner  = document.getElementById('ninner-'  + n.id);
-      const toggle = document.getElementById('ntoggle-' + n.id);
-      if (!inner || !toggle) return;
-      const hasImg = (n.content || '').includes('[[IMG:') || n.images?.length;
-      // 暫時移除 collapsed 量真實高度
-      inner.classList.remove('collapsed');
-      const fullH = inner.scrollHeight;
-      inner.classList.add('collapsed');
-      const clampH = inner.clientHeight;
-      if (fullH > clampH + 4 || hasImg) {
-        toggle.style.display = 'flex';
-      }
-    });
-  }, 400);
 }
 
-function toggleNoteCard(id) {
-  const inner       = document.getElementById('ninner-'       + id);
-  const toggle      = document.getElementById('ntoggle-'      + id);
-  const icon        = document.getElementById('ntoggle-icon-' + id);
-  const expandedEl  = document.getElementById('nexpanded-'    + id);
-  const collapsedEl = document.getElementById('ncollapsed-'   + id);
-  if (!inner) return;
-  const isExpanded = inner.classList.toggle('expanded');
-  inner.classList.toggle('collapsed', !isExpanded);
-  // Show/hide views
-  if (collapsedEl) collapsedEl.style.display = isExpanded ? 'none' : 'flex';
-  if (expandedEl)  expandedEl.style.display  = isExpanded ? 'block' : 'none';
-  // Update label
-  // Swap chevron icon
-  if (icon) {
-    icon.innerHTML = isExpanded
-      ? '<path d="M480-616 240-376l-56-56 296-296 296 296-56 56-240-240Z"/>'
-      : '<path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z"/>';
+function _ndContent() {
+  const title = document.getElementById('nd-title').value.replace(/\n/g, ' ').trim();
+  const body = document.getElementById('nd-text').value.replace(/^\n+/, '').trimEnd();
+  let content = title;
+  if (body) content += (content ? '\n' : '') + body;   // 沒填標題時，內文第一行就是標題
+  content += _nd.imgs.map(u => '\n[[IMG:' + u + ']]').join('');
+  return { content, empty: !title && !body && !_nd.imgs.length };
+}
+
+function _ndSave() {
+  clearTimeout(_nd.timer); _nd.timer = null;
+  const { content, empty } = _ndContent();
+  if (empty) return;
+  if (!Array.isArray(data.notes)) data.notes = [];
+  if (_nd.id === null) {
+    let id = _nd.ts || Date.now();
+    while (data.notes.some(n => n.id === id)) id++;
+    const n = { id, content };
+    if (_nd.pinned) n.pinned = true;
+    data.notes.push(n);
+    _nd.id = id;
+  } else {
+    const n = data.notes.find(n => n.id === _nd.id);
+    if (!n) return;
+    n.content = content;
+    if (_nd.pinned) n.pinned = true; else delete n.pinned;
   }
+  save();
 }
 
-function copyNoteText(id) {
-  const n = data.notes.find(n => n.id === id);
-  if (!n) return;
-  const text = [n.title, n.content].filter(Boolean).join('\n').trim();
+function ndInput() {
+  _ndAutosize();
+  clearTimeout(_nd.timer);
+  _nd.timer = setTimeout(_ndSave, 700);   // 邊打邊自動存，不用按儲存
+}
+
+function openNoteSheet(id) {
+  const note = id === null ? null : data.notes.find(n => n.id === id);
+  const p = note ? _noteParts(note) : { title: '', body: '', imgs: [] };
+  _nd = { id: note ? note.id : null, imgs: p.imgs.slice(), pinned: !!note?.pinned, timer: null, open: true, ts: note ? _noteTs(note) : Date.now() };
+  document.getElementById('nd-title').value = p.title;
+  document.getElementById('nd-text').value = p.body;
+  _ndRenderHead(); _ndRenderImgs();
+  const el = document.getElementById('note-detail');
+  el.classList.add('open');
+  document.getElementById('nd-body').scrollTop = 0;
+  _ndAutosize();
+  ndSyncViewport();
+  if (!note) setTimeout(() => document.getElementById('nd-title').focus(), 250);   // 新增時直接可以打字；開舊筆記不彈鍵盤，先讓你讀
+}
+
+function _ndHide() {
+  clearTimeout(_nd.timer); _nd.timer = null; _nd.open = false;
+  const el = document.getElementById('note-detail');
+  el.classList.remove('open', 'kb');
+  el.style.height = ''; el.style.top = '';
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+
+function closeNoteDetail() {
+  const { empty } = _ndContent();
+  if (empty) {
+    if (_nd.id !== null) { data.notes = data.notes.filter(n => n.id !== _nd.id); save(); }   // 全部清空＝這篇不留
+  } else {
+    _ndSave();
+  }
+  _ndHide();
+  renderNotes();
+}
+
+function ndTogglePin() {
+  _nd.pinned = !_nd.pinned;
+  if (_nd.id !== null) {
+    const n = data.notes.find(n => n.id === _nd.id);
+    if (n) { if (_nd.pinned) n.pinned = true; else delete n.pinned; save(); }
+  }
+  _ndRenderHead();
+}
+
+function ndCopy() {
+  const t = document.getElementById('nd-title').value.trim();
+  const b = document.getElementById('nd-text').value.trim();
+  const text = [t, b].filter(Boolean).join('\n');
+  if (!text) { showToast('沒有可複製的文字'); return; }
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => showToast('已複製'))
-      .catch(() => { document.execCommand('copy'); showToast('已複製'); });
+    navigator.clipboard.writeText(text).then(() => showToast('已複製')).catch(() => showToast('複製失敗'));
   } else {
     const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
     showToast('已複製');
   }
 }
 
-function toggleNotePin(id) {
-  const n = data.notes.find(n => n.id === id);
-  if (!n) return;
-  n.pinned = !n.pinned;
-  save();
-  renderNotes();
-}
-
-function confirmDeleteNote(id) {
+function ndDelete() {
   showConfirm('刪除筆記？', '此筆記將永久移除。', () => {
-    data.notes = data.notes.filter(n => n.id !== id);
-    save();
+    if (_nd.id !== null) { data.notes = data.notes.filter(n => n.id !== _nd.id); save(); }
+    _ndHide();
     renderNotes();
   });
 }
 
-function saveNoteSheet() {
-  const content = document.getElementById('note-sheet-content').value;
-  if (!content.trim()) { closeModal('modal-note-sheet'); return; }
-  if (!Array.isArray(data.notes)) data.notes = [];
-  if (_noteEditId === null) {
-    data.notes.push({ id: Date.now(), content });
-  } else {
-    const note = data.notes.find(n => n.id === _noteEditId);
-    if (note) note.content = content;
-  }
-  save();
-  closeModal('modal-note-sheet');
-  renderNotes();
+function ndOpenImg(i) {
+  const urls = _nd.imgs.map(resolvePhoto).filter(Boolean);
+  if (!urls.length) return;
+  openImageLightbox(urls[i] || urls[0], urls, Math.min(i, urls.length - 1));
 }
 
-function noteInsertImage() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.onchange = async () => {
-    const file = input.files[0];
-    if (!file) return;
-    showUploadStatus('儲存圖片中…');
+function ndRemoveImg(i) {
+  showConfirm('移除照片？', '照片會從這篇筆記拿掉。', () => {
+    _nd.imgs.splice(i, 1);
+    _ndRenderImgs();
+    ndInput();
+  }, null, '移除');
+}
+
+/* 加照片：相簿可一次多選；拍照用相機 */
+function ndAddPhoto(camera) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  if (camera) inp.setAttribute('capture', 'environment'); else inp.multiple = true;
+  inp.onchange = async () => {
+    const files = [...inp.files];
+    if (!files.length) return;
     try {
-      const url = await savePhoto(file);
-      showUploadStatus('');
-      const ta = document.getElementById('note-sheet-content');
-      const start = ta.selectionStart;
-      const marker = '\n[[IMG:' + url + ']]\n';
-      ta.value = ta.value.slice(0, start) + marker + ta.value.slice(ta.selectionEnd);
-      ta.setSelectionRange(start + marker.length, start + marker.length);
-      ta.focus();
-      _renderNoteImgPreview();
-    } catch(e) {
-      showUploadStatus('');
-      showToast('儲存失敗，請再試一次');
-    }
+      for (let i = 0; i < files.length; i++) {
+        showUploadStatus(`儲存中... ${i + 1}/${files.length}`);
+        _nd.imgs.push(await savePhoto(files[i]));
+        _ndRenderImgs();
+      }
+      _ndSave();
+    } catch (e) {
+      console.log('筆記照片儲存失敗', e);
+      showToast('儲存失敗：' + e.message);
+    } finally { showUploadStatus(''); }
   };
-  _openPicker(input);
+  _openPicker(inp);
 }
 
-function _renderNoteImgPreview() {
-  const wrap = document.getElementById('note-img-preview');
-  if (!wrap) return;
-  const ta = document.getElementById('note-sheet-content');
-  const matches = ta ? [...ta.value.matchAll(/\[\[IMG:([^\]]+)\]\]/g)] : [];
-  if (!matches.length) { wrap.innerHTML = ''; return; }
-  wrap.innerHTML = matches.map((m, i) =>
-    `<div style="position:relative;display:inline-block">
-      <img src="${resolvePhoto(m[1])}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;display:block">
-      <button onclick="_removeNoteImg(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#1A1A1A;border:none;color:#fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">×</button>
-    </div>`
-  ).join('');
+/* iPhone 鍵盤彈出時，把整個編輯畫面縮到鍵盤上方，工具列才不會被蓋住 */
+function ndSyncViewport() {
+  const el = document.getElementById('note-detail');
+  const vv = window.visualViewport;
+  if (!el || !_nd.open || !vv) return;
+  el.style.height = vv.height + 'px';
+  el.style.top = vv.offsetTop + 'px';
+  el.classList.toggle('kb', vv.height < window.innerHeight - 120);
 }
-
-function _removeNoteImg(idx) {
-  const ta = document.getElementById('note-sheet-content');
-  if (!ta) return;
-  let count = 0;
-  ta.value = ta.value.replace(/\n?\[\[IMG:[^\]]+\]\]\n?/g, m => count++ === idx ? '' : m);
-  _renderNoteImgPreview();
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', ndSyncViewport);
+  window.visualViewport.addEventListener('scroll', ndSyncViewport);
 }
-
-function deleteCurrentNote() {
-  if (_noteEditId === null) return;
-  confirmDeleteNote(_noteEditId);
-  closeModal('modal-note-sheet');
-}
-
 
 
 
