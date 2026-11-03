@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.03.6';
+const APP_VERSION = '2026.11.03.7';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3529,7 +3529,8 @@ function renderNotes() {
   const sorted = [...data.notes].sort((a, b) =>
     (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || _noteTs(b) - _noteTs(a));
   let html = '', lastPinned = null;
-  sorted.forEach(n => {
+  // 標題顏色：由上到下從橙色漸變到金色（和行程時間軸同一組顏色）
+  sorted.forEach((n, i) => {
     const pinned = !!n.pinned;
     if (pinned !== lastPinned) {
       lastPinned = pinned;
@@ -3539,7 +3540,7 @@ function renderNotes() {
     const p = _noteParts(n);
     html += `<div class="nl-card" onclick="openNoteSheet(${n.id})">
       <div class="nl-mid">
-        <div class="nl-title">${esc(p.title || '（無標題）')}</div>
+        <div class="nl-title" style="color:${gradGoldOrange(sorted.length > 1 ? i / (sorted.length - 1) : 0)}">${esc(p.title || '（無標題）')}</div>
         <div class="nl-body">${esc(p.body.replace(/\s+/g, ' '))}</div>
       </div>
       ${_noteThumbHtml(p.imgs)}
