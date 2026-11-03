@@ -3884,7 +3884,7 @@ textarea ~ .field-x {
 /* ═══════════════════════════════════════
    筆記：清單 + 滿版編輯
 ═══════════════════════════════════════ */
-.nl-list { padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
+.nl-list { padding: 28px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
 .nl-sec { font-family: var(--mono); font-size: 13px; font-weight: 700; color: #888; padding: 10px 2px 0; }
 .nl-sec:first-child { padding-top: 0; }
 .nl-card {
