@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.03.7';
+const APP_VERSION = '2026.11.03.8';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -1087,6 +1087,7 @@ const INFO_MODULE_DEFS = [
   { id: 'notes',     label: '筆記' },
   { id: 'expense',   label: '記帳' },
   { id: 'map',       label: '地圖' },
+  { id: 'guide',     label: '導覽' },
 ];
 
 const DEFAULT_MODULES = ['flight','hotel','shopping','checklist','notes','expense'];
@@ -1096,13 +1097,18 @@ function getInfoModules() {
   if (!data.settings.infoModules) data.settings.infoModules = [...DEFAULT_MODULES];
   if (!data.settings.infoModulesKnown) data.settings.infoModulesKnown = [...data.settings.infoModules];
   // 只補齊從未見過的新模組（使用者主動勾掉的不動）
-  const nonMap = INFO_MODULE_DEFS.map(m => m.id).filter(id => id !== 'map');
+  const nonMap = INFO_MODULE_DEFS.map(m => m.id).filter(id => id !== 'map' && id !== 'guide');
   nonMap.forEach(id => {
     if (!data.settings.infoModulesKnown.includes(id)) {
       data.settings.infoModulesKnown.push(id);
       data.settings.infoModules.push(id); // 第一次見到才加入
     }
   });
+  // 導覽（曼谷）：行程名稱有「曼谷」的行程第一次看到時自動打開，其他行程要自己到自訂裡勾選
+  if (!data.settings.infoModulesKnown.includes('guide')) {
+    data.settings.infoModulesKnown.push('guide');
+    if (/曼谷|bangkok/i.test(data.settings.tripName || '') && !data.settings.infoModules.includes('guide')) data.settings.infoModules.push('guide');
+  }
   return data.settings.infoModules;
 }
 
@@ -2535,6 +2541,7 @@ function openInfoSub(name) {
   if (name === 'shopping')  renderShopItems();
   if (name === 'notes')     renderNotes();
   if (name === 'map')       renderMapSub();
+  if (name === 'guide')     renderGuide();
 }
 
 function closeInfoSub(name) {
@@ -3469,6 +3476,103 @@ function _initLightboxGestures(lb, img) {
     const rect = lb.getBoundingClientRect();
     zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 1 / 1.12);
   }, { passive: false });
+}
+
+
+/* ═══════════════════════════════════════
+   導覽（曼谷）：路線 → 車站 → 景點；可搜尋、依分類篩選
+   資料在 guide-bangkok.js（GUIDE_BANGKOK）
+═══════════════════════════════════════ */
+const GUIDE = { line: null, cat: '', q: '' };
+
+function _gdTextColor(hex) {
+  const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 165 ? '#1A1A1A' : '#fff';
+}
+function _gdCatLabel(id) { return (GUIDE_BANGKOK.cats.find(c => c.id === id) || {}).label || id; }
+function _gdCode(color, code) {
+  return code ? `<span class="gd-code" style="background:${color};color:${_gdTextColor(color)}">${esc(code)}</span>` : `<span class="gd-dot" style="background:${color}"></span>`;
+}
+
+function _gdSpotHtml(L, S, sp) {
+  const tags = sp.c.map(c => `<span class="gd-tag">${esc(_gdCatLabel(c))}</span>`).join('') + (sp.x ? `<span class="gd-tag go">${esc(sp.x)}</span>` : '');
+  const q = encodeURIComponent((sp.n + ' 曼谷').replace(/'/g, ''));
+  return `<div class="gd-spot" style="border-left-color:${L.color}">
+    <div class="gd-spot-top"><div class="gd-spot-name">${esc(sp.n)}</div>
+      <button class="gd-map" onclick="openAddr(decodeURIComponent('${q}'))" aria-label="在地圖上開啟"><svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px"><path d="M480-480q33 0 56.5-23.5T560-560q0-33-23.5-56.5T480-640q-33 0-56.5 23.5T400-560q0 33 23.5 56.5T480-480Zm0 294q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm0 106Q319-217 239.5-334.5T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 100-79.5 217.5T480-80Zm0-480Z"/></svg></button>
+    </div>
+    <div class="gd-spot-desc">${esc(sp.d)}</div>
+    <div class="gd-tags">${tags}</div>
+  </div>`;
+}
+
+function _gdMatch(L, S, sp, q) {
+  if (GUIDE.cat && !sp.c.includes(GUIDE.cat)) return false;
+  if (!q) return true;
+  return (sp.n + sp.d + S.name + S.en + S.code + L.name + L.theme).toLowerCase().includes(q);
+}
+
+function renderGuide() {
+  const G = GUIDE_BANGKOK;
+  const q = GUIDE.q.trim().toLowerCase();
+  const filtering = !!(q || GUIDE.cat);
+  // 分類篩選列
+  document.getElementById('gd-chips').innerHTML =
+    `<button class="gd-chip${GUIDE.cat ? '' : ' on'}" onclick="guideCat('')">全部</button>` +
+    G.cats.map(c => `<button class="gd-chip${GUIDE.cat === c.id ? ' on' : ''}" onclick="guideCat('${c.id}')">${esc(c.label)}</button>`).join('');
+  const line = GUIDE.line ? G.lines.find(l => l.id === GUIDE.line) : null;
+  document.getElementById('gd-title').textContent = line ? line.name : '曼谷導覽';
+  const body = document.getElementById('gd-body');
+
+  // A. 路線清單
+  if (!filtering && !line) {
+    body.innerHTML = G.lines.map(L => {
+      const spots = L.stations.reduce((n, S) => n + S.spots.length, 0);
+      const codes = L.stations.some(S => S.code)
+        ? `<div class="gd-line-codes">${L.stations.filter(S => S.code).map(S => _gdCode(L.color, S.code)).join('')}</div>` : '';
+      const sub = [L.theme, L.stations.length > 1 || L.stations[0].code ? `${L.stations.length} 站` : '', `${spots} 個景點`].filter(Boolean).join(' · ');
+      return `<div class="gd-line" onclick="guideOpenLine('${L.id}')">
+        <div class="gd-line-bar" style="background:${L.color}"></div>
+        <div class="gd-line-main"><div class="gd-line-name">${esc(L.name)}</div><div class="gd-line-sub">${esc(sub)}</div>${codes}</div>
+        <div class="gd-line-chev">›</div></div>`;
+    }).join('');
+    body.scrollTop = 0;
+    return;
+  }
+
+  // B. 車站＋景點（選了路線，或有搜尋／分類篩選）
+  const lines = line ? [line] : G.lines;
+  let html = '', count = 0;
+  lines.forEach(L => {
+    let part = '';
+    L.stations.forEach(S => {
+      const spots = S.spots.filter(sp => _gdMatch(L, S, sp, q));
+      if (!spots.length) return;
+      count += spots.length;
+      part += `<div class="gd-station">${_gdCode(L.color, S.code)}<span class="gd-sname">${esc(S.name)}</span><span class="gd-sen">${esc(S.en)}</span></div>`
+            + spots.map(sp => _gdSpotHtml(L, S, sp)).join('');
+    });
+    if (!part) return;
+    const head = `<div class="gd-linehead" style="background:${L.color};color:${_gdTextColor(L.color)}"><div class="gd-linehead-name">${esc(L.name)}</div>${L.theme ? `<div class="gd-linehead-sub">${esc(L.theme)}</div>` : ''}</div>`;
+    const notes = (!filtering && line) ? L.notes.map(n => `<div class="gd-note">${esc(n)}</div>`).join('') : '';
+    html += head + notes + part;
+  });
+  body.innerHTML = count ? html : '<div class="gd-empty">找不到符合的景點</div>';
+  body.scrollTop = 0;
+}
+
+function guideOpenLine(id) { GUIDE.line = id; renderGuide(); }
+function guideCat(id) { GUIDE.cat = (GUIDE.cat === id) ? '' : id; renderGuide(); }
+function guideSearch(v) { GUIDE.q = v || ''; renderGuide(); }
+function guideBack() {
+  // 一層一層退：先清掉搜尋／分類 → 再回路線清單 → 最後離開導覽
+  if (GUIDE.q || GUIDE.cat) {
+    GUIDE.q = ''; GUIDE.cat = '';
+    document.getElementById('gd-search').value = '';
+    renderGuide(); return;
+  }
+  if (GUIDE.line) { GUIDE.line = null; renderGuide(); return; }
+  closeInfoSub('guide');
 }
 
 /* ═══════════════════════════════════════
@@ -6105,7 +6209,7 @@ function clearAllData() {
 (function() {
   // 左右滑的順序永遠跟著「旅遊資訊」清單實際顯示的順序走（DOM 順序 + 目前可見的項目），
   // 不再另外寫死一份順序，避免跟清單本身的排序兜不起來。地圖跟記帳有自己的手勢，不參與滑動。
-  const SWIPE_EXCLUDE = new Set(['expense', 'map']);
+  const SWIPE_EXCLUDE = new Set(['expense', 'map', 'guide']);
   function _allInfoSubIds() {
     return [...document.querySelectorAll('.info-list-item')]
       .map(btn => btn.id.replace(/^info-btn-/, ''))

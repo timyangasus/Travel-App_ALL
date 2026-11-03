@@ -3942,3 +3942,54 @@ textarea ~ .field-x {
 .nd-tb-btn { width: 44px; height: 44px; border: none; background: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
 .nd-tb-btn svg path { fill: #C9A84C; }
 .nd-tb-btn:active { background: #F0F0F0; }
+
+/* ═══════════════════════════════════════
+   導覽（曼谷）：路線 → 車站 → 景點
+═══════════════════════════════════════ */
+#screen-info-guide { overflow: hidden; }
+.gd-tools { padding: 4px 16px 0; flex-shrink: 0; }
+.gd-search {
+  width: 100%; box-sizing: border-box; height: 42px; border: 1px solid #E2E2E2; border-radius: 10px;
+  padding: 0 14px; font-size: 16px; font-family: var(--mono); outline: none; background: #FAFAFA; -webkit-appearance: none;
+}
+.gd-search:focus { border-color: #C9A84C; background: #fff; }
+.gd-chips { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.gd-chips::-webkit-scrollbar { display: none; }
+.gd-chip {
+  flex-shrink: 0; border: 1px solid #DADADA; background: #fff; color: #555; border-radius: 999px;
+  padding: 7px 14px; font-size: 14px; font-family: var(--mono); font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.gd-chip.on { background: #C9A84C; border-color: #C9A84C; color: #fff; }
+.gd-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 16px 28px; font-family: var(--mono); }
+.gd-empty { text-align: center; color: #BBB; padding: 50px 0; font-size: 14px; }
+
+.gd-line { display: flex; align-items: stretch; gap: 12px; background: #fff; border: 1px solid #E8E8E8; margin-bottom: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.gd-line:active { background: #F8F8F8; }
+.gd-line-bar { width: 10px; flex-shrink: 0; }
+.gd-line-main { flex: 1; min-width: 0; padding: 12px 0; }
+.gd-line-name { font-size: 18px; font-weight: 800; color: #1A1A1A; }
+.gd-line-sub { font-size: 12px; color: #888; margin-top: 3px; }
+.gd-line-codes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 9px; }
+.gd-line-chev { align-self: center; padding-right: 10px; color: #BBB; font-size: 22px; }
+.gd-code { display: inline-block; min-width: 30px; text-align: center; padding: 2px 6px; border-radius: 6px; font-size: 12px; font-weight: 800; line-height: 1.5; box-sizing: border-box; }
+
+.gd-linehead { margin: 14px 0 6px; padding: 12px 14px; color: #fff; }
+.gd-linehead-name { font-size: 18px; font-weight: 800; }
+.gd-linehead-sub { font-size: 13px; opacity: 0.92; margin-top: 3px; }
+.gd-note { font-size: 12px; color: #888; margin: 6px 2px 0; line-height: 1.6; }
+
+.gd-station { display: flex; align-items: baseline; gap: 8px; margin: 16px 0 6px; padding-left: 2px; }
+.gd-sname { font-size: 17px; font-weight: 800; color: #1A1A1A; }
+.gd-sen { font-size: 12px; color: #999; }
+.gd-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; align-self: center; }
+
+.gd-spot { background: #fff; border: 1px solid #E8E8E8; border-left-width: 4px; padding: 10px 12px; margin-bottom: 8px; }
+.gd-spot-top { display: flex; align-items: flex-start; gap: 8px; }
+.gd-spot-name { flex: 1; font-size: 16px; font-weight: 800; color: #1A1A1A; line-height: 1.35; }
+.gd-spot-desc { font-size: 13px; color: #666; line-height: 1.6; margin-top: 3px; }
+.gd-map { flex-shrink: 0; width: 32px; height: 32px; margin: -4px -6px 0 0; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; padding: 0; }
+.gd-map svg path { fill: #C9A84C; }
+.gd-map:active { background: #F0F0F0; }
+.gd-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.gd-tag { font-size: 11px; font-weight: 700; color: #8A7430; background: #F6F0DC; border-radius: 4px; padding: 2px 7px; }
+.gd-tag.go { color: #B45309; background: #FDEBD3; }
