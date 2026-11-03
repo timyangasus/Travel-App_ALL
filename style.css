@@ -3894,14 +3894,11 @@ textarea ~ .field-x {
 .nl-sec:first-child { padding-top: 0; }
 .nl-card {
   display: flex; align-items: center; gap: 14px;
-  padding: 6px 6px 6px 10px; min-height: 102px; box-sizing: border-box;
+  padding: 6px 6px 6px 16px; min-height: 92px; box-sizing: border-box;
   background: #fff; border: 1px solid #E4E4E4; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .nl-card:active { background: #F8F8F8; }
-.nl-left { flex-shrink: 0; width: 48px; text-align: center; font-family: var(--mono); }
-.nl-day { font-size: 24px; font-weight: 800; color: #1A1A1A; line-height: 1.15; }
-.nl-wd { font-size: 13px; font-weight: 600; color: #888; }
 .nl-mid { flex: 1; min-width: 0; font-family: var(--mono); }
 .nl-title { font-size: 19px; font-weight: 700; color: #C9A84C; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nl-body { font-size: 15px; color: #888; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3927,9 +3924,7 @@ textarea ~ .field-x {
 .nd-btn { width: 38px; height: 38px; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; border-radius: 50%; flex-shrink: 0; }
 .nd-btn svg path { fill: #C9A84C; }
 .nd-btn:active { background: #F0F0F0; }
-.nd-date { flex: 1; min-width: 0; text-align: center; font-family: var(--mono); }
-.nd-date-main { font-size: 16px; font-weight: 700; color: #1A1A1A; white-space: nowrap; }
-.nd-date-sub { font-size: 12px; color: #999; }
+.nd-spacer { flex: 1; }
 .nd-actions { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
 .nd-done { width: 38px; height: 38px; margin-left: 4px; border: none; border-radius: 50%; background: #C9A84C; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
 .nd-done svg path { fill: #fff; }
@@ -3941,9 +3936,9 @@ textarea ~ .field-x {
 .nd-title { font-size: 22px; font-weight: 800; line-height: 1.35; color: #C9A84C; margin-bottom: 14px; }
 .nd-text { font-size: 19px; line-height: 1.65; min-height: 1.65em; }
 .nd-title::placeholder, .nd-text::placeholder { color: #CCCCCC; }
-.nd-images { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-top: 18px; }
-.nd-img { position: relative; aspect-ratio: 1; overflow: hidden; background: #F0F0F0; }
-.nd-img img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; }
+.nd-images { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+.nd-img { position: relative; background: #F0F0F0; }
+.nd-img img { width: 100%; height: auto; display: block; cursor: pointer; }
 .nd-img-del { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; border: none; background: rgba(0,0,0,0.55); color: #fff; font-size: 15px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
 .nd-toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 14px calc(8px + var(--safe-bottom)); border-top: 1px solid #ECECEC; background: #fff; flex-shrink: 0; }
 #note-detail.kb .nd-toolbar { padding-bottom: 8px; }

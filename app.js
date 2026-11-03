@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.03.1';
+const APP_VERSION = '2026.11.03.2';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3475,8 +3475,6 @@ function _initLightboxGestures(lb, img) {
    筆記：清單式（日期＋標題＋預覽＋縮圖）→ 點進去滿版編輯
    資料格式不變：notes[] = { id, content, pinned? }；content 第一行是標題，圖片用 [[IMG:ref]] 標記放在最後
 ═══════════════════════════════════════ */
-const NOTE_WD = ['日','一','二','三','四','五','六'];
-
 function _noteTs(n) { return n.createdAt || (n.id > 1e12 ? n.id : 0); }
 
 /* 把一篇筆記拆成 { title, body, imgs }（imgs 是原始參照 "idb:…" 或網址） */
@@ -3530,19 +3528,16 @@ function renderNotes() {
   }
   const sorted = [...data.notes].sort((a, b) =>
     (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || _noteTs(b) - _noteTs(a));
-  let html = '', lastKey = null;
+  let html = '', lastPinned = null;
   sorted.forEach(n => {
-    const ts = _noteTs(n);
-    const d = ts ? new Date(ts) : null;
-    const key = n.pinned ? 'pin' : (d ? `${d.getFullYear()}-${d.getMonth()}` : 'none');
-    if (key !== lastKey) {
-      lastKey = key;
-      const label = n.pinned ? '置頂' : (d ? `${d.getFullYear()}年${d.getMonth() + 1}月` : '未標日期');
-      html += `<div class="nl-sec">${label}</div>`;
+    const pinned = !!n.pinned;
+    if (pinned !== lastPinned) {
+      lastPinned = pinned;
+      if (pinned) html += '<div class="nl-sec">置頂</div>';
+      else if (html) html += '<div class="nl-sec">其他</div>';
     }
     const p = _noteParts(n);
     html += `<div class="nl-card" onclick="openNoteSheet(${n.id})">
-      <div class="nl-left"><div class="nl-day">${d ? d.getDate() : '–'}</div><div class="nl-wd">${d ? '週' + NOTE_WD[d.getDay()] : ''}</div></div>
       <div class="nl-mid">
         <div class="nl-title">${esc(p.title || '（無標題）')}</div>
         <div class="nl-body">${esc(p.body.replace(/\s+/g, ' '))}</div>
@@ -3564,13 +3559,6 @@ function _ndAutosize() {
 }
 
 function _ndRenderHead() {
-  const main = document.getElementById('nd-date-main'), sub = document.getElementById('nd-date-sub');
-  if (_nd.ts) {
-    const d = new Date(_nd.ts);
-    main.textContent = `${d.getMonth() + 1}月${d.getDate()}日（週${NOTE_WD[d.getDay()]}）`;
-    const h = d.getHours(), m = String(d.getMinutes()).padStart(2, '0');
-    sub.textContent = `${h % 12 === 0 ? 12 : h % 12}:${m} ${h < 12 ? 'AM' : 'PM'}`;
-  } else { main.textContent = ''; sub.textContent = ''; }
   document.getElementById('nd-pin').innerHTML =
     `<svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 0 24 24" width="22px">${_nd.pinned
       ? '<circle cx="12" cy="12" r="7" fill="#C9A84C"/>'
