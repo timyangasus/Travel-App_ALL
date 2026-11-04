@@ -3769,7 +3769,9 @@ textarea ~ .field-x {
 .nl-mid { flex: 1; min-width: 0; font-family: var(--mono); }
 .nl-title { font-size: 19px; font-weight: 700; color: #C9A84C; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nl-body { font-size: 15px; color: #888; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nl-card.has-img { min-height: 156px; padding: 18px 12px 18px 16px; }   /* 有圖：欄高約 1.5 倍，縮圖 4:3 橫式 */
+.nl-card.has-img { min-height: 156px; padding: 8px 8px 8px 16px; align-items: flex-start; }   /* 有圖：欄高約 1.5 倍，縮圖 4:3 橫式、貼近邊框，標題靠左上 */
+.nl-card.has-img .nl-mid { padding-top: 8px; }
+.nl-card.has-img .nl-thumb { width: 187px; height: 140px; }
 .nl-card.has-img .nl-body { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }   /* 卡片變高了，內文改最多 3 行 */
 .nl-thumb { flex-shrink: 0; width: 160px; height: 120px; overflow: hidden; background: #F0F0F0; display: grid; gap: 1px; }
 .nl-thumb.n1 { grid-template: 1fr / 1fr; }
