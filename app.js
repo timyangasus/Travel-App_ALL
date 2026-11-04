@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.20';
+const APP_VERSION = '2026.11.04.21';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3387,6 +3387,7 @@ function _gdMatch(L, S, sp, q) {
 
 function renderGuide() {
   const G = GUIDE_BANGKOK;
+  _gdSyncClear();
   const q = GUIDE.q.trim().toLowerCase();
   const filtering = !!(q || GUIDE.cat);
   // 分類篩選列
@@ -3437,6 +3438,16 @@ function renderGuide() {
 function guideOpenLine(id) { GUIDE.line = id; renderGuide(); }
 function guideCat(id) { GUIDE.cat = (GUIDE.cat === id) ? '' : id; renderGuide(); }
 function guideSearch(v) { GUIDE.q = v || ''; renderGuide(); }
+function guideClearSearch() {
+  const inp = document.getElementById('gd-search');
+  inp.value = '';
+  guideSearch('');
+  inp.focus();
+}
+function _gdSyncClear() {
+  const inp = document.getElementById('gd-search'), x = document.getElementById('gd-search-x');
+  if (inp && x) x.style.display = inp.value ? '' : 'none';
+}
 function guideBack() {
   // 一層一層退：先清掉搜尋／分類 → 再回路線清單 → 最後離開導覽
   if (GUIDE.q || GUIDE.cat) {

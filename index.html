@@ -459,7 +459,12 @@
       <div class="screen-title" id="gd-title" style="flex:1">曼谷導覽</div>
     </div>
     <div class="gd-tools">
-      <input id="gd-search" class="gd-search" type="search" placeholder="搜尋景點、車站、路線、英文名…" autocomplete="off" oninput="guideSearch(this.value)">
+      <div class="gd-search-wrap">
+        <input id="gd-search" class="gd-search" type="search" placeholder="搜尋景點、車站、路線、英文名…" autocomplete="off" oninput="guideSearch(this.value)">
+        <button class="gd-search-x" id="gd-search-x" onclick="guideClearSearch()" aria-label="清除搜尋" style="display:none">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>
+        </button>
+      </div>
       <div class="gd-chips" id="gd-chips"></div>
     </div>
     <div class="gd-body" id="gd-body"></div>
