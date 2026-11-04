@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.8';
+const APP_VERSION = '2026.11.04.9';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -335,6 +335,32 @@ function migrateOldTrip() {
   } catch(e) {}
 }
 
+/* 購物清單功能已移除：舊資料轉成一則「購物清單」筆記，不遺失 */
+function _migrateShoppingToNote() {
+  const items = data.shopping;
+  if (!Array.isArray(items)) return;
+  delete data.shopping;
+  if (!items.length) return;
+  const lines = ['購物清單'];
+  const imgs = [];
+  items.forEach(it => {
+    const qty = (it.qty || 1) > 1 ? ' ×' + it.qty : '';
+    lines.push((it.done ? '✓ ' : '') + (it.name || '（未命名）') + qty);
+    ['addr', 'hours', 'link'].forEach(k => { if (it[k]) lines.push(it[k]); });
+    if (it.photo) imgs.push(it.photo);
+  });
+  let content = lines.join('\n') + imgs.map(u => '\n[[IMG:' + u + ']]').join('');
+  if (typeof data.notes === 'string') {
+    const old = data.notes.trim();
+    data.notes = old ? [{ id: Date.now() - 1, content: old }] : [];
+  }
+  if (!Array.isArray(data.notes)) data.notes = [];
+  let id = Date.now();
+  while (data.notes.some(n => n.id === id)) id++;
+  data.notes.push({ id, content });
+  try { localStorage.setItem(TRIP_PREFIX + currentTripId, JSON.stringify(data)); } catch(e) {}
+}
+
 /* ─── Load a specific trip ─── */
 function loadTrip(id) {
   currentTripId = id;
@@ -352,7 +378,7 @@ function loadTrip(id) {
     if (!data.hotels)    data.hotels    = [];
     if (!data.tickets)   data.tickets   = [];
     if (!data.checklist) data.checklist = [];
-    if (!data.shopping)  data.shopping  = [];
+    _migrateShoppingToNote();
     if (!data.notes)     data.notes     = '';
     if (!data.maps)      data.maps      = [];
     if (!data.settings)  data.settings  = { tripName: '', budget: 0, currency: 'TWD', theme: 'light' };
@@ -369,7 +395,7 @@ function freshTripData() {
   return {
     days: [{ banner: { date: '', subtitle: '', photos: [] }, events: [] }],
     expenses: [[]],
-    flights: [], hotels: [], tickets: [], checklist: [], shopping: [],
+    flights: [], hotels: [], tickets: [], checklist: [],
     notes: '',
     maps: [],
     settings: { tripName: '', budget: 0, currency: 'TWD', theme: 'light' }
@@ -1082,7 +1108,6 @@ function saveTripSheet() {
 const INFO_MODULE_DEFS = [
   { id: 'flight',    label: '機票' },
   { id: 'hotel',     label: '飯店' },
-  { id: 'shopping',  label: '購物清單' },
   { id: 'checklist', label: '點檢表' },
   { id: 'notes',     label: '筆記' },
   { id: 'expense',   label: '記帳' },
@@ -1090,7 +1115,7 @@ const INFO_MODULE_DEFS = [
   { id: 'guide',     label: '導覽' },
 ];
 
-const DEFAULT_MODULES = ['flight','hotel','shopping','checklist','notes','expense'];
+const DEFAULT_MODULES = ['flight','hotel','checklist','notes','expense'];
 
 function getInfoModules() {
   if (!data) return DEFAULT_MODULES;
@@ -2538,7 +2563,6 @@ function openInfoSub(name) {
   if (name === 'flight')    renderFlightCards();
   if (name === 'hotel')     renderHotelCards();
   if (name === 'checklist') renderCheckItems();
-  if (name === 'shopping')  renderShopItems();
   if (name === 'notes')     renderNotes();
   if (name === 'map')       renderMapSub();
   if (name === 'guide')     renderGuide();
@@ -3052,167 +3076,6 @@ function deleteCheckItem(i) {
   data.checklist.splice(i, 1);
   save(); renderCheckItems();
 }
-
-/* ─── Shopping List ─── */
-function renderShopItems() {
-  const items = data.shopping || [];
-  const el = document.getElementById('shopping-items');
-  if (!items.length) { el.innerHTML = `<div class="list-empty"></div>`; return; }
-
-  el.innerHTML = items.map((item, i) => {
-    const photoUrl = item.photo ? resolvePhoto(item.photo) : '';
-    const done = item.done;
-
-    if (done) {
-      // 完成態：只保留圖片 + 名稱 + check
-      return `
-      <div class="sl-card sl-done" style="min-height:72px">
-        <div class="sl-img-col" style="width:72px;min-height:72px;flex-shrink:0">
-          ${photoUrl ? `<img class="sl-img" src="${photoUrl}">` : `<div class="sl-img-empty" style="min-height:72px"></div>`}
-        </div>
-        <div class="sl-content" style="flex-direction:row;align-items:center;padding:0 16px;gap:0">
-          <span class="sl-name" style="flex:1;padding-right:12px">${esc(item.name || '')}</span>
-          <button class="sl-check sl-checked" onclick="event.stopPropagation();toggleShop(${i})">
-            <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px"><path d="m424-312 282-282-56-56-226 226-114-114-56 56 170 170Zm56 232q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>
-          </button>
-        </div>
-      </div>`;
-    }
-
-    const nameHtml   = `<div class="sl-name">${esc(item.name || '')}</div>` +
-      (item.subname ? `<div class="sl-subname">${esc(item.subname)}</div>` : '');
-    const addrHtml   = item.addr  ? `<div class="sl-meta sl-addr" onclick="event.stopPropagation();window.open('https://maps.google.com/?q=${encodeURIComponent(item.addr)}','_blank')">${esc(item.addr)}</div>` : '';
-    const hoursHtml  = item.hours ? `<div class="sl-hours">${esc(item.hours)}</div>` : '';
-    const linkHtml   = item.link  ? `<div class="sl-link" onclick="event.stopPropagation();window.open('${esc(item.link)}','_blank')">${esc(item.link)}</div>` : '';
-
-    return `
-    <div class="sl-card" onclick="openShopSheet(${i})">
-      <div class="sl-img-col">
-        ${photoUrl ? `<img class="sl-img" src="${photoUrl}">` : `<div class="sl-img-empty"></div>`}
-      </div>
-      <div class="sl-content">
-        <button class="sl-del" onclick="event.stopPropagation();deleteShopItem(${i})">×</button>
-        ${nameHtml}
-        ${addrHtml}
-        ${hoursHtml}
-        ${linkHtml}
-        <div class="sl-bottom">
-          <div class="sl-qty-row">
-            <button class="sl-qty-btn" onclick="event.stopPropagation();changeShopQty(${i},-1)">−</button>
-            <span class="sl-qty">${item.qty || 1}</span>
-            <button class="sl-qty-btn" onclick="event.stopPropagation();changeShopQty(${i},1)">＋</button>
-          </div>
-          <button class="sl-check" onclick="event.stopPropagation();toggleShop(${i})">
-            <svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px"><path d="m424-312 282-282-56-56-226 226-114-114-56 56 170 170Zm56 232q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-let _shopEditIdx = null;
-
-function openShopSheet(idx) {
-  _shopEditIdx = (idx !== undefined && idx !== null) ? idx : null;
-  const isNew = _shopEditIdx === null;
-  const item = isNew ? {} : (data.shopping[_shopEditIdx] || {});
-
-  const fields = ['name','addr','hours','link','qty'];
-  fields.forEach(k => {
-    const el = document.getElementById('sf-' + k);
-    if (el) el.value = (k === 'qty') ? (item.qty || 1) : (item[k] || '');
-  });
-
-  // photo
-  const photoUrl = item.photo ? resolvePhoto(item.photo) : '';
-  const photoEl  = document.getElementById('sf-photo-preview');
-  if (photoEl) {
-    photoEl.style.backgroundImage = photoUrl ? `url('${photoUrl}')` : '';
-    photoEl.classList.toggle('has-photo', !!photoUrl);
-  }
-
-  document.getElementById('shop-sheet-title').textContent = isNew ? '新增品項' : '編輯品項';
-  document.getElementById('modal-shop-sheet').classList.add('open');
-  setTimeout(() => {
-    document.getElementById('sf-name')?.focus();
-    document.querySelectorAll('#modal-shop-sheet .ev-auto').forEach(el => autoResize(el));
-    document.querySelectorAll('#modal-shop-sheet .ev-auto').forEach(el => {
-      if (!el.dataset.autoInited) {
-        el.dataset.autoInited = '1';
-        el.addEventListener('input', () => autoResize(el));
-      }
-    });
-  }, 340);
-}
-
-function saveShopSheet() {
-  const get = id => document.getElementById(id)?.value.trim() || '';
-  const vals = {
-    name:    get('sf-name'),
-    addr:    get('sf-addr'),
-    hours:   get('sf-hours'),
-    link:    get('sf-link'),
-    qty:     Math.max(1, parseInt(document.getElementById('sf-qty')?.value) || 1),
-    done:    false,
-  };
-  if (_shopEditIdx !== null) {
-    Object.assign(data.shopping[_shopEditIdx], vals);
-  } else {
-    if (!data.shopping) data.shopping = [];
-    data.shopping.push({ photo: '', ...vals });
-  }
-  save();
-  closeModal('modal-shop-sheet');
-  renderShopItems();
-}
-
-async function handleShopPhotoSheet(input) {
-  const file = input.files[0];
-  if (!file) return;
-  showUploadStatus('儲存中...');
-  try {
-    const url = await savePhoto(file);
-    if (_shopEditIdx !== null && data.shopping[_shopEditIdx]) {
-      data.shopping[_shopEditIdx].photo = url;
-      save();
-    }
-    const photoEl = document.getElementById('sf-photo-preview');
-    if (photoEl) {
-      photoEl.style.backgroundImage = `url('${url}')`;
-      photoEl.classList.add('has-photo');
-    }
-  } catch(err) {
-    alert('儲存失敗：' + err.message);
-  } finally {
-    showUploadStatus('');
-  }
-}
-
-function addShopItem() { openShopSheet(null); }
-
-function saveShopField(i, field, val) {
-  if (!data.shopping[i]) return;
-  data.shopping[i][field] = val; save();
-}
-
-function changeShopQty(i, delta) {
-  if (!data.shopping[i]) return;
-  data.shopping[i].qty = Math.max(1, (data.shopping[i].qty || 1) + delta);
-  save(); renderShopItems();
-}
-
-function toggleShop(i) {
-  if (!data.shopping[i]) return;
-  data.shopping[i].done = !data.shopping[i].done;
-  save(); renderShopItems();
-}
-
-function deleteShopItem(i) {
-  data.shopping.splice(i, 1);
-  save(); renderShopItems();
-}
-
 
 function openExpenseSheetForEdit(id) {
   const item = (data.expenses[expenseDay] || []).find(i => i.id === id);
@@ -4191,21 +4054,6 @@ function fmtHotelPrice(el) {
   if (raw) el.value = parseInt(raw).toLocaleString();
   else el.value = '';
 }
-
-function fmtShopHours(el) {
-  // 輸入 09001200 → 09:00-12:00
-  const digits = el.value.replace(/\D/g, '').slice(0, 8);
-  const fmtTime = (d4) => {
-    if (d4.length <= 2) return d4;
-    return d4.slice(0,2) + ':' + d4.slice(2,4);
-  };
-  if (digits.length <= 4) {
-    el.value = fmtTime(digits);
-  } else {
-    el.value = fmtTime(digits.slice(0,4)) + '-' + fmtTime(digits.slice(4,8));
-  }
-}
-
 
 function fmtHotelDates(el) {
   const raw    = el.value;
