@@ -3536,7 +3536,7 @@ textarea ~ .field-x {
   display: block !important;
 }
 #map-sub-header {
-  position: relative;
+  position: sticky;   /* iOS 27 PWA：頂端要有固定／sticky 的不透明標題列，系統才不會在上面蓋模糊 */
   z-index: 2;
 }
 /* Prevent page scroll on map viewer */
