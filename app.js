@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.31';
+const APP_VERSION = '2026.11.04.32';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3431,9 +3431,7 @@ function renderGuide() {
       if (byKey[k]) byKey[k].alts.push(x); else groups.push(byKey[k] = Object.assign({ alts: [x] }, x));
     });
     const list = groups.slice(0, 40);
-    const acc = N.acc ? `，精度約 ${Math.round(N.acc)} 公尺` : '';
-    let html = bar(`依你目前的位置排序${acc}`, '重新定位');
-    if (list.length && list[0].d > 60000) html += `<div class="gd-note">你目前不在曼谷附近，離你最近的景點${_gdFmtDist(list[0].d)}。</div>`;
+    let html = bar('', '重新定位');
     html += list.map(x => _gdSpotHtml(x.L, x.S, x.sp, x.d, x.alts)).join('');
     body.innerHTML = list.length ? html : bar('找不到符合的景點');
     body.scrollTop = 0;
