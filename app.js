@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.7';
+const APP_VERSION = '2026.11.04.8';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3506,10 +3506,10 @@ function _gdSpotHtml(L, S, sp) {
   const tags = sp.c.map(c => `<span class="gd-tag">${esc(_gdCatLabel(c))}</span>`).join('') + (sp.x ? `<span class="gd-tag go">${esc(sp.x)}</span>` : '');
   const q = encodeURIComponent((sp.e ? sp.e + ' Bangkok' : sp.n + ' 曼谷').replace(/'/g, ''));
   return `<div class="gd-spot" style="border-left-color:${L.color}">
-    <div class="gd-spot-top"><div class="gd-spot-title"><div class="gd-spot-name">${esc(sp.n)}</div>${sp.e ? `<div class="gd-spot-en">${esc(sp.e)}</div>` : ''}</div>
+    <div class="gd-spot-top"><div class="gd-spot-title"><div class="gd-spot-name">${esc(sp.n)}${sp.o ? `<span class="gd-exit-txt"><span class="gd-exit-sep">｜</span><span style="color:${_gdInk(L.color)}">出口 ${esc(sp.o)}</span></span>` : ''}</div>${sp.e ? `<div class="gd-spot-en">${esc(sp.e)}</div>` : ''}</div>
       <button class="gd-map" onclick="openAddr(decodeURIComponent('${q}'))" aria-label="在地圖上開啟"><svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px"><path d="M480-480q33 0 56.5-23.5T560-560q0-33-23.5-56.5T480-640q-33 0-56.5 23.5T400-560q0 33 23.5 56.5T480-480Zm0 294q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm0 106Q319-217 239.5-334.5T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 100-79.5 217.5T480-80Zm0-480Z"/></svg></button>
     </div>
-    ${sp.o ? `<div class="gd-exit"><span class="gd-exit-pill" style="background:${L.color};color:${_gdTextColor(L.color)}">出口 ${esc(sp.o)}</span>${sp.on ? `<span class="gd-exit-note">${esc(sp.on)}</span>` : ''}</div>` : ''}
+    ${sp.o && sp.on ? `<div class="gd-exit-note">${esc(sp.on)}</div>` : ''}
     <div class="gd-spot-desc">${esc(sp.d)}</div>
     <div class="gd-tags">${tags}</div>
   </div>`;

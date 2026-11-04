@@ -3995,6 +3995,6 @@ textarea ~ .field-x {
 .gd-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .gd-tag { font-size: 11px; font-weight: 700; color: #8A7430; background: #F6F0DC; border-radius: 4px; padding: 2px 7px; }
 .gd-tag.go { color: #B45309; background: #FDEBD3; }
-.gd-exit { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 7px; }
-.gd-exit-pill { display: inline-block; font-size: 13px; font-weight: 800; padding: 2px 10px; border-radius: 6px; line-height: 1.5; }
-.gd-exit-note { font-size: 12px; color: #B45309; line-height: 1.5; }
+.gd-exit-txt { white-space: nowrap; font-size: 14px; font-weight: 700; }
+.gd-exit-sep { color: #CFCFCF; font-weight: 400; margin: 0 5px; }
+.gd-exit-note { font-size: 12px; color: #B45309; line-height: 1.5; margin-top: 4px; }
