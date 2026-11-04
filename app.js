@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.23';
+const APP_VERSION = '2026.11.04.24';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3347,7 +3347,7 @@ function _initLightboxGestures(lb, img) {
    導覽（曼谷）：路線 → 車站 → 景點；可搜尋、依分類篩選
    資料在 guide-bangkok.js（GUIDE_BANGKOK）
 ═══════════════════════════════════════ */
-const GUIDE = { line: null, cat: '', q: '' };
+const GUIDE = { line: null, cat: '', q: '', near: null, locating: false, locErr: '' };
 
 function _gdTextColor(hex) {
   const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
@@ -3366,16 +3366,27 @@ function _gdCode(color, code) {
   return code ? `<span class="gd-code" style="background:${color};color:${_gdTextColor(color)}">${esc(code)}</span>` : `<span class="gd-dot" style="background:${color}"></span>`;
 }
 
-function _gdSpotHtml(L, S, sp) {
+/* 兩點直線距離（公尺） */
+function _gdDist(lat1, lon1, lat2, lon2) {
+  const R = 6371000, r = Math.PI / 180, dp = (lat2 - lat1) * r, dl = (lon2 - lon1) * r;
+  const h = Math.sin(dp / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dl / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function _gdFmtDist(m) {
+  if (m < 950) return `約 ${Math.max(10, Math.round(m / 10) * 10)} 公尺`;
+  return `約 ${(m / 1000).toFixed(m < 10000 ? 1 : 0)} 公里`;
+}
+
+function _gdSpotHtml(L, S, sp, dist) {
   const tags = sp.c.map(c => `<span class="gd-tag">${esc(_gdCatLabel(c))}</span>`).join('') + (sp.x ? `<span class="gd-tag go">${esc(sp.x)}</span>` : '');
   const q = encodeURIComponent((sp.e ? sp.e + ' Bangkok' : sp.n + ' 曼谷').replace(/'/g, ''));
   return `<div class="gd-spot" style="border-left-color:${L.color}">
-    <div class="gd-spot-top"><div class="gd-spot-title"><div class="gd-spot-name">${esc(sp.n)}${sp.o ? `<span class="gd-exit-txt"><span class="gd-exit-sep">｜</span><span style="color:${_gdInk(L.color)}">出口 ${esc(sp.o)}</span></span>` : ''}</div>${sp.e ? `<div class="gd-spot-en">${esc(sp.e)}</div>` : ''}</div>
+    <div class="gd-spot-top"><div class="gd-spot-title">${dist != null ? `<div class="gd-dist">${_gdFmtDist(dist)}${sp.a ? '<span class="gd-dist-a">（街區，位置為約略中心）</span>' : ''}</div>` : ''}<div class="gd-spot-name">${esc(sp.n)}${sp.o ? `<span class="gd-exit-txt"><span class="gd-exit-sep">｜</span><span style="color:${_gdInk(L.color)}">出口 ${esc(sp.o)}</span></span>` : ''}</div>${sp.e ? `<div class="gd-spot-en">${esc(sp.e)}</div>` : ''}</div>
       <button class="gd-map" onclick="openAddr(decodeURIComponent('${q}'))" aria-label="在地圖上開啟"><svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px"><path d="M480-480q33 0 56.5-23.5T560-560q0-33-23.5-56.5T480-640q-33 0-56.5 23.5T400-560q0 33 23.5 56.5T480-480Zm0 294q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm0 106Q319-217 239.5-334.5T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 100-79.5 217.5T480-80Zm0-480Z"/></svg></button>
     </div>
     ${sp.o && sp.on ? `<div class="gd-exit-note">${esc(sp.on)}</div>` : ''}
     <div class="gd-spot-desc">${esc(sp.d)}</div>
-    <div class="gd-tags">${tags}</div>
+    <div class="gd-tags">${dist != null && (S.name || S.code) ? `<span class="gd-tag stn">${S.code ? esc(S.code) + ' ' : ''}${esc(S.name)}</span>` : ''}${tags}</div>
   </div>`;
 }
 
@@ -3392,11 +3403,35 @@ function renderGuide() {
   const filtering = !!(q || GUIDE.cat);
   // 分類篩選列
   document.getElementById('gd-chips').innerHTML =
+    `<button class="gd-chip gd-near${GUIDE.near || GUIDE.locating ? ' on' : ''}" onclick="guideNear()">📍 附近</button>` +
     `<button class="gd-chip${GUIDE.cat ? '' : ' on'}" onclick="guideCat('')">全部</button>` +
     G.cats.map(c => `<button class="gd-chip${GUIDE.cat === c.id ? ' on' : ''}" onclick="guideCat('${c.id}')">${esc(c.label)}</button>`).join('');
   const line = GUIDE.line ? G.lines.find(l => l.id === GUIDE.line) : null;
   document.getElementById('gd-title').textContent = line ? line.name : '曼谷導覽';
   const body = document.getElementById('gd-body');
+
+  // N. 附近（依目前位置由近到遠）
+  if (GUIDE.near || GUIDE.locating || GUIDE.locErr) {
+    document.getElementById('gd-title').textContent = '附近景點';
+    const N = GUIDE.near;
+    const bar = (txt, btn) => `<div class="gd-nearbar"><span>${txt}</span>${btn ? `<button onclick="guideNear(true)">${btn}</button>` : ''}</div>`;
+    if (GUIDE.locating) { body.innerHTML = bar('定位中…'); return; }
+    if (!N) { body.innerHTML = bar(esc(GUIDE.locErr), '再試一次'); return; }
+    const all = [];
+    G.lines.forEach(L => L.stations.forEach(S => S.spots.forEach(sp => {
+      if (!sp.ll || !_gdMatch(L, S, sp, q)) return;
+      all.push({ L, S, sp, d: _gdDist(N.lat, N.lon, sp.ll[0], sp.ll[1]) });
+    })));
+    all.sort((a, b) => a.d - b.d);
+    const list = all.slice(0, 40);
+    const acc = N.acc ? `，精度約 ${Math.round(N.acc)} 公尺` : '';
+    let html = bar(`依你目前的位置排序${acc}`, '重新定位');
+    if (list.length && list[0].d > 60000) html += `<div class="gd-note">你目前不在曼谷附近，離你最近的景點${_gdFmtDist(list[0].d)}。</div>`;
+    html += list.map(x => _gdSpotHtml(x.L, x.S, x.sp, x.d)).join('');
+    body.innerHTML = list.length ? html : bar('找不到符合的景點');
+    body.scrollTop = 0;
+    return;
+  }
 
   // A. 路線清單
   if (!filtering && !line) {
@@ -3436,6 +3471,25 @@ function renderGuide() {
 }
 
 function guideOpenLine(id) { GUIDE.line = id; renderGuide(); }
+function guideNear(refresh) {
+  if (!refresh && (GUIDE.near || GUIDE.locating || GUIDE.locErr)) {   // 再按一次＝關閉
+    GUIDE.near = null; GUIDE.locating = false; GUIDE.locErr = '';
+    renderGuide(); return;
+  }
+  if (!navigator.geolocation) { GUIDE.locErr = '這個瀏覽器不支援定位'; renderGuide(); return; }
+  GUIDE.line = null; GUIDE.locating = true; GUIDE.locErr = '';
+  renderGuide();
+  navigator.geolocation.getCurrentPosition(pos => {
+    GUIDE.locating = false;
+    GUIDE.near = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy };
+    renderGuide();
+  }, err => {
+    GUIDE.locating = false; GUIDE.near = null;
+    GUIDE.locErr = err.code === 1 ? '沒有定位權限。請到瀏覽器／系統設定允許這個網站使用位置，再按一次。'
+                 : err.code === 3 ? '定位逾時，請到空曠處再試一次。' : '暫時無法取得位置，請稍後再試。';
+    renderGuide();
+  }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+}
 function guideCat(id) { GUIDE.cat = (GUIDE.cat === id) ? '' : id; renderGuide(); }
 function guideSearch(v) { GUIDE.q = v || ''; renderGuide(); }
 function guideClearSearch() {
@@ -3449,7 +3503,8 @@ function _gdSyncClear() {
   if (inp && x) x.style.display = inp.value ? '' : 'none';
 }
 function guideBack() {
-  // 一層一層退：先清掉搜尋／分類 → 再回路線清單 → 最後離開導覽
+  // 一層一層退：先關附近 → 清掉搜尋／分類 → 再回路線清單 → 最後離開導覽
+  if (GUIDE.near || GUIDE.locating || GUIDE.locErr) { GUIDE.near = null; GUIDE.locating = false; GUIDE.locErr = ''; renderGuide(); return; }
   if (GUIDE.q || GUIDE.cat) {
     GUIDE.q = ''; GUIDE.cat = '';
     document.getElementById('gd-search').value = '';
