@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.1';
+const APP_VERSION = '2026.11.04.2';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3489,6 +3489,14 @@ function _gdTextColor(hex) {
   const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
   return (0.299 * r + 0.587 * g + 0.114 * b) > 165 ? '#1A1A1A' : '#fff';
 }
+/* 路線色當文字用：太亮的顏色（黃、淺綠…）在白底上看不清楚，自動加深一點，色相不變 */
+function _gdInk(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+  const k = lum > 150 ? 0.62 : lum > 125 ? 0.85 : 1;
+  return `rgb(${Math.round(r * k)},${Math.round(g * k)},${Math.round(b * k)})`;
+}
 function _gdCatLabel(id) { return (GUIDE_BANGKOK.cats.find(c => c.id === id) || {}).label || id; }
 function _gdCode(color, code) {
   return code ? `<span class="gd-code" style="background:${color};color:${_gdTextColor(color)}">${esc(code)}</span>` : `<span class="gd-dot" style="background:${color}"></span>`;
@@ -3549,7 +3557,7 @@ function renderGuide() {
       const spots = S.spots.filter(sp => _gdMatch(L, S, sp, q));
       if (!spots.length) return;
       count += spots.length;
-      part += `<div class="gd-station">${_gdCode(L.color, S.code)}<span class="gd-sname">${esc(S.name)}</span><span class="gd-sen">${esc(S.en)}</span></div>`
+      part += `<div class="gd-station">${_gdCode(L.color, S.code)}<span class="gd-sname" style="color:${_gdInk(L.color)}">${esc(S.name)}</span><span class="gd-sen">${esc(S.en)}</span></div>`
             + spots.map(sp => _gdSpotHtml(L, S, sp)).join('');
     });
     if (!part) return;
