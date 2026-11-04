@@ -3768,7 +3768,7 @@ textarea ~ .field-x {
 .nl-card:active { background: #F8F8F8; }
 .nl-mid { flex: 1; min-width: 0; font-family: var(--mono); }
 .nl-title { font-size: 19px; font-weight: 700; color: #C9A84C; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nl-body { font-size: 15px; color: #888; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nl-body { font-size: 15px; color: #555; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nl-card.has-img { min-height: 156px; padding: 8px 8px 8px 16px; align-items: flex-start; }   /* 有圖：欄高約 1.5 倍，縮圖 4:3 橫式、貼近邊框，標題靠左上 */
 .nl-card.has-img .nl-mid { padding-top: 8px; }
 .nl-card.has-img .nl-thumb { width: 187px; height: 140px; }
