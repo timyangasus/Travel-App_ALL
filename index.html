@@ -912,7 +912,7 @@
       </button>
     </div>
   </div>
-  <div class="nd-body" id="nd-body">
+  <div class="nd-body" id="nd-body" onclick="ndBodyClick(event)">
     <textarea id="nd-title" class="nd-title" rows="1" placeholder="標題"
       oninput="ndInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('nd-text').focus()}"></textarea>
     <div id="nd-view" class="nd-text nd-view" onclick="ndViewClick(event)" style="display:none"></div>
