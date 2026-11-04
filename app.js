@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.26';
+const APP_VERSION = '2026.11.04.27';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3386,7 +3386,7 @@ function _gdSpotHtml(L, S, sp, dist) {
     </div>
     ${sp.o && sp.on ? `<div class="gd-exit-note">${esc(sp.on)}</div>` : ''}
     <div class="gd-spot-desc">${esc(sp.d)}</div>
-    <div class="gd-tags">${dist != null && (S.name || S.code) ? `<span class="gd-tag stn">${S.code ? esc(S.code) + ' ' : ''}${esc(S.name)}</span>` : ''}${tags}</div>
+    <div class="gd-tags">${dist != null && (S.name || S.code) ? `<span class="gd-tag stn" style="background:${L.color};color:${_gdTextColor(L.color)}">${S.code ? esc(S.code) + ' ' : ''}${esc(S.name)}</span>` : ''}${tags}</div>
   </div>`;
 }
 
