@@ -3968,7 +3968,7 @@ textarea ~ .field-x {
 .gd-line-bar { width: 10px; flex-shrink: 0; }
 .gd-line-main { flex: 1; min-width: 0; padding: 12px 0; }
 .gd-line-name { font-size: 18px; font-weight: 800; color: #1A1A1A; }
-.gd-line-sub { font-size: 12px; color: #888; margin-top: 3px; }
+.gd-line-sub { font-size: 12.5px; color: #5E5E5E; margin-top: 3px; }
 .gd-line-codes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 9px; }
 .gd-line-chev { align-self: center; padding-right: 10px; color: #BBB; font-size: 22px; }
 .gd-code { display: inline-block; min-width: 30px; text-align: center; padding: 2px 6px; border-radius: 6px; font-size: 12px; font-weight: 800; line-height: 1.5; box-sizing: border-box; }
@@ -3976,19 +3976,19 @@ textarea ~ .field-x {
 .gd-linehead { margin: 14px 0 6px; padding: 12px 14px; color: #fff; }
 .gd-linehead-name { font-size: 18px; font-weight: 800; }
 .gd-linehead-sub { font-size: 13px; opacity: 0.92; margin-top: 3px; }
-.gd-note { font-size: 12px; color: #888; margin: 6px 2px 0; line-height: 1.6; }
+.gd-note { font-size: 13px; color: #5E5E5E; margin: 6px 2px 0; line-height: 1.6; }
 
 .gd-station { display: flex; align-items: baseline; gap: 8px; margin: 16px 0 6px; padding-left: 2px; }
 .gd-sname { font-size: 17px; font-weight: 800; color: #1A1A1A; }
-.gd-sen { font-size: 12px; color: #999; }
+.gd-sen { font-size: 12px; color: #6F6F6F; }
 .gd-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; align-self: center; }
 
 .gd-spot { background: #fff; border: 1px solid #E8E8E8; border-left-width: 4px; padding: 10px 12px; margin-bottom: 8px; }
 .gd-spot-top { display: flex; align-items: flex-start; gap: 8px; }
 .gd-spot-title { flex: 1; min-width: 0; }
 .gd-spot-name { font-size: 16px; font-weight: 800; color: #1A1A1A; line-height: 1.35; }
-.gd-spot-en { font-size: 12px; color: #9A9A9A; line-height: 1.35; margin-top: 1px; }
-.gd-spot-desc { font-size: 13px; color: #666; line-height: 1.6; margin-top: 3px; }
+.gd-spot-en { font-size: 12px; color: #6F6F6F; line-height: 1.35; margin-top: 1px; }
+.gd-spot-desc { font-size: 14px; color: #2E2E2E; line-height: 1.65; margin-top: 4px; }
 .gd-map { flex-shrink: 0; width: 32px; height: 32px; margin: -4px -6px 0 0; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; padding: 0; }
 .gd-map svg path { fill: #C9A84C; }
 .gd-map:active { background: #F0F0F0; }
