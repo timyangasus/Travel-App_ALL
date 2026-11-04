@@ -914,10 +914,8 @@
   </div>
   <div class="nd-body" id="nd-body" onclick="ndBodyClick(event)">
     <textarea id="nd-title" class="nd-title" rows="1" placeholder="標題"
-      oninput="ndInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('nd-text').focus()}"></textarea>
-    <div id="nd-view" class="nd-text nd-view" onclick="ndViewClick(event)" style="display:none"></div>
-    <textarea id="nd-text" class="nd-text" rows="1" placeholder="寫點什麼…" oninput="ndInput()" onfocus="_nd.editing=true" onblur="ndTextBlur()"></textarea>
-    <div class="nd-images" id="nd-images"></div>
+      oninput="ndInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.querySelector('#nd-blocks textarea')?.focus()}"></textarea>
+    <div id="nd-blocks"></div>
   </div>
   <div class="nd-toolbar">
     <button class="nd-tb-btn" onclick="ndAddPhoto(false)" aria-label="從相簿加入照片">

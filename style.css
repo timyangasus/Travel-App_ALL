@@ -3808,8 +3808,9 @@ textarea ~ .field-x {
 .nd-title::placeholder, .nd-text::placeholder { color: #CCCCCC; }
 .nd-view { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; cursor: text; }
 .nd-view a { color: #C9A84C; text-decoration: underline; text-underline-offset: 3px; }
-.nd-images { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
-.nd-img { position: relative; background: #F0F0F0; }
+.nd-blk .nd-text::placeholder { color: transparent; }
+.nd-blk:first-child .nd-text::placeholder, .nd-blk .nd-text:focus::placeholder { color: #CCCCCC; }
+.nd-img { position: relative; background: #F0F0F0; margin: 8px 0; }
 .nd-img img { width: 100%; height: auto; display: block; cursor: pointer; }
 .nd-img-del { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; border: none; background: rgba(0,0,0,0.55); color: #fff; font-size: 15px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
 .nd-toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 14px calc(8px + var(--safe-bottom)); border-top: 1px solid #ECECEC; background: #fff; flex-shrink: 0; }

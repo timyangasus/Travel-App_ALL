@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.13';
+const APP_VERSION = '2026.11.04.14';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3540,13 +3540,46 @@ function _linkify(text) {
 }
 
 /* ─── 編輯畫面 ─── */
-let _nd = { id: null, imgs: [], pinned: false, timer: null, open: false, ts: 0, editing: false };
+let _nd = { id: null, blocks: [], pinned: false, timer: null, open: false, ts: 0, edit: null, cur: null };
 
 function _ndAutosize() {
-  ['nd-title', 'nd-text'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el && el.offsetParent !== null) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+  document.querySelectorAll('#nd-title, #nd-blocks textarea').forEach(el => {
+    if (el.offsetParent !== null) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
   });
+}
+
+/* 內容 = 標題 + 若干「文字區塊／照片區塊」交錯，照片可以插在文字中間 */
+function _ndParse(content) {
+  const blocks = [];
+  let title = '';
+  content.split(/(\[\[IMG:[^\]]+\]\])/).forEach((piece, k) => {
+    const m = piece.match(/^\[\[IMG:([^\]]+)\]\]$/);
+    if (m) { blocks.push({ t: 'img', ref: m[1] }); return; }
+    let v = piece.replace(/^\n+|\n+$/g, '');
+    if (k === 0) {                       // 開頭文字的第一行是標題
+      const nl = piece.indexOf('\n');
+      title = (nl < 0 ? piece : piece.slice(0, nl)).trim();
+      v = nl < 0 ? '' : piece.slice(nl + 1).replace(/^\n+|\n+$/g, '');
+    }
+    blocks.push({ t: 'text', v });
+  });
+  return { title, blocks: _ndNormalize(blocks) };
+}
+
+/* 讓區塊永遠是「文字、照片、文字、照片…、文字」：開頭和每張照片後面都有一格可以打字 */
+function _ndNormalize(blocks) {
+  const out = [];
+  blocks.forEach(b => {
+    const prev = out[out.length - 1];
+    if (b.t === 'text' && prev && prev.t === 'text') prev.v = prev.v && b.v ? prev.v + '\n' + b.v : prev.v + b.v;
+    else out.push({ ...b });
+  });
+  if (!out.length || out[0].t !== 'text') out.unshift({ t: 'text', v: '' });
+  if (out[out.length - 1].t !== 'text') out.push({ t: 'text', v: '' });
+  for (let i = 0; i < out.length - 1; i++) {
+    if (out[i].t === 'img' && out[i + 1].t === 'img') out.splice(i + 1, 0, { t: 'text', v: '' });
+  }
+  return out;
 }
 
 function _ndRenderHead() {
@@ -3557,21 +3590,28 @@ function _ndRenderHead() {
     `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px"><path d="${_nd.pinned ? solid : outline}"/></svg>`;
 }
 
-function _ndRenderImgs() {
-  const wrap = document.getElementById('nd-images');
-  wrap.innerHTML = _nd.imgs.map((ref, i) => {
-    const u = resolvePhoto(ref);
-    return `<div class="nd-img">${u ? `<img src="${esc(u)}" alt="" onclick="ndOpenImg(${i})">` : ''}<button class="nd-img-del" onclick="ndRemoveImg(${i})" aria-label="移除">×</button></div>`;
+function _ndRenderBlocks() {
+  const wrap = document.getElementById('nd-blocks');
+  wrap.innerHTML = _nd.blocks.map((b, i) => {
+    if (b.t === 'img') {
+      const u = resolvePhoto(b.ref);
+      return `<div class="nd-img">${u ? `<img src="${esc(u)}" alt="" onclick="ndOpenImg(${i})">` : ''}<button class="nd-img-del" onclick="ndRemoveImg(${i})" aria-label="移除">×</button></div>`;
+    }
+    return `<div class="nd-blk" data-i="${i}">` +
+      `<div class="nd-text nd-view" onclick="ndViewClick(event,${i})" style="display:none"></div>` +
+      `<textarea class="nd-text" rows="1" placeholder="寫點什麼…" oninput="ndBlockInput(${i},this)" onfocus="ndBlockFocus(${i},this)" onblur="ndBlockBlur(${i},this)" onclick="ndBlockCur(${i},this)" onkeyup="ndBlockCur(${i},this)"></textarea></div>`;
   }).join('');
+  wrap.querySelectorAll('.nd-blk').forEach(el => { el.querySelector('textarea').value = _nd.blocks[+el.dataset.i].v; });
+  _ndSyncViews();
 }
 
 function _ndContent() {
   const title = document.getElementById('nd-title').value.replace(/\n/g, ' ').trim();
-  const body = document.getElementById('nd-text').value.replace(/^\n+/, '').trimEnd();
-  let content = title;
-  if (body) content += (content ? '\n' : '') + body;   // 沒填標題時，內文第一行就是標題
-  content += _nd.imgs.map(u => '\n[[IMG:' + u + ']]').join('');
-  return { content, empty: !title && !body && !_nd.imgs.length };
+  const parts = _nd.blocks.map(b => b.t === 'img' ? '[[IMG:' + b.ref + ']]' : b.v.replace(/^\n+|\n+$/g, '')).filter(Boolean);
+  const hasText = _nd.blocks.some(b => b.t === 'text' && b.v.trim());
+  const hasImg = _nd.blocks.some(b => b.t === 'img');
+  const content = [title, ...parts].filter(Boolean).join('\n');   // 沒填標題時，內文第一行就是標題
+  return { content, empty: !title && !hasText && !hasImg };
 }
 
 function _ndSave() {
@@ -3595,35 +3635,49 @@ function _ndSave() {
   save();
 }
 
-/* 內文有網址、而且現在沒在打字時：顯示成可點連結的閱讀版；點到文字（不是連結）就切回輸入框 */
-function _ndSyncView() {
-  const ta = document.getElementById('nd-text'), view = document.getElementById('nd-view');
-  const showView = !_nd.editing && /https?:\/\//.test(ta.value);
-  if (showView) view.innerHTML = _linkify(ta.value);
-  view.style.display = showView ? '' : 'none';
-  ta.style.display = showView ? 'none' : '';
+/* 區塊有網址、而且現在沒在打字時：顯示成可點連結的閱讀版；點到文字（不是連結）就切回輸入框 */
+function _ndSyncViews() {
+  document.querySelectorAll('#nd-blocks .nd-blk').forEach(el => {
+    const i = +el.dataset.i, v = _nd.blocks[i]?.v ?? '';
+    const view = el.querySelector('.nd-view'), ta = el.querySelector('textarea');
+    const showView = _nd.edit !== i && /https?:\/\//.test(v);
+    if (showView) view.innerHTML = _linkify(v);
+    view.style.display = showView ? '' : 'none';
+    ta.style.display = showView ? 'none' : '';
+  });
   _ndAutosize();
 }
-function ndViewClick(e) {
+function _ndBlockEl(i) { return document.querySelector(`#nd-blocks .nd-blk[data-i="${i}"] textarea`); }
+function ndViewClick(e, i) {
   if (e.target.closest('a')) return;   // 點連結：照原本開啟網址
-  _nd.editing = true;
-  _ndSyncView();
-  const ta = document.getElementById('nd-text');
+  _nd.edit = i;
+  _ndSyncViews();
+  const ta = _ndBlockEl(i);
   ta.focus();
   ta.setSelectionRange(ta.value.length, ta.value.length);
 }
-/* 點到空白處（圖片下方、標題外）＝開始打字，不用瞄準上面那一行 */
+function ndBlockInput(i, el) {
+  _nd.blocks[i].v = el.value;
+  ndBlockCur(i, el);
+  ndInput();
+}
+function ndBlockCur(i, el) { _nd.cur = { i, pos: el.selectionStart }; }   // 記住游標，加照片時插在這裡
+function ndBlockFocus(i, el) { _nd.edit = i; ndBlockCur(i, el); }
+function ndBlockBlur(i, el) {
+  ndBlockCur(i, el);
+  _nd.edit = null;
+  setTimeout(() => { if (_nd.open && _nd.edit === null) _ndSyncViews(); }, 150);
+}
+/* 點到空白處（照片下方、內容外）＝在最後面開始打字 */
 function ndBodyClick(e) {
   if (e.target.id !== 'nd-body') return;
-  const view = document.getElementById('nd-view');
-  if (view.style.display !== 'none') { ndViewClick({ target: view }); return; }
-  const ta = document.getElementById('nd-text');
+  let i = _nd.blocks.length - 1;
+  if (_nd.blocks[i].t !== 'text') return;
+  const view = document.querySelector(`#nd-blocks .nd-blk[data-i="${i}"] .nd-view`);
+  if (view && view.style.display !== 'none') { ndViewClick({ target: view }, i); return; }
+  const ta = _ndBlockEl(i);
   ta.focus();
   ta.setSelectionRange(ta.value.length, ta.value.length);
-}
-function ndTextBlur() {
-  _nd.editing = false;
-  setTimeout(() => { if (_nd.open && !_nd.editing) _ndSyncView(); }, 150);
 }
 
 function ndInput() {
@@ -3634,14 +3688,14 @@ function ndInput() {
 
 function openNoteSheet(id) {
   const note = id === null ? null : data.notes.find(n => n.id === id);
-  const p = note ? _noteParts(note) : { title: '', body: '', imgs: [] };
-  _nd = { id: note ? note.id : null, imgs: p.imgs.slice(), pinned: !!note?.pinned, timer: null, open: true, ts: note ? _noteTs(note) : Date.now(), editing: false };
+  let raw = note?.content || '';
+  if (note?.images?.length && !raw.includes('[[IMG:')) raw += note.images.map(u => '\n[[IMG:' + u + ']]').join('');
+  const p = _ndParse(raw);
+  _nd = { id: note ? note.id : null, blocks: p.blocks, pinned: !!note?.pinned, timer: null, open: true, ts: note ? _noteTs(note) : Date.now(), edit: null, cur: null };
   document.getElementById('nd-title').value = p.title;
-  document.getElementById('nd-text').value = p.body;
-  _ndRenderHead(); _ndRenderImgs();
+  _ndRenderHead(); _ndRenderBlocks();
   const el = document.getElementById('note-detail');
   el.classList.add('open');
-  _ndSyncView();
   document.getElementById('nd-body').scrollTop = 0;
   _ndAutosize();
   ndSyncViewport();
@@ -3685,17 +3739,33 @@ function ndDelete() {
 }
 
 function ndOpenImg(i) {
-  const urls = _nd.imgs.map(resolvePhoto).filter(Boolean);
+  const refs = _nd.blocks.filter(b => b.t === 'img').map(b => b.ref);
+  const urls = refs.map(resolvePhoto).filter(Boolean);
   if (!urls.length) return;
-  openImageLightbox(urls[i] || urls[0], urls, Math.min(i, urls.length - 1));
+  const k = _nd.blocks.slice(0, i).filter(b => b.t === 'img').length;
+  openImageLightbox(urls[k] || urls[0], urls, Math.min(k, urls.length - 1));
 }
 
 function ndRemoveImg(i) {
   showConfirm('移除照片？', '照片會從這篇筆記拿掉。', () => {
-    _nd.imgs.splice(i, 1);
-    _ndRenderImgs();
+    _nd.blocks.splice(i, 1);
+    _nd.blocks = _ndNormalize(_nd.blocks);   // 前後兩段文字會接起來
+    _nd.cur = null;
+    _ndRenderBlocks();
     ndInput();
   }, null, '移除');
+}
+
+/* 照片插在游標所在的位置（把那段文字從游標處切成上下兩段）；沒有游標就加在最後面 */
+function _ndInsertImg(ref) {
+  let i = _nd.cur ? _nd.cur.i : _nd.blocks.length - 1;
+  if (!_nd.blocks[i] || _nd.blocks[i].t !== 'text') i = _nd.blocks.length - 1;
+  const b = _nd.blocks[i];
+  const pos = _nd.cur && _nd.cur.i === i ? Math.min(_nd.cur.pos, b.v.length) : b.v.length;
+  const before = b.v.slice(0, pos).replace(/\n+$/, ''), after = b.v.slice(pos).replace(/^\n+/, '');
+  _nd.blocks.splice(i, 1, { t: 'text', v: before }, { t: 'img', ref }, { t: 'text', v: after });
+  _nd.cur = { i: i + 2, pos: 0 };   // 下一張接在這張後面
+  _ndRenderBlocks();
 }
 
 /* 加照片：相簿可一次多選；拍照用相機 */
@@ -3709,8 +3779,7 @@ function ndAddPhoto(camera) {
     try {
       for (let i = 0; i < files.length; i++) {
         showUploadStatus(`儲存中... ${i + 1}/${files.length}`);
-        _nd.imgs.push(await savePhoto(files[i]));
-        _ndRenderImgs();
+        _ndInsertImg(await savePhoto(files[i]));
       }
       _ndSave();
     } catch (e) {
