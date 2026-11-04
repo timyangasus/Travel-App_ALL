@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.16';
+const APP_VERSION = '2026.11.04.17';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3540,7 +3540,7 @@ function _linkify(text) {
 }
 
 /* ─── 編輯畫面 ─── */
-let _nd = { id: null, blocks: [], pinned: false, timer: null, open: false, ts: 0, edit: null, cur: null };
+let _nd = { id: null, blocks: [], pinned: false, timer: null, open: false, ts: 0, edit: null, cur: null, sig: '' };
 
 function _ndAutosize() {
   document.querySelectorAll('#nd-title, #nd-blocks textarea').forEach(el => {
@@ -3680,22 +3680,21 @@ function ndBodyClick(e) {
   ta.setSelectionRange(ta.value.length, ta.value.length);
 }
 
-/* 勾勾＝打完字了：存檔、收鍵盤，停在這篇筆記；要回清單按左上角返回。勾勾只在打字時出現 */
+/* 勾勾＝確認這次的修改：存檔、收鍵盤，停在這篇筆記（返回箭頭才回清單）。沒有修改時是灰色、按不下去 */
+function _ndSig() { return _ndContent().content + '|' + (_nd.pinned ? 1 : 0); }
+function _ndUpdateDone() {
+  document.getElementById('note-detail').classList.toggle('dirty', _nd.sig !== _ndSig());
+}
 function ndDone() {
   _ndSave();
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  _ndSyncEditing();
+  _nd.sig = _ndSig();
+  _ndUpdateDone();
 }
-function _ndSyncEditing() {
-  const a = document.activeElement;
-  const editing = !!(_nd.open && a && (a.id === 'nd-title' || a.closest('#nd-blocks')) && a.tagName === 'TEXTAREA');
-  document.getElementById('note-detail').classList.toggle('editing', editing);
-}
-document.addEventListener('focusin', () => { if (_nd.open) _ndSyncEditing(); });
-document.addEventListener('focusout', () => { setTimeout(() => { if (_nd.open) _ndSyncEditing(); }, 60); });
 
 function ndInput() {
   _ndAutosize();
+  _ndUpdateDone();
   clearTimeout(_nd.timer);
   _nd.timer = setTimeout(_ndSave, 700);   // 邊打邊自動存，不用按儲存
 }
@@ -3705,9 +3704,10 @@ function openNoteSheet(id) {
   let raw = note?.content || '';
   if (note?.images?.length && !raw.includes('[[IMG:')) raw += note.images.map(u => '\n[[IMG:' + u + ']]').join('');
   const p = _ndParse(raw);
-  _nd = { id: note ? note.id : null, blocks: p.blocks, pinned: !!note?.pinned, timer: null, open: true, ts: note ? _noteTs(note) : Date.now(), edit: null, cur: null };
+  _nd = { id: note ? note.id : null, blocks: p.blocks, pinned: !!note?.pinned, timer: null, open: true, ts: note ? _noteTs(note) : Date.now(), edit: null, cur: null, sig: '' };
   document.getElementById('nd-title').value = p.title;
   _ndRenderHead(); _ndRenderBlocks();
+  _nd.sig = _ndSig(); _ndUpdateDone();
   const el = document.getElementById('note-detail');
   el.classList.add('open');
   document.getElementById('nd-body').scrollTop = 0;
@@ -3719,7 +3719,7 @@ function openNoteSheet(id) {
 function _ndHide() {
   clearTimeout(_nd.timer); _nd.timer = null; _nd.open = false;
   const el = document.getElementById('note-detail');
-  el.classList.remove('open', 'kb', 'editing');
+  el.classList.remove('open', 'kb', 'dirty');
   el.style.height = ''; el.style.top = '';
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 }
@@ -3742,6 +3742,7 @@ function ndTogglePin() {
     if (n) { if (_nd.pinned) n.pinned = true; else delete n.pinned; save(); }
   }
   _ndRenderHead();
+  _ndUpdateDone();
 }
 
 function ndDelete() {
@@ -3796,6 +3797,7 @@ function ndAddPhoto(camera) {
         _ndInsertImg(await savePhoto(files[i]));
       }
       _ndSave();
+      _ndUpdateDone();
     } catch (e) {
       console.log('筆記照片儲存失敗', e);
       showToast('儲存失敗：' + e.message);
