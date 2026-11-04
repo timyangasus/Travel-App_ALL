@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.32';
+const APP_VERSION = '2026.11.04.33';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -2178,6 +2178,12 @@ function saveEvent() {
   renderTimeline();
 }
 
+/* 用名稱搜尋，但把地圖視野定在我們查到的座標上（有座標時比單純用名稱搜尋準，街區類縮小一點） */
+function openSpotMap(name, lat, lon, approx) {
+  const url = `https://www.google.com/maps/search/${encodeURIComponent(name)}/@${lat},${lon},${approx ? 15 : 17}z`;
+  window.open(url, '_blank');
+}
+
 function openAddr(addr) {
   const url = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
   window.open(url, '_blank');
@@ -3383,7 +3389,7 @@ function _gdSpotHtml(L, S, sp, dist, alts) {
   const q = encodeURIComponent((sp.e ? sp.e + ' Bangkok' : sp.n + ' 曼谷').replace(/'/g, ''));
   return `<div class="gd-spot" style="border-left-color:${L.color}">
     <div class="gd-spot-top"><div class="gd-spot-title">${dist != null ? `<div class="gd-dist">${_gdFmtDist(dist)}${sp.a ? '<span class="gd-dist-a">（街區，位置為約略中心）</span>' : ''}</div>` : ''}<div class="gd-spot-name">${esc(sp.n)}${sp.o && !multi ? `<span class="gd-exit-txt"><span class="gd-exit-sep">｜</span><span style="color:${_gdInk(L.color)}">出口 ${esc(sp.o)}</span></span>` : ''}</div>${sp.e ? `<div class="gd-spot-en">${esc(sp.e)}</div>` : ''}</div>
-      <button class="gd-map" onclick="openAddr(decodeURIComponent('${q}'))" aria-label="在地圖上開啟"><svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px"><path d="M480-480q33 0 56.5-23.5T560-560q0-33-23.5-56.5T480-640q-33 0-56.5 23.5T400-560q0 33 23.5 56.5T480-480Zm0 294q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm0 106Q319-217 239.5-334.5T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 100-79.5 217.5T480-80Zm0-480Z"/></svg></button>
+      <button class="gd-map" onclick="${sp.ll ? `openSpotMap(decodeURIComponent('${q}'), ${sp.ll[0]}, ${sp.ll[1]}, ${sp.a ? 1 : 0})` : `openAddr(decodeURIComponent('${q}'))`}" aria-label="在地圖上開啟"><svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px"><path d="M480-480q33 0 56.5-23.5T560-560q0-33-23.5-56.5T480-640q-33 0-56.5 23.5T400-560q0 33 23.5 56.5T480-480Zm0 294q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm0 106Q319-217 239.5-334.5T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 100-79.5 217.5T480-80Zm0-480Z"/></svg></button>
     </div>
     ${multi ? alts.filter(a => a.sp.o && a.sp.on).map(a => `<div class="gd-exit-note">${esc(a.S.name)}：${esc(a.sp.on)}</div>`).join('') : (sp.o && sp.on ? `<div class="gd-exit-note">${esc(sp.on)}</div>` : '')}
     <div class="gd-spot-desc">${esc(sp.d)}</div>
