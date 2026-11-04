@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.14';
+const APP_VERSION = '2026.11.04.15';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3680,6 +3680,20 @@ function ndBodyClick(e) {
   ta.setSelectionRange(ta.value.length, ta.value.length);
 }
 
+/* 勾勾＝打完字了：存檔、收鍵盤，停在這篇筆記；要回清單按左上角返回。勾勾只在打字時出現 */
+function ndDone() {
+  _ndSave();
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  _ndSyncEditing();
+}
+function _ndSyncEditing() {
+  const a = document.activeElement;
+  const editing = !!(_nd.open && a && (a.id === 'nd-title' || a.closest('#nd-blocks')) && a.tagName === 'TEXTAREA');
+  document.getElementById('note-detail').classList.toggle('editing', editing);
+}
+document.addEventListener('focusin', () => { if (_nd.open) _ndSyncEditing(); });
+document.addEventListener('focusout', () => { setTimeout(() => { if (_nd.open) _ndSyncEditing(); }, 60); });
+
 function ndInput() {
   _ndAutosize();
   clearTimeout(_nd.timer);
@@ -3705,7 +3719,7 @@ function openNoteSheet(id) {
 function _ndHide() {
   clearTimeout(_nd.timer); _nd.timer = null; _nd.open = false;
   const el = document.getElementById('note-detail');
-  el.classList.remove('open', 'kb');
+  el.classList.remove('open', 'kb', 'editing');
   el.style.height = ''; el.style.top = '';
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 }

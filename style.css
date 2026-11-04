@@ -3798,6 +3798,8 @@ textarea ~ .field-x {
 .nd-actions { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
 .nd-done { width: 38px; height: 38px; margin-left: 22px; border: none; border-radius: 50%; background: #C9A84C; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
 .nd-done svg path { fill: #fff; }
+.nd-done { visibility: hidden; }
+#note-detail.editing .nd-done { visibility: visible; }
 .nd-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 30px 18px 24px; overscroll-behavior-y: contain; }
 .nd-title, .nd-text {
   width: 100%; box-sizing: border-box; border: none; outline: none; background: transparent;
