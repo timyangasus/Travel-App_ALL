@@ -1,6 +1,6 @@
 /* 曼谷導覽資料（路線 → 車站 → 景點）。c＝分類，x＝需另外前往的提醒。資料來源：使用者整理的曼谷交通與景點指南。 */
 const GUIDE_BANGKOK = {
-  cats: [{"id": "photo", "label": "攝影"}, {"id": "shop", "label": "百貨商場"}, {"id": "food", "label": "美食"}, {"id": "market", "label": "市集夜市"}, {"id": "temple", "label": "寺廟古蹟"}, {"id": "street", "label": "老街街區"}, {"id": "park", "label": "公園"}, {"id": "museum", "label": "博物館展覽"}, {"id": "rail", "label": "鐵道"}, {"id": "night", "label": "夜景夜生活"}],
+  cats: [{"id": "photo", "label": "攝影"}, {"id": "shop", "label": "百貨商場"}, {"id": "food", "label": "美食"}, {"id": "market", "label": "市集夜市"}, {"id": "temple", "label": "寺廟古蹟"}, {"id": "street", "label": "老街街區"}, {"id": "park", "label": "公園"}, {"id": "museum", "label": "藝文展覽"}, {"id": "rail", "label": "鐵道"}, {"id": "night", "label": "夜景夜生活"}],
   lines: [
     { "id": "bts-sukhumvit", "name": "BTS 淺綠線", "theme": "素坤逸線", "color": "#7AC143", "sub": "百貨商場、潮流街區、公園與大型市集", "notes": [], "stations": [
       {"code": "N9", "name": "哈耶叻拋站", "en": "Ha Yaek Lat Phrao", "spots": [{"n": "尚泰叻拋購物中心", "e": "Central Ladprao", "d": "曼谷北部大型百貨，有服飾、餐廳、超市及生活用品。", "c": ["shop"], "o": "1"}, {"n": "聯合購物中心", "e": "Union Mall", "d": "以平價服飾、年輕潮流及小型特色商店為主。", "c": ["shop"], "o": "2"}]},
