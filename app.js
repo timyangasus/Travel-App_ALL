@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.18.1';
+const APP_VERSION = '2026.11.18.3';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -4960,14 +4960,11 @@ function _applySmartImport(result) {
       data.days.push({ banner: { date: '', subtitle: '', photos: [] }, events: [] });
       data.expenses.push([]);
     }
-    reports.push(`✓ 新增 ${extra} 天，請至設定頁更新行程區間`);
   }
 
   // 取代模式：貼入文字中出現的每一天，先清空該天原有行程，只保留最新貼入的（沒出現的天數不動）
-  const replaced = {};
   new Set(result.events.map(ev => (ev.day || 1) - 1)).forEach(dayIdx => {
     if (dayIdx < 0 || dayIdx >= data.days.length) return;
-    replaced[dayIdx + 1] = data.days[dayIdx].events.length;
     data.days[dayIdx].events = [];
   });
 
@@ -4994,21 +4991,14 @@ function _applySmartImport(result) {
     written++;
   });
 
-  // Count by day
-  const dayCount = {};
-  result.events.forEach(ev => {
-    if (!ev._skipped) dayCount[ev.day] = (dayCount[ev.day] || 0) + 1;
-  });
-  const dayReports = Object.keys(dayCount).sort((a,b)=>a-b)
-    .map(d => `✓ Day ${d} 匯入 ${dayCount[d]} 筆行程` + (replaced[d] ? `（取代原有 ${replaced[d]} 筆）` : ''));
-  reports.unshift(...dayReports);
-  reports.unshift(`✓ 共匯入 ${written} 筆行程`);
+  // 一切正常就不顯示報告，只有需要你注意的事才列出來
   if (result._noDayDetected) reports.push('⚠️ 未偵測到日期或天數，所有行程已放入 Day 1，請自行移至正確天數');
-  if (skipped > 0) reports.push(`✓ ${skipped} 筆重複行程已略過`);
+  if (skipped > 0) reports.push(`${skipped} 筆重複行程已略過`);
   if (result.issues?.length) result.issues.forEach(i => reports.push(i));
 
   save();
   renderItinerary();
+  if (!reports.length) { closeSmartImportDone(); return; }
 
   // Show report
   document.getElementById('smart-import-loading').style.display = 'none';
@@ -5029,7 +5019,6 @@ function _importToDay(dayIdx) {
   const result = window._pendingSmartResult;
   if (!result) return;
   const reports = [];
-  const replacedCount = data.days[dayIdx].events.length;
   data.days[dayIdx].events = [];   // 取代模式：先清空該天原有行程
   let written = 0, skipped = 0;
   result.events.forEach(ev => {
@@ -5049,11 +5038,11 @@ function _importToDay(dayIdx) {
     });
     written++;
   });
-  reports.push(`✓ 共匯入 ${written} 筆行程至 Day ${dayIdx+1}` + (replacedCount ? `（取代原有 ${replacedCount} 筆）` : ''));
-  if (skipped > 0) reports.push(`✓ ${skipped} 筆重複行程已略過`);
+  if (skipped > 0) reports.push(`${skipped} 筆重複行程已略過`);
   window._pendingSmartResult = null;
   save();
   renderItinerary();
+  if (!reports.length) { closeSmartImportDone(); return; }
   const listEl = document.getElementById('smart-import-report-list');
   listEl.innerHTML = reports.map(r =>
     `<div style="font-family:var(--mono);font-size:14px;color:#1A1A1A;padding:8px 12px;background:#F8F8F8;border-left:3px solid #1A1A1A">${r}</div>`
