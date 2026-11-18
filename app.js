@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.04.43';
+const APP_VERSION = '2026.11.18.1';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -2850,7 +2850,57 @@ function mapSelDel(idx) {
 }
 
 // ── Add map ───────────────────────────────
+/* 其他行程裡已經有的地圖（同一張圖片只存一份，匯入只是多一個參照） */
+function _mapOtherTripMaps() {
+  const out = [];
+  (meta.trips || []).forEach(t => {
+    if (t.id === currentTripId) return;
+    try {
+      const d = JSON.parse(localStorage.getItem(TRIP_PREFIX + t.id) || 'null');
+      (d?.maps || []).forEach(m => { if (m && m.url) out.push({ trip: t.name || '未命名行程', name: m.name || '地圖', url: m.url }); });
+    } catch (e) {}
+  });
+  return out;
+}
+
 function mapAddNew() {
+  if (_mapOtherTripMaps().length) { document.getElementById('action-sheet-map').classList.add('open'); return; }
+  mapUploadNew();
+}
+
+let _mapImportList = [];
+async function mapOpenImport() {
+  closeActionSheet('action-sheet-map');
+  _mapImportList = _mapOtherTripMaps();
+  try { await preloadPhotos(JSON.stringify(_mapImportList.map(m => m.url))); } catch (e) {}
+  const have = new Set(_mapList().map(m => m.url));
+  let html = '', last = null;
+  _mapImportList.forEach((m, i) => {
+    if (m.trip !== last) { last = m.trip; html += `<div class="nl-sec" style="padding:14px 4px 6px">${esc(m.trip)}</div>`; }
+    const dup = have.has(m.url);
+    const src = resolvePhoto(m.url);
+    html += `<div onclick="mapImportPick(${i})" style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:0.5px solid #EEE;cursor:pointer;${dup ? 'opacity:.45' : ''}">
+      <div style="width:64px;height:48px;flex-shrink:0;background:#EEE;overflow:hidden">${src ? `<img src="${esc(src)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">` : ''}</div>
+      <div style="flex:1;min-width:0;font-family:var(--mono);font-size:15px;font-weight:600;color:#1A1A1A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.name)}</div>
+      ${dup ? '<div style="font-family:var(--mono);font-size:12px;color:#999">已加入</div>' : ''}
+    </div>`;
+  });
+  document.getElementById('map-import-list').innerHTML = html;
+  document.getElementById('modal-map-import').classList.add('open');
+}
+
+async function mapImportPick(i) {
+  const m = _mapImportList[i];
+  if (!m) return;
+  if (_mapList().some(x => x.url === m.url)) { showToast('這張地圖已經在這趟行程裡了'); return; }
+  _mapList().push({ id: Date.now(), name: m.name, url: m.url });
+  _mapIdx = _mapList().length - 1;
+  save();
+  closeModal('modal-map-import');
+  renderMapSub();
+}
+
+function mapUploadNew() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';

@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="icon-512.png?v=14">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=14">
   <title>旅遊誌</title>
-  <link rel="stylesheet" href="style.css?v=2026.11.04.43">
+  <link rel="stylesheet" href="style.css?v=2026.11.18.1">
 </head>
 <body>
 
@@ -98,7 +98,32 @@
     </div>
   </div>
 
-  <!-- ═══ MAP NAME MODAL ═══ -->
+  <!-- ═══ MAP ADD ACTION SHEET ═══ -->
+  <div class="modal-overlay" id="action-sheet-map">
+    <div class="action-sheet">
+      <div class="modal-handle"></div>
+      <button class="action-sheet-btn" onclick="closeActionSheet('action-sheet-map');mapUploadNew()">上傳新地圖</button>
+      <div class="action-sheet-divider"></div>
+      <button class="action-sheet-btn" onclick="mapOpenImport()">從其他行程選取</button>
+      <button class="action-sheet-btn action-sheet-btn-cancel" onclick="closeActionSheet('action-sheet-map')">取消</button>
+    </div>
+  </div>
+
+  <!-- ═══ MAP IMPORT MODAL（從其他行程選取地圖）═══ -->
+  <div class="modal-overlay" id="modal-map-import">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">從其他行程選取</div>
+      <div class="modal-body" style="padding:6px 20px 8px">
+        <div id="map-import-list"></div>
+        <div class="modal-btn-row" style="padding:12px 0 0">
+          <button class="modal-btn modal-btn-cancel" onclick="closeModal('modal-map-import')">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MAP NAME MODAL ═══
   <div class="modal-overlay" id="modal-map-name">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
@@ -1091,8 +1116,8 @@
   </div>
 </div>
 
-<script src="guide-bangkok.js?v=2026.11.04.43"></script>
-<script src="app.js?v=2026.11.04.43"></script>
+<script src="guide-bangkok.js?v=2026.11.18.1"></script>
+<script src="app.js?v=2026.11.18.1"></script>
 
 
 </body>
