@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.18.3';
+const APP_VERSION = '2026.11.18.4';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -284,6 +284,24 @@ let editingEventId = null;
 let _slideshowTimer = null;
 const _blobCache = new Map();
 
+/* 行程／照片／記帳項目的編號：整數、同一毫秒內連續產生也不會重複
+   （舊寫法 Date.now()+Math.random() 同一毫秒產生多筆時有機率撞號，撞號後點 A 會打開 B） */
+let _itemSeq = 0;
+function newItemId() { return Date.now() * 1000 + (_itemSeq++ % 1000); }
+
+/* 同一份清單裡編號重複（或不是數字）的項目，重新給編號。回傳有沒有改動 */
+function _dedupeIds(list) {
+  if (!Array.isArray(list)) return false;
+  const seen = new Set();
+  let changed = false;
+  list.forEach(it => {
+    if (!it || typeof it !== 'object') return;
+    if (typeof it.id !== 'number' || !isFinite(it.id) || seen.has(it.id)) { it.id = newItemId(); changed = true; }
+    seen.add(it.id);
+  });
+  return changed;
+}
+
 function genId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
@@ -386,6 +404,12 @@ function loadTrip(id) {
       if (!d.banner) d.banner = { date: '', subtitle: '', photos: [] };
       if (!d.banner.photos) d.banner.photos = [];
     });
+    // 修復舊資料裡編號撞號的項目（會造成點 A 開到 B）
+    let healed = false;
+    data.days.forEach(d => { if (_dedupeIds(d.events)) healed = true; });
+    data.expenses.forEach(list => { if (_dedupeIds(list)) healed = true; });
+    if (_dedupeIds(data.photos)) healed = true;
+    if (healed) { try { localStorage.setItem(TRIP_PREFIX + id, JSON.stringify(data)); } catch (e) {} }
   } catch(e) {
     data = freshTripData();
   }
@@ -2682,7 +2706,7 @@ async function addPhotoFromPicker(input) {
     showUploadStatus('儲存中...');
     try {
       const url = await savePhoto(file, SPEC_TAB);
-      data.photos.push({ id: Date.now() + Math.random(), url, day: dayKey });
+      data.photos.push({ id: newItemId(), url, day: dayKey });
       save();
       renderPhotoPage();
     } catch(err) {
@@ -4979,7 +5003,7 @@ function _applySmartImport(result) {
       skipped++; return;
     }
     dayEvents.push({
-      id: Date.now() + Math.random(),
+      id: newItemId(),
       time:      ev.time     || '',
       title:     ev.title    || '',
       note:      ev.note     || '',
@@ -5027,7 +5051,7 @@ function _importToDay(dayIdx) {
       skipped++; return;
     }
     dayEvents.push({
-      id: Date.now() + Math.random(),
+      id: newItemId(),
       time:      ev.time     || '',
       title:     ev.title    || '',
       note:      ev.note     || '',
@@ -5396,7 +5420,7 @@ function _writeExpenseEntries(entries, issues) {
     );
     if (isDup) { skipped++; return; }
     data.expenses[dayIdx].push({
-      id: Date.now() + Math.random(),
+      id: newItemId(),
       name:     ev.name,
       amount:   ev.amount,
       cat:      ev.cat,
