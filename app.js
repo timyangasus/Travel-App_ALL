@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.20.8';
+const APP_VERSION = '2026.11.20.9';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -295,10 +295,15 @@ function _evTransit(ev) {
   return { legs: [{ station: parts[0] || '', line: ev.line || '', color: ev.lineColor || '' }], alight: parts.slice(1).join(' → ') };
 }
 
-/* 時間軸上線路標籤的字：顏色已經在底色裡了，名稱裡的「淺綠線／藍線」這類顏色字就省略
-   例：BTS 淺綠線（Sukhumvit Line）→ BTS Sukhumvit；MRT 藍線 → MRT；JR山手線維持原樣。縮完變空白就用原名稱 */
+/* 時間軸上線路標籤的字：顏色已經在底色裡了，名稱裡的「淺綠線／藍線」這類顏色字就省略；編號線路只留編號
+   例：重慶軌道交通 1 號線 → 1號線；BTS 淺綠線（Sukhumvit Line）→ BTS Sukhumvit；MRT 藍線 → MRT；JR山手線維持原樣。縮完變空白就用原名稱 */
 function _shortLine(line) {
   const full = String(line || '').trim();
+  // 編號線路（重慶軌道交通 1 號線、Chongqing Rail Transit Line 2…）：前面重複的城市／營運單位都省略，只留「1號線」「Line 2」
+  const cn = full.match(/(\d+)\s*號\s*線(.*)$/);
+  if (cn) return `${cn[1]}號線${cn[2].trim()}`;
+  const en = full.match(/\bLine\s*(\d+)\b(.*)$/i);
+  if (en) return `Line ${en[1]}${en[2]}`.trim();
   let s = full
     .replace(/[（(]\s*([^）)]*?)\s*\bLine\b\s*[）)]/ig, ' $1')
     .replace(/(?:淺綠|深綠|淺藍|深藍|紅|橘|橙|黃|綠|藍|紫|棕|粉|灰|黑|金|銀)線/g, ' ')
@@ -306,9 +311,6 @@ function _shortLine(line) {
     .replace(/\s+/g, ' ').trim();
   return s || full;
 }
-
-/* 線路標籤的字色：色票是淺色（黃、金…）時用深色字，其他用白字 */
-function _pillText(hex) { return /^#[0-9a-f]{6}$/i.test(hex || '') ? _gdTextColor(hex) : '#fff'; }
 
 let _itemSeq = 0;
 function newItemId() { return Date.now() * 1000 + (_itemSeq++ % 1000); }
@@ -1876,7 +1878,7 @@ function renderTimeline() {
     const chain = [];
     tr.legs.forEach(g => {
       if (!g.station && !g.line) return;
-      chain.push(`${g.station ? `<span class="timeline-station-name">${esc(g.station)}</span>` : ''}${g.line ? `<span class="transit-pill${g.color === 'none' ? ' none' : ''}" style="${g.color === 'none' ? '' : `background:${g.color||'#999'};color:${_pillText(g.color)}`}" onclick="openTransit('${esc(g.station||'')}','${esc(g.line||'')}')">${esc(_shortLine(g.line))}</span>` : ''}`);
+      chain.push(`${g.station ? `<span class="timeline-station-name">${esc(g.station)}</span>` : ''}${g.line ? `<span class="transit-pill${g.color === 'none' ? ' none' : ''}" style="${g.color === 'none' ? '' : `background:${g.color||'#999'}`}" onclick="openTransit('${esc(g.station||'')}','${esc(g.line||'')}')">${esc(_shortLine(g.line))}</span>` : ''}`);
     });
     if (tr.alight) chain.push(`<span class="timeline-station-name">${esc(tr.alight)}</span>`);
     const stationHtml = chain.length ? `
