@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.20.10';
+const APP_VERSION = '2026.11.20.11';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -1873,7 +1873,7 @@ function renderTimeline() {
   list.innerHTML = evs.map((ev, i) => {
     const c = gradGoldOrange(tAt(i)), cNext = gradGoldOrange(tAt(i + 1));
     const noteHtml = ev.note ? `<div class="timeline-note" onclick="editEvent(${ev.id})" style="cursor:pointer">${noteToHtml(ev.note)}</div>` : '';
-    const addrHtml = ev.addr ? `<div class="timeline-addr" onclick="openAddr('${esc(ev.addr)}')">${esc(ev.addr)}</div>` : '';
+    const addrHtml = ev.addr ? `<div class="timeline-addr" onclick="openAddr('${esc(ev.addr).replace(/'/g, "\\'")}')">${esc(ev.addr)}</div>` : '';
     const tr = _evTransit(ev);
     const chain = [];
     tr.legs.forEach(g => {
@@ -2265,7 +2265,10 @@ function openSpotMap(name, lat, lon, approx) {
 }
 
 function openAddr(addr) {
-  const url = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
+  // 地址欄貼的是網址（例如 Google 地圖分享連結）就直接開，不要當成地址去搜尋
+  const text = String(addr || '').trim();
+  const link = text.match(/https?:\/\/\S+/i);
+  const url = link ? link[0] : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(text);
   window.open(url, '_blank');
 }
 
