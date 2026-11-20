@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.20.11';
+const APP_VERSION = '2026.11.20.12';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -1873,7 +1873,7 @@ function renderTimeline() {
   list.innerHTML = evs.map((ev, i) => {
     const c = gradGoldOrange(tAt(i)), cNext = gradGoldOrange(tAt(i + 1));
     const noteHtml = ev.note ? `<div class="timeline-note" onclick="editEvent(${ev.id})" style="cursor:pointer">${noteToHtml(ev.note)}</div>` : '';
-    const addrHtml = ev.addr ? `<div class="timeline-addr" onclick="openAddr('${esc(ev.addr).replace(/'/g, "\\'")}')">${esc(ev.addr)}</div>` : '';
+    const addrHtml = _addrItems(ev.addr).map(a => `<div class="timeline-addr" onclick="openAddr('${esc(a).replace(/'/g, "\\'")}')">${esc(a)}</div>`).join('');
     const tr = _evTransit(ev);
     const chain = [];
     tr.legs.forEach(g => {
@@ -2262,6 +2262,21 @@ function saveEvent() {
 function openSpotMap(name, lat, lon, approx) {
   const url = `https://www.google.com/maps/search/${encodeURIComponent(name)}/@${lat},${lon},${approx ? 15 : 17}z`;
   window.open(url, '_blank');
+}
+
+/* 地址欄可以放多個：網址獨立一筆（一行一個，同一行有多個網址也會拆開），連續的純文字行合併成一筆地址 */
+function _addrItems(addr) {
+  const items = [];
+  let buf = [];
+  const flush = () => { if (buf.length) { items.push(buf.join(' ')); buf = []; } };
+  String(addr || '').split(/\n/).map(l => l.trim()).filter(Boolean).forEach(line => {
+    const urls = line.match(/https?:\/\/\S+/gi) || [];
+    if (!urls.length) { buf.push(line); return; }
+    flush();
+    if (urls.length > 1) urls.forEach(u => items.push(u)); else items.push(line);
+  });
+  flush();
+  return items;
 }
 
 function openAddr(addr) {
@@ -4475,7 +4490,7 @@ function renderHotelCards() {
           </div>
           <div class="hotel2-name">${esc(h.name || '未命名')}</div>
           ${h.ref ? `<div class="hotel2-ref"><div class="hotel2-ref-label">訂單編號</div><div class="hotel2-ref-val">${esc(h.ref)}</div></div>` : ''}
-          ${h.addr ? `<div class="hotel2-addr" onclick="event.stopPropagation();window.open('https://maps.google.com/?q=${encodeURIComponent(h.addr)}','_blank')">${esc(h.addr)}</div>` : ''}
+          ${h.addr ? `<div class="hotel2-addr" onclick="event.stopPropagation();openAddr('${esc(h.addr).replace(/'/g, "\\'")}')">${esc(h.addr)}</div>` : ''}
           ${priceDisplay ? `<div class="hotel2-price-row"><span class="hotel2-price-label">總價</span><span class="hotel2-price-val">${priceDisplay}</span></div>` : ''}
         </div>
       </div>
