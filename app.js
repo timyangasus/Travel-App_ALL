@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.20.2';
+const APP_VERSION = '2026.11.20.3';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -4784,6 +4784,57 @@ function openSmartImport() {
   document.getElementById('modal-smart-import').classList.add('open');
 }
 
+/* ═══ AI 行程匯入防呆：行程名稱的城市 vs 貼入內容的城市 ═══
+   名稱（出現就算一個）＋代表景點（出現就算一個）。只做提醒，不強制擋，所以詞表寧可保守。 */
+const IMPORT_CITIES = [
+  { n: '曼谷', k: ['曼谷', 'Bangkok', '大皇宮', '臥佛寺', '鄭王廟', '考山路', 'Khao San', '恰圖恰', 'Chatuchak', '帕空花市', '亞洲碼頭', 'Asiatique', '湄南河', '素坤逸', 'Sukhumvit', '四面佛', '倫批尼', 'Lumphini', '暹羅百麗宮', 'Siam Paragon', 'ICONSIAM', '水門市場', 'Pratunam'] },
+  { n: '清邁', k: ['清邁', 'Chiang Mai', '素帖山', '雙龍寺', '尼曼', 'Nimman', '帕辛寺', '塔佩門'] },
+  { n: '普吉島', k: ['普吉', 'Phuket', '芭東', 'Patong', '皮皮島', '卡倫海灘'] },
+  { n: '成都', k: ['成都', 'Chengdu', '寬窄巷子', '錦里', '熊貓基地', '大熊貓', '春熙路', '武侯祠', '杜甫草堂', '都江堰', '青城山', '成都太古里', '樂山大佛', '天府廣場'] },
+  { n: '重慶', k: ['重慶', 'Chongqing', '洪崖洞', '解放碑', '磁器口', '李子壩', '長江索道'] },
+  { n: '北京', k: ['北京', 'Beijing', '故宮', '天安門', '八達嶺', '頤和園', '天壇', '南鑼鼓巷', '王府井', '鳥巢'] },
+  { n: '上海', k: ['上海', 'Shanghai', '外灘', '豫園', '東方明珠', '南京路', '田子坊', '陸家嘴', '上海新天地'] },
+  { n: '東京', k: ['東京', 'Tokyo', '淺草', '澀谷', '新宿', '原宿', '銀座', '築地', '秋葉原', '晴空塔', '東京鐵塔', '池袋', '六本木', '台場'] },
+  { n: '大阪', k: ['大阪', 'Osaka', '道頓堀', '心齋橋', '難波', '梅田', '環球影城', '大阪城', '天王寺'] },
+  { n: '京都', k: ['京都', 'Kyoto', '清水寺', '伏見稻荷', '嵐山', '金閣寺', '祇園', '錦市場', '二年坂'] },
+  { n: '沖繩', k: ['沖繩', 'Okinawa', '那霸', '美麗海水族館', '國際通'] },
+  { n: '福岡', k: ['福岡', 'Fukuoka', '博多', '太宰府', '中洲屋台'] },
+  { n: '札幌', k: ['札幌', 'Sapporo', '小樽', '狸小路', '北海道'] },
+  { n: '名古屋', k: ['名古屋', 'Nagoya'] },
+  { n: '首爾', k: ['首爾', 'Seoul', '明洞', '弘大', '景福宮', '梨泰院', '東大門', '北村韓屋', '樂天世界', '漢江'] },
+  { n: '釜山', k: ['釜山', 'Busan', '海雲台', '甘川洞', '札嘎其', '廣安里'] },
+  { n: '新加坡', k: ['新加坡', 'Singapore', '濱海灣', '魚尾獅', '聖淘沙', '烏節路', '牛車水'] },
+  { n: '香港', k: ['香港', 'Hong Kong', '尖沙咀', '旺角', '中環', '太平山', '銅鑼灣', '維多利亞港'] },
+  { n: '澳門', k: ['澳門', 'Macau', '大三巴', '威尼斯人', '議事亭'] },
+  { n: '台北', k: ['台北', '臺北', 'Taipei', '西門町', '士林夜市', '九份', '淡水老街'] },
+  { n: '河內', k: ['河內', 'Hanoi', '還劍湖', '三十六古街'] },
+  { n: '胡志明市', k: ['胡志明', 'Ho Chi Minh', 'Saigon', '濱城市場', '范五老'] },
+  { n: '峴港', k: ['峴港', 'Da Nang', '會安', 'Hoi An', '巴拿山'] },
+  { n: '吉隆坡', k: ['吉隆坡', 'Kuala Lumpur', '雙子星塔', '黑風洞', '茨廠街', '武吉免登'] },
+  { n: '峇里島', k: ['峇里', '巴厘島', 'Bali', '烏布', 'Ubud', '金巴蘭', '海神廟'] },
+  { n: '巴黎', k: ['巴黎', 'Paris', '艾菲爾', '羅浮宮', '凱旋門', '香榭麗舍', '蒙馬特'] },
+  { n: '倫敦', k: ['倫敦', 'London', '大笨鐘', '大英博物館', '倫敦眼', '白金漢宮', '塔橋'] },
+];
+
+/* 回傳 null（沒問題／看不出來）或 { trip: '曼谷', found: '成都', hits: ['成都','寬窄巷子'] } */
+function _importCityMismatch(text) {
+  const tripName = [data?.settings?.tripName, (meta.trips || []).find(t => t.id === currentTripId)?.name].filter(Boolean).join(' ');
+  const has = (hay, kw) => hay.toLowerCase().includes(kw.toLowerCase());
+  const tripCities = IMPORT_CITIES.filter(c => c.k.slice(0, 2).some(kw => has(tripName, kw)) || has(tripName, c.n));
+  if (!tripCities.length) return null;                      // 行程名稱沒有可辨識的城市，不檢查
+  // 有些路名剛好是別的城市名（台北的成都路、重慶南路…），先拿掉避免誤判；「東京都」裡的「京都」也要避開
+  const t = text.replace(/東京都/g, '東京').replace(/(成都|重慶|北京|上海|南京|天津|廣州)[東西南北中]?(路|街)/g, ' ');
+  const hitsOf = c => c.k.filter(kw => has(t, kw));
+  if (tripCities.some(c => hitsOf(c).length)) return null;  // 內容有提到這趟的城市，放行
+  let worst = null;
+  IMPORT_CITIES.forEach(c => {
+    if (tripCities.includes(c)) return;
+    const hits = hitsOf(c);
+    if (hits.length >= 2 && (!worst || hits.length > worst.hits.length)) worst = { trip: tripCities.map(x => x.n).join('、'), found: c.n, hits };
+  });
+  return worst;
+}
+
 function runSmartImport() {
   const ta = document.getElementById('smart-import-text');
   const text = ta?.value?.trim() || '';
@@ -4796,6 +4847,20 @@ function runSmartImport() {
   setTimeout(() => {
     try {
       const result = _parseItineraryText(text);
+      const mm = result?.events?.length ? _importCityMismatch(text) : null;
+      if (mm) {
+        // 先回到輸入畫面，取消時文字還在；確定才真的匯入
+        document.getElementById('smart-import-loading').style.display = 'none';
+        document.getElementById('smart-import-actions').style.display = 'flex';
+        showConfirm('這份行程好像不是這趟旅行的',
+          `這趟行程的名稱是「${mm.trip}」，但貼入的內容看起來是「${mm.found}」（偵測到：${mm.hits.slice(0, 4).join('、')}）。確定要匯入嗎？匯入會取代那幾天原有的行程。`,
+          () => {
+            document.getElementById('smart-import-actions').style.display = 'none';
+            document.getElementById('smart-import-loading').style.display = 'flex';
+            setTimeout(() => _applySmartImport(result), 50);
+          }, null, '仍要匯入');
+        return;
+      }
       _applySmartImport(result);
     } catch(e) {
       document.getElementById('smart-import-loading').style.display = 'none';
