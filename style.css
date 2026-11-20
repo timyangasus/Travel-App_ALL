@@ -3272,7 +3272,8 @@ canvas { display: block; width: 100%; height: 100%; }
 .ev-leg-add { width: 100%; padding: 12px; background: none; border: 1px dashed #C9A84C; color: #8A7430; font-family: var(--mono); font-size: 14px; font-weight: 700; cursor: pointer; }
 .timeline-station-name {
   font-size: 13px;
-  color: #555;
+  font-weight: 700;
+  color: #333;
   font-family: var(--mono);
   line-height: 1;
 }
