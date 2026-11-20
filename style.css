@@ -3261,6 +3261,15 @@ canvas { display: block; width: 100%; height: 100%; }
   flex-wrap: wrap;
 }
 
+.timeline-leg { display: inline-flex; align-items: center; gap: 6px; }
+.timeline-arrow { color: #BBB; font-size: 13px; font-family: var(--mono); line-height: 1; }
+.ev-leg { padding: 0 0 14px; }
+.ev-leg + .ev-leg { border-top: 1px dashed #E4E4E4; padding-top: 14px; }
+.ev-leg-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: #C9A84C; font-family: var(--mono); margin-bottom: 8px; }
+.ev-leg-del { background: none; border: none; color: #BBB; font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.ev-leg-label { font-size: 12px; color: #888; font-family: var(--mono); margin-bottom: 6px; }
+.ev-leg-sw { width: 36px; height: 36px; flex-shrink: 0; cursor: pointer; border: 1.5px solid #E0E0E0; }
+.ev-leg-add { width: 100%; padding: 12px; background: none; border: 1px dashed #C9A84C; color: #8A7430; font-family: var(--mono); font-size: 14px; font-weight: 700; cursor: pointer; }
 .timeline-station-name {
   font-size: 13px;
   color: #555;

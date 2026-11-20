@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.18.4';
+const APP_VERSION = '2026.11.20.1';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -286,6 +286,15 @@ const _blobCache = new Map();
 
 /* 行程／照片／記帳項目的編號：整數、同一毫秒內連續產生也不會重複
    （舊寫法 Date.now()+Math.random() 同一毫秒產生多筆時有機率撞號，撞號後點 A 會打開 B） */
+/* 行程的轉乘資料：ev.transit = [{ station, line, color }]（一段一個），ev.alight = 最後下車站（可省略）。
+   舊資料是 ev.station / ev.line / ev.lineColor 單一一組，這裡讀的時候自動當成第一段（舊匯入寫成「上車 → 下車」的拆成上車站＋下車站）。 */
+function _evTransit(ev) {
+  if (Array.isArray(ev.transit)) return { legs: ev.transit, alight: ev.alight || '' };
+  if (!ev.station && !ev.line) return { legs: [], alight: '' };
+  const parts = String(ev.station || '').split(/\s*→\s*/);
+  return { legs: [{ station: parts[0] || '', line: ev.line || '', color: ev.lineColor || '' }], alight: parts.slice(1).join(' → ') };
+}
+
 let _itemSeq = 0;
 function newItemId() { return Date.now() * 1000 + (_itemSeq++ % 1000); }
 
@@ -1848,11 +1857,15 @@ function renderTimeline() {
     const c = gradGoldOrange(tAt(i)), cNext = gradGoldOrange(tAt(i + 1));
     const noteHtml = ev.note ? `<div class="timeline-note" onclick="editEvent(${ev.id})" style="cursor:pointer">${noteToHtml(ev.note)}</div>` : '';
     const addrHtml = ev.addr ? `<div class="timeline-addr" onclick="openAddr('${esc(ev.addr)}')">${esc(ev.addr)}</div>` : '';
-    const stationHtml = (ev.station || ev.line) ? `
-      <div class="timeline-station-row">
-        ${ev.station ? `<span class="timeline-station-name">${esc(ev.station)}</span>` : ''}
-        ${ev.line ? `<span class="transit-pill" style="background:${ev.lineColor||'#999'}" onclick="openTransit('${esc(ev.station||'')}','${esc(ev.line||'')}')">${esc(ev.line)}</span>` : ''}
-      </div>` : '';
+    const tr = _evTransit(ev);
+    const chain = [];
+    tr.legs.forEach(g => {
+      if (!g.station && !g.line) return;
+      chain.push(`${g.station ? `<span class="timeline-station-name">${esc(g.station)}</span>` : ''}${g.line ? `<span class="transit-pill" style="background:${g.color||'#999'}" onclick="openTransit('${esc(g.station||'')}','${esc(g.line||'')}')">${esc(g.line)}</span>` : ''}`);
+    });
+    if (tr.alight) chain.push(`<span class="timeline-station-name">${esc(tr.alight)}</span>`);
+    const stationHtml = chain.length ? `
+      <div class="timeline-station-row">${chain.map(c => `<span class="timeline-leg">${c}</span>`).join('<span class="timeline-arrow">→</span>')}</div>` : '';
     return `
     <div class="timeline-item" style="animation-delay:${i * 0.05}s">
       <div class="timeline-left">
@@ -2110,27 +2123,51 @@ function initAutoResize() {
   });
 }
 
-let _evColor = '#999';
+/* 編輯行程：轉乘清單的暫存狀態（一段 = 車站＋線路＋顏色） */
+let _evLegsState = [];
+let _evLegIdx = 0;
+
+function _renderEvLegs() {
+  const box = document.getElementById('ev-legs');
+  if (!box) return;
+  const multi = _evLegsState.length > 1;
+  box.innerHTML = _evLegsState.map((g, i) => `
+    <div class="ev-leg">
+      ${multi ? `<div class="ev-leg-head"><span>第 ${i + 1} 段</span><button type="button" class="ev-leg-del" onclick="evLegDel(${i})" aria-label="刪除這一段">×</button></div>` : ''}
+      <div class="ev-leg-label">車站</div>
+      <input class="ev-big-input" value="${esc(g.station)}" oninput="_evLegsState[${i}].station=this.value">
+      <div class="ev-leg-label" style="margin-top:12px">線路名稱</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input class="ev-big-input" value="${esc(g.line)}" style="flex:1" oninput="_evLegsState[${i}].line=this.value" onchange="evLegLineDone(${i})">
+        <div class="ev-leg-sw" style="background:${g.color || '#CCC'}" onclick="evLegPickColor(${i})"></div>
+      </div>
+    </div>`).join('');
+}
+function evLegAdd() { _evLegsState.push({ station: '', line: '', color: '' }); _renderEvLegs(); }
+function evLegDel(i) { _evLegsState.splice(i, 1); if (!_evLegsState.length) _evLegsState.push({ station: '', line: '', color: '' }); _renderEvLegs(); }
+/* 線路名稱填完、而且還沒選過顏色時，依名稱自動配色（認不出來就維持原樣） */
+function evLegLineDone(i) {
+  const g = _evLegsState[i];
+  if (g.color && g.color !== '#CCC') return;
+  const t = getTransitColor(g.line);
+  if (t !== '#999999') { g.color = t; _renderEvLegs(); }
+}
+function evLegPickColor(i) { _evLegIdx = i; openColorSheet(); }
 
 function openColorSheet() {
-  // Mark currently selected color
+  const cur = _evLegsState[_evLegIdx]?.color || '';
   document.querySelectorAll('.cpk-swatch').forEach(el => {
-    el.classList.toggle('selected', el.style.background === _evColor || el.style.backgroundColor === _evColor);
+    el.classList.toggle('selected', !!cur && (el.style.background === cur || el.style.backgroundColor === cur));
   });
   document.getElementById('modal-color-sheet').classList.add('open');
 }
 
 function pickColor(hex) {
-  _evColor = hex;
-  document.getElementById('ev-color-swatch').style.background = hex;
-  document.querySelectorAll('.cpk-swatch').forEach(el => {
-    el.classList.toggle('selected', el.style.background === hex || el.style.backgroundColor === hex);
-  });
+  if (_evLegsState[_evLegIdx]) _evLegsState[_evLegIdx].color = hex;
+  _renderEvLegs();
   closeModal('modal-color-sheet');
 }
 
-function setEvColor(hex) { pickColor(hex); }
-function toggleEvColorPicker() { openColorSheet(); }
 
 function noteToHtml(text) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -2146,8 +2183,8 @@ function noteToHtml(text) {
 function openEventModal(id) {
   editingEventId = id !== undefined ? id : null;
   document.getElementById('modal-event-title').textContent = id !== undefined ? '編輯行程' : '新增行程';
-  _evColor = '#CCC';
-  document.getElementById('ev-color-swatch').style.background = '#CCC';
+  _evLegsState = [];
+  _evLegIdx = 0;
 
   if (id !== undefined) {
     const ev = data.days[currentDay].events.find(e => e.id === id);
@@ -2155,17 +2192,16 @@ function openEventModal(id) {
     document.getElementById('ev-title').value   = ev.title;
     document.getElementById('ev-note').value    = ev.note    || '';
     document.getElementById('ev-addr').value    = ev.addr    || '';
-    document.getElementById('ev-station').value = ev.station || '';
-    document.getElementById('ev-line').value    = ev.line    || '';
-    if (ev.lineColor) {
-      _evColor = ev.lineColor;
-      document.getElementById('ev-color-swatch').style.background = ev.lineColor;
-    }
+    const tr = _evTransit(ev);
+    _evLegsState = tr.legs.map(g => ({ station: g.station || '', line: g.line || '', color: g.color || '' }));
+    document.getElementById('ev-alight').value = tr.alight || '';
   } else {
-    ['ev-time','ev-title','ev-note','ev-addr','ev-station','ev-line'].forEach(id => {
+    ['ev-time','ev-title','ev-note','ev-addr','ev-alight'].forEach(id => {
       document.getElementById(id).value = '';
     });
   }
+  if (!_evLegsState.length) _evLegsState.push({ station: '', line: '', color: '' });
+  _renderEvLegs();
   document.getElementById('modal-event').classList.add('open');
   setTimeout(() => {
     document.getElementById('ev-time').focus();
@@ -2187,15 +2223,17 @@ function saveEvent() {
   if (!time || !title) return;
   const note    = document.getElementById('ev-note').value.trim();
   const addr    = document.getElementById('ev-addr').value.trim();
-  const station = document.getElementById('ev-station').value.trim();
-  const line    = document.getElementById('ev-line').value.trim();
-  const lineColor = (station || line) ? _evColor : '';
+  const transit = _evLegsState
+    .map(g => ({ station: (g.station || '').trim(), line: (g.line || '').trim(), color: g.color || '' }))
+    .filter(g => g.station || g.line)
+    .map(g => ({ ...g, color: g.color || '#CCC' }));
+  const alight = document.getElementById('ev-alight').value.trim();
 
   if (editingEventId !== null) {
     const ev = data.days[currentDay].events.find(e => e.id === editingEventId);
-    if (ev) { ev.time = time; ev.title = title; ev.note = note; ev.addr = addr; ev.station = station; ev.line = line; ev.lineColor = lineColor; }
+    if (ev) { ev.time = time; ev.title = title; ev.note = note; ev.addr = addr; ev.transit = transit; ev.alight = alight; delete ev.station; delete ev.line; delete ev.lineColor; }
   } else {
-    data.days[currentDay].events.push({ id: Date.now(), time, title, note, addr, station, line, lineColor });
+    data.days[currentDay].events.push({ id: newItemId(), time, title, note, addr, transit, alight });
   }
   save();
   closeModal('modal-event');
@@ -4619,13 +4657,13 @@ const AI_ITINERARY_TEMPLATE = `請依下列固定格式輸出旅遊行程，不�
 3. 行程底下的細節是子項目，縮排 3 個空格再加「* 」，一行只寫一個標籤，只能使用下面這些標籤，冒號用「：」：
    - 地址：（想用 Google 地圖搜尋的店名或地址）
    - 說明：（其他所有文字都寫在這裡，可以寫多行「說明：」）
-   搭乘電車／捷運／地鐵時，才加上這四行：
+   搭乘電車／捷運／地鐵時，才加上這幾行（一段路線寫一組前三行）：
    - 線路名稱：（例：BTS 深綠線（Silom Line））
    - 線路顏色：（只能寫：紅、橘、黃、綠、深綠、淺綠、藍、深藍、淺藍、紫、棕、粉、灰、黑，後面加「色」，例如 藍色；或直接寫色碼 #1A3F8F）
-   - 上車車站：（車站名）
-   - 下車車站：（車站名，沒有就省略這行）
+   - 上車車站：（這一段上車的車站名）
+   - 下車車站：（最後下車的車站名，整個行程只寫一次，沒有就省略這行）
 4. 搭 Grab、步行、巴士等非軌道交通：不要用上面四個線路標籤，交通方式、預估時間、搭乘方向等全部寫進「說明：」。
-5. 一個行程只能有一條線路。轉乘站只寫要搭的那一條，另一條寫進「說明：」。
+5. 需要轉乘時，每一段路線各寫一組「線路名稱、線路顏色、上車車站」，依搭乘順序由上往下排，「上車車站」寫轉乘後要上車的車站；最後下車的車站只在最後寫一次「下車車站」。不需要轉乘就只寫一組。
 6. 凌晨跨日的行程（例如半夜 00:30）請放在「隔天」的日期標題下，時間直接寫 00:30，不要寫「翌日」「隔天」。
 7. 不要使用「交通方式：」「出發地點：」「目的地：」「地點：」這類其他標籤。
 
@@ -4654,6 +4692,15 @@ const AI_ITINERARY_TEMPLATE = `請依下列固定格式輸出旅遊行程，不�
    * 上車車站：Wat Mangkon
    * 下車車站：Sam Yan
    * 說明：往 Hua Lamphong 方向，下車後步行返回飯店。
+* 20:30 搭捷運轉乘回飯店附近
+   * 線路名稱：MRT 藍線
+   * 線路顏色：藍色
+   * 上車車站：Wat Mangkon
+   * 線路名稱：BTS 深綠線（Silom Line）
+   * 線路顏色：深綠色
+   * 上車車站：Sala Daeng
+   * 下車車站：Chong Nonsi
+   * 說明：Si Lom 站與 Sala Daeng 站以天橋相連，可轉乘。
 * 22:15 Grab 前往帕空花市
    * 地址：Pak Khlong Talat, Bangkok
    * 說明：出發地點為巴吞旺公主飯店。
@@ -4862,7 +4909,7 @@ function _parseItineraryText(text) {
       pushCurrentEvent();
       const time = padTime(trm[1]), endTime = padTime(trm[2]);
       const title = trm[3].trim().replace(/[\u3002.\u3001,]$/, '');
-      currentEvent = { day: currentDay||1, time, title, note: time+'\u2013'+endTime+' '+title, addr:'', station:'', line:'' };
+      currentEvent = { day: currentDay||1, time, title, note: time+'\u2013'+endTime+' '+title, addr:'', transit:[] };
       noteLines = []; continue;
     }
 
@@ -4873,7 +4920,7 @@ function _parseItineraryText(text) {
       pushCurrentEvent();
       const time = padTime(tsm[1]);
       const title = tsm[2].trim().replace(/[\u3002.\u3001,]$/, '');
-      currentEvent = { day: currentDay||1, time, title, note:'', addr:'', station:'', line:'' };
+      currentEvent = { day: currentDay||1, time, title, note:'', addr:'', transit:[] };
       noteLines = []; continue;
     }
 
@@ -4883,8 +4930,7 @@ function _parseItineraryText(text) {
     if (currentEvent) {
       if (/^\u6700\u8fd1\u7ad9[\uff1a:]/.test(line)) {
         const v = db.replace(/^\u6700\u8fd1\u7ad9[\uff1a:]/, '').trim().split(/[|\uff5c]/);
-        currentEvent.station = (v[0] || '').trim();
-        currentEvent.line = (v[1] || '').trim();
+        (currentEvent.transit = currentEvent.transit || []).push({ station: (v[0] || '').trim(), line: (v[1] || '').trim(), color: '' });
         continue;
       }
       // GPT 常見的「標籤：內容」子項目（normalize() 已把全形冒號轉成半形）
@@ -4895,22 +4941,27 @@ function _parseItineraryText(text) {
           currentEvent.addr = val;
           continue;
         }
+        // 轉乘：同一個欄位再出現一次，就當作下一段
+        const legFor = field => {
+          const t = currentEvent.transit = currentEvent.transit || [];
+          let g = t[t.length - 1];
+          if (!g || g[field]) { g = { station: '', line: '', color: '' }; t.push(g); }
+          return g;
+        };
         if (/色/.test(key)) {
-          currentEvent.lineColor = colorFromName(val);
+          legFor('color').color = colorFromName(val);
         } else if (/名稱|^(線路|路線)$/.test(key)) {
-          currentEvent.line = val;
+          legFor('line').line = val;
         } else if (/^(上車|搭乘|出發)|^(車站|站名)$/.test(key)) {
-          currentEvent._board = val;
+          legFor('station').station = val;
         } else {
-          currentEvent._alight = val;
+          currentEvent.alight = val;
         }
-        currentEvent.station = [currentEvent._board, currentEvent._alight].filter(Boolean).join(' → ');
         continue;
       }
       const transitPipe = db.match(/^(.+?)[|\uff5c](.+)$/);
       if (transitPipe && /(\u7dda|Line|BTS|MRT|JR|\u6377\u904b|\u5730\u9435)/i.test(transitPipe[2])) {
-        currentEvent.station = transitPipe[1].trim();
-        currentEvent.line = transitPipe[2].trim();
+        (currentEvent.transit = currentEvent.transit || []).push({ station: transitPipe[1].trim(), line: transitPipe[2].trim(), color: '' });
         continue;
       }
     }
@@ -4936,6 +4987,13 @@ function _parseItineraryText(text) {
   const noDayDetected = daysCount === 0;
   if (daysCount === 0 && events.length > 0) daysCount = 1;
   return { days_count: daysCount, events, issues, _noDayDetected: noDayDetected };
+}
+
+/* 匯入解析出來的轉乘段：沒給顏色的依線路名稱配色 */
+function _importLegs(ev) {
+  return (ev.transit || [])
+    .filter(g => g && (g.station || g.line))
+    .map(g => ({ station: g.station || '', line: g.line || '', color: g.color || getTransitColor(g.line || '') }));
 }
 
 function _applySmartImport(result) {
@@ -5008,9 +5066,8 @@ function _applySmartImport(result) {
       title:     ev.title    || '',
       note:      ev.note     || '',
       addr:      ev.addr     || '',
-      station:   ev.station  || '',
-      line:      ev.line     || '',
-      lineColor: ev.lineColor || ((ev.station || ev.line) ? getTransitColor(ev.line || '') : '')
+      transit:   _importLegs(ev),
+      alight:    ev.alight   || ''
     });
     written++;
   });
@@ -5056,9 +5113,8 @@ function _importToDay(dayIdx) {
       title:     ev.title    || '',
       note:      ev.note     || '',
       addr:      ev.addr     || '',
-      station:   ev.station  || '',
-      line:      ev.line     || '',
-      lineColor: ev.lineColor || ((ev.station || ev.line) ? getTransitColor(ev.line || '') : '')
+      transit:   _importLegs(ev),
+      alight:    ev.alight   || ''
     });
     written++;
   });

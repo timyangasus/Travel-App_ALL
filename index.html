@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="icon-512.png?v=14">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=14">
   <title>旅遊誌</title>
-  <link rel="stylesheet" href="style.css?v=2026.11.18.4">
+  <link rel="stylesheet" href="style.css?v=2026.11.20.1">
 </head>
 <body>
 
@@ -841,16 +841,13 @@
         <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">地址</div>
         <textarea class="ev-big-input ev-auto" id="ev-addr" placeholder="" rows="1"></textarea>
       </div>
+      <div style="padding:12px 20px 0" id="ev-legs"></div>
       <div style="padding:12px 20px 0">
-        <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">車站</div>
-        <input class="ev-big-input" id="ev-station" placeholder="">
+        <button type="button" class="ev-leg-add" onclick="evLegAdd()">＋ 新增轉乘</button>
       </div>
       <div style="padding:12px 20px 16px">
-        <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">線路名稱</div>
-        <div style="display:flex;gap:10px;align-items:center">
-          <input class="ev-big-input" id="ev-line" placeholder="" style="flex:1">
-          <div id="ev-color-swatch" onclick="openColorSheet()" style="width:36px;height:36px;border-radius:0;background:#CCC;cursor:pointer;flex-shrink:0;border:1.5px solid #E0E0E0"></div>
-        </div>
+        <div style="font-size:12px;color:#888;font-family:var(--mono);margin-bottom:6px">下車站（可省略）</div>
+        <input class="ev-big-input" id="ev-alight" placeholder="">
       </div>
       <div style="padding:0 20px 16px">
         <div class="modal-btn-row" style="padding:0">
@@ -1116,8 +1113,8 @@
   </div>
 </div>
 
-<script src="guide-bangkok.js?v=2026.11.18.4"></script>
-<script src="app.js?v=2026.11.18.4"></script>
+<script src="guide-bangkok.js?v=2026.11.20.1"></script>
+<script src="app.js?v=2026.11.20.1"></script>
 
 
 </body>
