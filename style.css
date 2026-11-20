@@ -3328,6 +3328,16 @@ canvas { display: block; width: 100%; height: 100%; }
 .cpk-swatch:active { transform: scale(0.92); }
 .cpk-swatch.selected { box-shadow: inset 0 0 0 3px #fff, 0 0 0 3px #1A1A1A; }
 .cpk-swatch span { display: none; }
+.cpk-section { font-size: 12px; font-weight: 700; color: #888; font-family: var(--mono); margin: 16px 2px 8px; }
+.cpk-bkk { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 6px; }
+.cpk-item { cursor: pointer; text-align: center; }
+.cpk-item .cpk-swatch { width: 100%; aspect-ratio: 5 / 3; }
+.cpk-name { font-size: 11px; color: #555; font-family: var(--mono); margin-top: 5px; line-height: 1.25; }
+.cpk-none-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 13px; border: 1.5px solid #DADADA; color: #333; font-family: var(--mono); font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+.cpk-none-btn.selected { border-color: #1A1A1A; box-shadow: inset 0 0 0 1px #1A1A1A; }
+.cpk-none-ico, .ev-leg-sw.none { background: #fff linear-gradient(to top right, transparent calc(50% - 1px), #E53935 50%, transparent calc(50% + 1px)); }
+.cpk-none-ico { width: 22px; height: 22px; border: 1.5px solid #CFCFCF; }
+.transit-pill.none { background: transparent; color: #444; box-shadow: inset 0 0 0 1.5px #BDBDBD; }
 
 /* Expense day tabs — compact, up to 10 before wrap */
 /* Expense screen */

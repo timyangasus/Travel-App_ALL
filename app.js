@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.20.5';
+const APP_VERSION = '2026.11.20.6';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -306,6 +306,9 @@ function _shortLine(line) {
     .replace(/\s+/g, ' ').trim();
   return s || full;
 }
+
+/* 線路標籤的字色：色票是淺色（黃、金…）時用深色字，其他用白字 */
+function _pillText(hex) { return /^#[0-9a-f]{6}$/i.test(hex || '') ? _gdTextColor(hex) : '#fff'; }
 
 let _itemSeq = 0;
 function newItemId() { return Date.now() * 1000 + (_itemSeq++ % 1000); }
@@ -1873,7 +1876,7 @@ function renderTimeline() {
     const chain = [];
     tr.legs.forEach(g => {
       if (!g.station && !g.line) return;
-      chain.push(`${g.station ? `<span class="timeline-station-name">${esc(g.station)}</span>` : ''}${g.line ? `<span class="transit-pill" style="background:${g.color||'#999'}" onclick="openTransit('${esc(g.station||'')}','${esc(g.line||'')}')">${esc(_shortLine(g.line))}</span>` : ''}`);
+      chain.push(`${g.station ? `<span class="timeline-station-name">${esc(g.station)}</span>` : ''}${g.line ? `<span class="transit-pill${g.color === 'none' ? ' none' : ''}" style="${g.color === 'none' ? '' : `background:${g.color||'#999'};color:${_pillText(g.color)}`}" onclick="openTransit('${esc(g.station||'')}','${esc(g.line||'')}')">${esc(_shortLine(g.line))}</span>` : ''}`);
     });
     if (tr.alight) chain.push(`<span class="timeline-station-name">${esc(tr.alight)}</span>`);
     const stationHtml = chain.length ? `
@@ -2151,7 +2154,7 @@ function _renderEvLegs() {
       <div class="ev-leg-label" style="margin-top:12px">線路名稱</div>
       <div style="display:flex;gap:10px;align-items:center">
         <input class="ev-big-input" value="${esc(g.line)}" style="flex:1" oninput="_evLegsState[${i}].line=this.value" onchange="evLegLineDone(${i})">
-        <div class="ev-leg-sw" style="background:${g.color || '#CCC'}" onclick="evLegPickColor(${i})"></div>
+        <div class="ev-leg-sw${g.color === 'none' ? ' none' : ''}" style="${g.color === 'none' ? '' : `background:${g.color || '#CCC'}`}" onclick="evLegPickColor(${i})"></div>
       </div>
     </div>`).join('');
 }
@@ -2167,9 +2170,11 @@ function evLegLineDone(i) {
 function evLegPickColor(i) { _evLegIdx = i; openColorSheet(); }
 
 function openColorSheet() {
-  const cur = _evLegsState[_evLegIdx]?.color || '';
-  document.querySelectorAll('.cpk-swatch').forEach(el => {
-    el.classList.toggle('selected', !!cur && (el.style.background === cur || el.style.backgroundColor === cur));
+  const cur = (_evLegsState[_evLegIdx]?.color || '').toLowerCase();
+  document.querySelectorAll('#modal-color-sheet [onclick^="pickColor("]').forEach(el => {
+    const hex = (el.getAttribute('onclick').match(/pickColor\('([^']+)'\)/) || [])[1] || '';
+    const target = el.classList.contains('cpk-swatch') || el.classList.contains('cpk-none-btn') ? el : el.querySelector('.cpk-swatch');
+    if (target) target.classList.toggle('selected', !!cur && hex.toLowerCase() === cur);
   });
   document.getElementById('modal-color-sheet').classList.add('open');
 }
