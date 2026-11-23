@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.23.5';
+const APP_VERSION = '2026.11.23.6';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3140,13 +3140,24 @@ const CHECKLIST_DEFAULTS = [
   { g: '日用',      items: ['雨傘','黃色雨衣','寶特瓶','帆布包','分裝袋','筷子叉子'] },
 ];
 
+/* 預設清單版本：舊行程存的是舊版清單，第一次打開時整份換成新版（只做一次，之後自己加的項目不會再被清掉）。
+   清單裡已經有件數欄位的，代表已經是新版（例如已經填了件數），只補上版本記號、不重置。 */
+const CHECKLIST_VER = 2;
+function _seedChecklist() {
+  return CHECKLIST_DEFAULTS.flatMap(g =>
+    g.items.map(it => typeof it === 'string'
+      ? { text: it, done: false, group: g.g }
+      : { text: it.t, done: false, group: g.g, hasQty: !!it.q, qty: '' })
+  );
+}
 function initChecklist() {
-  if (!data.checklist || data.checklist.length === 0) {
-    data.checklist = CHECKLIST_DEFAULTS.flatMap(g =>
-      g.items.map(it => typeof it === 'string'
-        ? { text: it, done: false, group: g.g }
-        : { text: it.t, done: false, group: g.g, hasQty: !!it.q, qty: '' })
-    );
+  const list = data.checklist || [];
+  if (!list.length || (data.checklistVer !== CHECKLIST_VER && !list.some(i => i.hasQty))) {
+    data.checklist = _seedChecklist();
+    data.checklistVer = CHECKLIST_VER;
+    save();
+  } else if (data.checklistVer !== CHECKLIST_VER) {
+    data.checklistVer = CHECKLIST_VER;
     save();
   }
 }
