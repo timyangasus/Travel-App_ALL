@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.23.2';
+const APP_VERSION = '2026.11.23.3';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3129,19 +3129,23 @@ function _mapInitEngine() {
 }
 
 /* ─── Checklist ─── */
+/* 預設點檢表：字串＝一般項目；{ t, q: true }＝要填件數的項目（顯示成「上衣 x8」） */
 const CHECKLIST_DEFAULTS = [
-  { g: '證件/文具', items: ['護照','眼鏡','筆記本','筆','分裝袋'] },
+  { g: '證件/文具', items: ['護照','眼鏡','筆記本','筆'] },
   { g: '電子/充電', items: ['手錶充電 x1','充電器 Type-C x2','Sony 充電器 x1','行動電源＋充電線 x1'] },
   { g: '攝影',      items: ['相機電池','拭鏡布'] },
-  { g: '盥洗/保養', items: ['盥洗用具','毛巾','刮鬍刀','護唇膏'] },
-  { g: '藥品/衛生', items: ['止痛藥','胃藥','感冒藥','溫度計','OK繃','衛生紙','口罩','落健'] },
-  { g: '衣物/日用', items: ['帽子','短袖上衣','長褲','短褲','內衣褲','襪子','布鞋','夾腳拖或涼鞋','薄外套','雨傘','黃色雨衣','寶特瓶','帆布包','筷子叉子'] },
+  { g: '盥洗/保養', items: ['盥洗用具','落健','刮鬍刀','護唇膏'] },
+  { g: '藥品/衛生', items: ['藥品','溫度計','OK繃','濕紙巾','面紙','口罩'] },
+  { g: '衣物',      items: ['帽子', { t: '外套', q: true }, { t: '上衣', q: true }, { t: '長褲', q: true }, { t: '短褲', q: true }, '睡衣褲', { t: '襪子', q: true }, { t: '內衣褲', q: true }, '布鞋','涼鞋','圍巾'] },
+  { g: '日用',      items: ['雨傘','黃色雨衣','寶特瓶','帆布包','分裝袋','筷子叉子'] },
 ];
 
 function initChecklist() {
   if (!data.checklist || data.checklist.length === 0) {
     data.checklist = CHECKLIST_DEFAULTS.flatMap(g =>
-      g.items.map(text => ({ text, done: false, group: g.g }))
+      g.items.map(it => typeof it === 'string'
+        ? { text: it, done: false, group: g.g }
+        : { text: it.t, done: false, group: g.g, hasQty: !!it.q, qty: '' })
     );
     save();
   }
@@ -3182,7 +3186,7 @@ function renderCheckItems() {
             <div class="cl-circle ${item.done ? 'cl-checked' : ''}">
               ${item.done ? `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#fff"><path d="m424-312 282-282-56-56-226 226-114-114-56 56 170 170Z"/></svg>` : ''}
             </div>
-            <span class="cl-text">${esc(item.text)}</span>
+            <span class="cl-text">${esc(item.text)}${item.hasQty ? `<button class="cl-qty${item.qty ? ' set' : ''}" onclick="event.stopPropagation();openChecklistQty(${item.idx})">${item.qty ? 'x' + esc(item.qty) : 'x －'}</button>` : ''}</span>
             <button class="cl-del" onclick="event.stopPropagation();deleteCheckItem(${item.idx})">×</button>
           </div>`).join('')}
       </div>`;
@@ -3203,6 +3207,7 @@ function openChecklistModal(group) {
     const inp = document.getElementById('checklist-add-input');
     if (inp) { inp.value = ''; inp.focus(); }
   }, 340);
+  const qc = document.getElementById('checklist-add-qty'); if (qc) qc.checked = false;
 }
 
 function saveChecklistModal() {
@@ -3210,7 +3215,9 @@ function saveChecklistModal() {
   const group = document.getElementById('modal-checklist-add').dataset.group || '其他';
   if (!text) return;
   if (!data.checklist) data.checklist = [];
-  data.checklist.push({ text, done: false, group });
+  const item = { text, done: false, group };
+  if (document.getElementById('checklist-add-qty')?.checked) { item.hasQty = true; item.qty = ''; }
+  data.checklist.push(item);
   save();
   closeModal('modal-checklist-add');
   renderCheckItems();
@@ -3220,6 +3227,27 @@ function saveChecklistModal() {
 function addCheckItem() {
   // fallback — 加到其他
   addCheckItemToGroup('其他', 'cg-other');
+}
+
+/* 點檢表：填件數 */
+let _clQtyIdx = null;
+function openChecklistQty(i) {
+  const it = data.checklist[i]; if (!it) return;
+  _clQtyIdx = i;
+  document.getElementById('checklist-qty-name').textContent = it.text;
+  const inp = document.getElementById('checklist-qty-input');
+  inp.value = it.qty || '';
+  document.getElementById('modal-checklist-qty').classList.add('open');
+  setTimeout(() => { inp.focus(); inp.select(); }, 340);
+}
+function saveChecklistQty() {
+  const it = data.checklist[_clQtyIdx];
+  if (it) {
+    const n = parseInt(document.getElementById('checklist-qty-input').value, 10);
+    it.qty = n > 0 ? String(n) : '';
+    save(); renderCheckItems();
+  }
+  closeModal('modal-checklist-qty');
 }
 
 function toggleCheck(i) {

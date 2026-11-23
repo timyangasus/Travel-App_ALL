@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="icon-512.png?v=14">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=14">
   <title>旅遊誌</title>
-  <link rel="stylesheet" href="style.css?v=2026.11.23.2">
+  <link rel="stylesheet" href="style.css?v=2026.11.23.3">
 </head>
 <body>
 
@@ -965,6 +965,7 @@
     <div class="modal-body">
       <input class="modal-input" id="checklist-add-input" placeholder="項目名稱"
         onkeydown="if(event.key==='Enter')saveChecklistModal()">
+      <label class="cl-qty-opt"><input type="checkbox" id="checklist-add-qty"> 需要填件數（顯示成 x數量）</label>
       <div class="modal-btn-row">
         <button class="modal-btn modal-btn-cancel" onclick="closeModal('modal-checklist-add')">取消</button>
         <button class="modal-btn modal-btn-save" onclick="saveChecklistModal()">加入</button>
@@ -973,7 +974,23 @@
   </div>
 </div>
 
-<!-- ═══ TRIP ADD SHEET ═══ -->
+<!-- ═══ CHECKLIST QTY MODAL ═══ -->
+<div class="modal-overlay" id="modal-checklist-qty">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="checklist-qty-name">件數</div>
+    <div class="modal-body">
+      <input class="modal-input" id="checklist-qty-input" type="number" inputmode="numeric" min="0" placeholder="件數"
+        onkeydown="if(event.key==='Enter')saveChecklistQty()">
+      <div class="modal-btn-row">
+        <button class="modal-btn modal-btn-cancel" onclick="closeModal('modal-checklist-qty')">取消</button>
+        <button class="modal-btn modal-btn-save" onclick="saveChecklistQty()">完成</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TRIP ADD SHEET ═══
 <div class="modal-overlay" id="modal-trip-sheet">
   <div class="modal-sheet">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0">
@@ -1131,8 +1148,8 @@
   </div>
 </div>
 
-<script src="guide-bangkok.js?v=2026.11.23.2"></script>
-<script src="app.js?v=2026.11.23.2"></script>
+<script src="guide-bangkok.js?v=2026.11.23.3"></script>
+<script src="app.js?v=2026.11.23.3"></script>
 
 
 </body>
