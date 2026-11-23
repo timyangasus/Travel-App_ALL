@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.23.4';
+const APP_VERSION = '2026.11.23.5';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3186,7 +3186,7 @@ function renderCheckItems() {
             <div class="cl-circle ${item.done ? 'cl-checked' : ''}">
               ${item.done ? `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#fff"><path d="m424-312 282-282-56-56-226 226-114-114-56 56 170 170Z"/></svg>` : ''}
             </div>
-            <span class="cl-text">${esc(item.text)}${item.hasQty ? `<button class="cl-qty${item.qty ? ' set' : ''}" onclick="event.stopPropagation();openChecklistQty(${item.idx})">${item.qty ? 'x' + esc(item.qty) : '（件）'}</button>` : ''}</span>
+            <span class="cl-text">${esc(item.text)}${item.hasQty ? `<button class="cl-qty${item.qty ? ' set' : ''}" onclick="event.stopPropagation();openChecklistQty(${item.idx})">${item.qty ? 'x' + esc(item.qty) : '件'}</button>` : ''}</span>
             <button class="cl-del" onclick="event.stopPropagation();deleteCheckItem(${item.idx})">×</button>
           </div>`).join('')}
       </div>`;
