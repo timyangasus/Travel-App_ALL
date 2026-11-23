@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.23.3';
+const APP_VERSION = '2026.11.23.4';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -3136,7 +3136,7 @@ const CHECKLIST_DEFAULTS = [
   { g: '攝影',      items: ['相機電池','拭鏡布'] },
   { g: '盥洗/保養', items: ['盥洗用具','落健','刮鬍刀','護唇膏'] },
   { g: '藥品/衛生', items: ['藥品','溫度計','OK繃','濕紙巾','面紙','口罩'] },
-  { g: '衣物',      items: ['帽子', { t: '外套', q: true }, { t: '上衣', q: true }, { t: '長褲', q: true }, { t: '短褲', q: true }, '睡衣褲', { t: '襪子', q: true }, { t: '內衣褲', q: true }, '布鞋','涼鞋','圍巾'] },
+  { g: '衣物',      items: [{ t: '外套', q: true }, { t: '上衣', q: true }, { t: '長褲', q: true }, { t: '短褲', q: true }, { t: '襪子', q: true }, { t: '內衣褲', q: true }, '帽子','睡衣褲','布鞋','涼鞋','圍巾'] },
   { g: '日用',      items: ['雨傘','黃色雨衣','寶特瓶','帆布包','分裝袋','筷子叉子'] },
 ];
 
@@ -3186,7 +3186,7 @@ function renderCheckItems() {
             <div class="cl-circle ${item.done ? 'cl-checked' : ''}">
               ${item.done ? `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#fff"><path d="m424-312 282-282-56-56-226 226-114-114-56 56 170 170Z"/></svg>` : ''}
             </div>
-            <span class="cl-text">${esc(item.text)}${item.hasQty ? `<button class="cl-qty${item.qty ? ' set' : ''}" onclick="event.stopPropagation();openChecklistQty(${item.idx})">${item.qty ? 'x' + esc(item.qty) : 'x －'}</button>` : ''}</span>
+            <span class="cl-text">${esc(item.text)}${item.hasQty ? `<button class="cl-qty${item.qty ? ' set' : ''}" onclick="event.stopPropagation();openChecklistQty(${item.idx})">${item.qty ? 'x' + esc(item.qty) : '（件）'}</button>` : ''}</span>
             <button class="cl-del" onclick="event.stopPropagation();deleteCheckItem(${item.idx})">×</button>
           </div>`).join('')}
       </div>`;
