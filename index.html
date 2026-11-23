@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="icon-512.png?v=14">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=14">
   <title>旅遊誌</title>
-  <link rel="stylesheet" href="style.css?v=2026.11.20.12">
+  <link rel="stylesheet" href="style.css?v=2026.11.23.1">
 </head>
 <body>
 
@@ -444,7 +444,13 @@
           <textarea class="ff-input ev-auto" id="hf-addr" placeholder="" rows="1" style="resize:none;line-height:1.6;overflow:hidden"></textarea>
         </div>
         <div style="padding:12px 0 16px">
-          <div class="ff-label">總價</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div class="ff-label" style="margin:0">總價</div>
+            <div class="cur-seg" id="hf-cur-seg" style="display:none">
+              <button type="button" id="hf-cur-local" onclick="hotelSetCur('local')"></button>
+              <button type="button" id="hf-cur-twd" onclick="hotelSetCur('TWD')">NT$ 新台幣</button>
+            </div>
+          </div>
           <input class="ff-input" id="hf-price" placeholder="" type="text" inputmode="decimal" oninput="fmtHotelPrice(this)">
         </div>
 
@@ -1125,8 +1131,8 @@
   </div>
 </div>
 
-<script src="guide-bangkok.js?v=2026.11.20.12"></script>
-<script src="app.js?v=2026.11.20.12"></script>
+<script src="guide-bangkok.js?v=2026.11.23.1"></script>
+<script src="app.js?v=2026.11.23.1"></script>
 
 
 </body>

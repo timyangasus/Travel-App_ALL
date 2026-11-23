@@ -3904,3 +3904,9 @@ textarea ~ .field-x {
 .gd-exit-txt { white-space: nowrap; font-size: 14px; font-weight: 700; }
 .gd-exit-sep { color: #CFCFCF; font-weight: 400; margin: 0 5px; }
 .gd-exit-note { font-size: 12px; color: #B45309; line-height: 1.5; margin-top: 4px; }
+
+/* 住宿總價幣別切換（行程貨幣／新台幣） */
+.cur-seg { display: inline-flex; border: 1px solid #D5D5D5; }
+.cur-seg button { background: #fff; border: none; padding: 6px 12px; font-family: var(--mono); font-size: 12px; font-weight: 700; color: #777; cursor: pointer; }
+.cur-seg button + button { border-left: 1px solid #D5D5D5; }
+.cur-seg button.on { background: #1A1A1A; color: #fff; }

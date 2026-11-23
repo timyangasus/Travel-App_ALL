@@ -4,7 +4,7 @@
 ═══════════════════════════════════════ */
 
 /* 版本號：顯示在「設定」頁最下方，每次推送更新時一起遞增，用來確認手機拿到的是不是最新版 */
-const APP_VERSION = '2026.11.20.12';
+const APP_VERSION = '2026.11.23.1';
 
 /* ─── SVG Icon Strings ─── */
 const EDIT_SVG  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
@@ -4395,9 +4395,25 @@ function fmtHotelDates(el) {
   }
 }
 
+/* 住宿總價的幣別：'local'＝跟著行程貨幣（預設）、'TWD'＝新台幣；行程貨幣本身就是新台幣時不顯示切換 */
+let _sheetCur = 'local';
+function _syncHotelCurSeg() {
+  const code = data.settings?.currency || 'TWD';
+  const seg = document.getElementById('hf-cur-seg');
+  if (!seg) return;
+  seg.style.display = code === 'TWD' ? 'none' : 'inline-flex';
+  const cur = CURRENCIES.find(x => x.code === code);
+  document.getElementById('hf-cur-local').textContent = cur ? `${cur.symbol} ${cur.label}` : code;
+  document.getElementById('hf-cur-local').classList.toggle('on', _sheetCur !== 'TWD');
+  document.getElementById('hf-cur-twd').classList.toggle('on', _sheetCur === 'TWD');
+}
+function hotelSetCur(v) { _sheetCur = v === 'TWD' ? 'TWD' : 'local'; _syncHotelCurSeg(); }
+function _hotelSymbol(h) { return h && h.cur === 'TWD' ? 'NT$' : getCurrencySymbol(); }
+
 function openHotelSheet(editId) {
   _hotelEditId = editId || null;
   _sheetBreakfast = false;
+  _sheetCur = 'local';
   ['hf-name','hf-dates','hf-ref','hf-addr','hf-price'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
@@ -4412,8 +4428,10 @@ function openHotelSheet(editId) {
       if (document.getElementById('hf-price'))
         document.getElementById('hf-price').value = h.price ? parseInt(h.price).toLocaleString() : '';
       _sheetBreakfast = h.breakfast || false;
+      _sheetCur = h.cur === 'TWD' ? 'TWD' : 'local';
     }
   }
+  _syncHotelCurSeg();
   const tog = document.getElementById('hf-breakfast-toggle');
   const lbl = document.getElementById('hf-breakfast-label');
   if (tog) tog.classList.toggle('on', _sheetBreakfast);
@@ -4441,7 +4459,8 @@ function saveHotelSheet() {
   const price = get('hf-price').replace(/[^0-9]/g,'');
   const parts = dates.split('-');
   const nights = calcNights(parts[0]?.trim(), parts[1]?.trim());
-  const vals = { name: get('hf-name'), dates, ref: get('hf-ref'), addr: get('hf-addr'), price, nights, breakfast: _sheetBreakfast };
+  const cur = (_sheetCur === 'TWD' && (data.settings?.currency || 'TWD') !== 'TWD') ? 'TWD' : '';
+  const vals = { name: get('hf-name'), dates, ref: get('hf-ref'), addr: get('hf-addr'), price, nights, breakfast: _sheetBreakfast, cur };
   if (_hotelEditId) {
     const h = data.hotels.find(h => h.id === _hotelEditId);
     if (h) Object.assign(h, vals);
@@ -4458,7 +4477,6 @@ function deleteHotelCard(id) {
 }
 
 function renderHotelCards() {
-  const sym = getCurrencySymbol();
   const el  = document.getElementById('hotel-cards');
   if (!data.hotels.length) {
     el.innerHTML = `<div class="list-empty"></div>`;
@@ -4472,7 +4490,7 @@ function renderHotelCards() {
   });
   el.innerHTML = sorted.map(h => {
     const nights = h.nights || 0;
-    const priceDisplay = h.price ? `${sym} ${parseInt(h.price).toLocaleString()}` : '';
+    const priceDisplay = h.price ? `${_hotelSymbol(h)} ${parseInt(h.price).toLocaleString()}` : '';
     const coverBg = resolvePhoto(h.img)
       ? `background-image:url('${esc(resolvePhoto(h.img))}');background-size:cover;background-position:center`
       : 'background:#F0F0F0';
